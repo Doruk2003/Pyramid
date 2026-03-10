@@ -5,10 +5,13 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "lint": "eslint --fix . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+        "lint": "eslint --fix . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@primeuix/themes": "^2.0.0",
+        "@supabase/supabase-js": "^2.49.1",
         "chart.js": "3.3.2",
         "primeicons": "^7.0.0",
         "primevue": "^4.5.4",
@@ -22,12 +25,15 @@
         "@tailwindcss/vite": "^4.1.17",
         "@vitejs/plugin-vue": "^5.0.5",
         "@vue/eslint-config-prettier": "^9.0.0",
+        "@vue/test-utils": "^2.4.6",
         "eslint": "^8.57.0",
         "eslint-plugin-vue": "^9.23.0",
+        "jsdom": "^24.0.0",
         "prettier": "^3.2.5",
         "sass": "^1.55.0",
         "tailwindcss": "^4.1.17",
         "unplugin-vue-components": "^0.27.3",
-        "vite": "^5.3.1"
+        "vite": "^5.3.1",
+        "vitest": "^1.6.0"
     }
 }
