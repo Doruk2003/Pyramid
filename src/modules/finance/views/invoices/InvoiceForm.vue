@@ -1,0 +1,265 @@
+<script setup lang="ts">
+import { onMounted, ref, computed } from 'vue';
+import { useFinanceStore } from '@/modules/finance/application/finance.store';
+import { useProductStore } from '@/modules/inventory/application/product.store';
+import { useAuthStore } from '@/core/auth/auth.store';
+import { Invoice, type InvoiceLineProps } from '@/modules/finance/domain/invoice.entity';
+import { useRouter, useRoute } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+
+const financeStore = useFinanceStore();
+const productStore = useProductStore();
+const authStore = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+const toast = useToast();
+
+const invoiceId = route.params.id as string;
+const isEdit = !!invoiceId;
+
+const invoice = ref<any>({
+    invoiceType: 'sale',
+    invoiceNumber: '',
+    accountId: '',
+    issueDate: new Date(),
+    dueDate: null,
+    status: 'draft',
+    currency: 'TRY',
+    exchangeRate: 1,
+    notes: '',
+    lines: []
+});
+
+const invoiceTypes = [
+    { label: 'Satış', value: 'sale' },
+    { label: 'Alış', value: 'purchase' },
+    { label: 'Satış İade', value: 'return_sale' },
+    { label: 'Alış İade', value: 'return_purchase' }
+];
+
+const taxRates = [
+    { label: '%0', value: 0 },
+    { label: '%1', value: 1 },
+    { label: '%8', value: 8 },
+    { label: '%10', value: 10 },
+    { label: '%20', value: 20 }
+];
+
+onMounted(async () => {
+    await financeStore.fetchAccounts();
+    if (productStore.products.length === 0) await productStore.fetchProducts();
+
+    if (isEdit) {
+        const result = await financeStore.fetchInvoices(); // Basitlik için tümünü çekip içinden bulalım
+        const found = financeStore.invoices.find(i => i.id === invoiceId);
+        if (found) {
+            const obj = found.toObject();
+            invoice.value = { ...obj, issueDate: new Date(obj.issueDate), dueDate: obj.dueDate ? new Date(obj.dueDate) : null };
+        }
+    }
+});
+
+function addLine() {
+    invoice.value.lines.push({
+        id: crypto.randomUUID(),
+        productId: '',
+        description: '',
+        quantity: 1,
+        unitUnitPrice: 0,
+        vatRate: 20,
+        discountRate: 0,
+        lineTotal: 0
+    });
+}
+
+function removeLine(index: number) {
+    invoice.value.lines.splice(index, 1);
+}
+
+function onProductChange(line: any) {
+    const product = productStore.products.find(p => p.id === line.productId);
+    if (product) {
+        line.unitPrice = product.price || 0;
+        line.vatRate = product.taxRate || 20;
+    }
+}
+
+const totals = computed(() => {
+    let subtotal = 0;
+    let vatTotal = 0;
+
+    invoice.value.lines.forEach((line: any) => {
+        const lineSubtotal = line.quantity * (line.unitPrice || 0) * (1 - line.discountRate / 100);
+        const lineVat = lineSubtotal * (line.vatRate / 100);
+        line.lineTotal = lineSubtotal + lineVat;
+        
+        subtotal += lineSubtotal;
+        vatTotal += lineVat;
+    });
+
+    return {
+        subtotal,
+        vatTotal,
+        total: subtotal + vatTotal
+    };
+});
+
+async function saveInvoice() {
+    if (!invoice.value.accountId || !invoice.value.invoiceNumber || invoice.value.lines.length === 0) {
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 });
+        return;
+    }
+
+    const t = totals.value;
+    const inv = Invoice.create({
+        ...invoice.value,
+        id: invoiceId || crypto.randomUUID(),
+        companyId: authStore.user?.companyId || '',
+        subtotal: t.subtotal,
+        vatTotal: t.vatTotal,
+        total: t.total,
+        paidAmount: invoice.value.paidAmount || 0,
+        createdAt: invoice.value.createdAt || new Date(),
+        updatedAt: new Date(),
+        lines: invoice.value.lines.map((l: any) => ({
+            ...l,
+            invoiceId: invoiceId || ''
+        }))
+    });
+
+    const result = await financeStore.saveInvoice(inv);
+    if (result.success) {
+        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Fatura kaydedildi', life: 3000 });
+        router.push('/finance/invoices');
+    } else {
+        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+    }
+}
+
+function goBack() {
+    router.push('/finance/invoices');
+}
+</script>
+
+<template>
+    <div class="flex flex-col gap-0">
+        <div class="card p-6 min-h-32 flex flex-col gap-0">
+            <h4 class="m-0 text-xl font-bold">{{ isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura' }}</h4>
+            <div class="text-surface-600 dark:text-surface-400">
+                <p>Fatura bilgilerini ve kalemlerini buradan yönetebilirsiniz.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <!-- Üst Bilgiler -->
+            <div class="grid grid-cols-12 gap-6 mb-8">
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="type" class="block font-bold mb-3">Fatura Tipi</label>
+                    <Select id="type" v-model="invoice.invoiceType" :options="invoiceTypes" optionLabel="label" optionValue="value" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="number" class="block font-bold mb-3">Fatura No</label>
+                    <InputText id="number" v-model="invoice.invoiceNumber" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-6">
+                    <label for="account" class="block font-bold mb-3">Cari Hesap</label>
+                    <Select id="account" v-model="invoice.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="date" class="block font-bold mb-3">Tarih</label>
+                    <DatePicker id="date" v-model="invoice.issueDate" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="dueDate" class="block font-bold mb-3">Vade Tarihi</label>
+                    <DatePicker id="dueDate" v-model="invoice.dueDate" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="currency" class="block font-bold mb-3">Döviz</label>
+                    <InputText id="currency" v-model="invoice.currency" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-3">
+                    <label for="rate" class="block font-bold mb-3">Kur</label>
+                    <InputNumber id="rate" v-model="invoice.exchangeRate" :minFractionDigits="4" fluid />
+                </div>
+            </div>
+
+            <!-- Kalemler -->
+            <div class="mb-8">
+                <h5 class="font-bold mb-4">Fatura Kalemleri</h5>
+                <DataTable :value="invoice.lines" class="p-datatable-sm">
+                    <Column header="Ürün" style="width: 30%">
+                        <template #body="slotProps">
+                            <Select v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                        </template>
+                    </Column>
+                    <Column header="Miktar" style="width: 10%">
+                        <template #body="slotProps">
+                            <InputNumber v-model="slotProps.data.quantity" :min="1" fluid />
+                        </template>
+                    </Column>
+                    <Column header="Birim Fiyat" style="width: 15%">
+                        <template #body="slotProps">
+                            <InputNumber v-model="slotProps.data.unitPrice" :minFractionDigits="2" fluid />
+                        </template>
+                    </Column>
+                    <Column header="KDV %" style="width: 10%">
+                        <template #body="slotProps">
+                            <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
+                        </template>
+                    </Column>
+                    <Column header="İndirim %" style="width: 10%">
+                        <template #body="slotProps">
+                            <InputNumber v-model="slotProps.data.discountRate" :min="0" :max="100" fluid />
+                        </template>
+                    </Column>
+                    <Column header="Toplam" style="width: 15%">
+                        <template #body="slotProps">
+                            <span class="font-bold">{{ slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        </template>
+                    </Column>
+                    <Column style="width: 10%">
+                        <template #body="slotProps">
+                            <Button icon="pi pi-trash" severity="danger" text rounded @click="removeLine(slotProps.index)" />
+                        </template>
+                    </Column>
+                </DataTable>
+                <Button label="Kalem Ekle" icon="pi pi-plus" text class="mt-4" @click="addLine" />
+            </div>
+
+            <!-- Özet ve Not -->
+            <div class="grid grid-cols-12 gap-8">
+                <div class="col-span-12 lg:col-span-8">
+                    <label for="notes" class="block font-bold mb-3">Notlar</label>
+                    <Textarea id="notes" v-model="invoice.notes" rows="5" fluid />
+                </div>
+                <div class="col-span-12 lg:col-span-4">
+                    <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
+                        <div class="flex justify-between">
+                            <span>Ara Toplam:</span>
+                            <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>KDV Toplam:</span>
+                            <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        </div>
+                        <div class="flex justify-between text-xl font-bold border-t pt-4">
+                            <span>Genel Toplam:</span>
+                            <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Butonlar -->
+            <div class="grid grid-cols-12 gap-4 mt-8">
+                <div class="col-span-6">
+                    <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
+                </div>
+                <div class="col-span-6">
+                    <Button label="Kaydet" icon="pi pi-check" class="w-full" @click="saveInvoice" />
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+

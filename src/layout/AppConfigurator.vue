@@ -9,8 +9,8 @@ import { ref } from 'vue';
 const { layoutConfig, isDarkTheme, changeMenuMode } = useLayout();
 
 const presets = {
-    Aura,
     Lara,
+    Aura,
     Nora
 };
 const preset = ref(layoutConfig.preset);

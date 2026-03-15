@@ -8,6 +8,10 @@ import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    server: {
+        port: 5173,
+        strictPort: false // Meşgulse bir sonrakine geçer (5174 gibi)
+    },
     optimizeDeps: {
         noDiscovery: true
     },
