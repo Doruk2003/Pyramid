@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account } from '@/modules/finance/domain/account.entity';
 import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
@@ -64,18 +64,18 @@ async function saveAccount() {
 
 function getAccountTypeLabel(type: string) {
     const map: any = {
-        'customer': 'Müşteri',
-        'supplier': 'Tedarikçi',
-        'both': 'Müşteri + Tedarikçi'
+        customer: 'Müşteri',
+        supplier: 'Tedarikçi',
+        both: 'Müşteri + Tedarikçi'
     };
     return map[type] || type;
 }
 
 function getAccountTypeSeverity(type: string) {
     const map: any = {
-        'customer': 'info',
-        'supplier': 'warn',
-        'both': 'success'
+        customer: 'info',
+        supplier: 'warn',
+        both: 'success'
     };
     return map[type] || 'secondary';
 }
@@ -112,21 +112,21 @@ function getAccountTypeSeverity(type: string) {
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="accountDialog" :style="{ width: '600px' }" header="Cari Hesap Detayları" :modal="true">
+        <Dialog v-model:visible="accountDialog" :style="{ width: '900px' }" header="Cari Hesap Detayları" :modal="true">
             <div class="grid grid-cols-12 gap-6">
                 <div class="col-span-12">
-                    <label for="name" class="block font-bold mb-3">Ad / Ünvan</label>
+                    <label for="name" class="block font-bold mb-3">Adı - Ünvanı</label>
                     <InputText id="name" v-model.trim="account.name" required="true" autofocus :invalid="submitted && !account.name" fluid />
                     <small v-if="submitted && !account.name" class="text-red-500">Ad zorunludur.</small>
                 </div>
-                
+
                 <div class="col-span-12 lg:col-span-6">
                     <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
                     <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
                 </div>
 
                 <div class="col-span-12 lg:col-span-6">
-                    <label for="taxNumber" class="block font-bold mb-3">Vergi No / TC</label>
+                    <label for="taxNumber" class="block font-bold mb-3">Vergi No - TC</label>
                     <InputText id="taxNumber" v-model.trim="account.taxNumber" fluid />
                 </div>
 
@@ -165,11 +165,14 @@ function getAccountTypeSeverity(type: string) {
                 </div>
             </div>
 
-            <template #footer>
-                <Button label="İptal" icon="pi pi-times" text @click="accountDialog = false" />
-                <Button label="Kaydet" icon="pi pi-check" @click="saveAccount" />
-            </template>
+            <div class="grid grid-cols-12 gap-4 mt-6">
+                <div class="col-span-6">
+                    <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" text @click="accountDialog = false" />
+                </div>
+                <div class="col-span-6">
+                    <Button label="Kaydet" icon="pi pi-check" class="w-full" @click="saveAccount" />
+                </div>
+            </div>
         </Dialog>
     </div>
 </template>
-
