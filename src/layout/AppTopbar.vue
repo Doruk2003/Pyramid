@@ -38,7 +38,7 @@ const logout = async () => {
                         />
                     </g>
                 </svg>
-                <span>PYRAMID</span>
+                <span>Pyramid ERP</span>
             </router-link>
         </div>
 
