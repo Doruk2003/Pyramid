@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -128,45 +128,53 @@ function goBack() {
         </div>
 
         <div class="card">
-            <div class="grid grid-cols-12 gap-6 mb-6">
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="movementType" class="block font-bold mb-3">Hareket Tipi</label>
-                    <Select id="movementType" v-model="movement.movementType" :options="movementTypes" optionLabel="label" optionValue="value" placeholder="Tip Seçin" fluid />
+            <div class="flex flex-col gap-8 mb-6">
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="movementType" class="block font-bold mb-3">Hareket Tipi</label>
+                            <Select id="movementType" v-model="movement.movementType" :options="movementTypes" optionLabel="label" optionValue="value" placeholder="Tip Seçin" fluid />
+                        </div>
+
+                        <div>
+                            <label for="product" class="block font-bold mb-3">Ürün</label>
+                            <Select id="product" v-model="movement.productId" :options="productStore.products" optionLabel="name" optionValue="id" placeholder="Ürün Seçin" filter fluid />
+                            <small v-if="submitted && !movement.productId" class="text-red-500">Ürün seçimi zorunludur.</small>
+                        </div>
+
+                        <div>
+                            <label for="warehouse" class="block font-bold mb-3">
+                                {{ movement.movementType === 'transfer' ? 'Kaynak Depo' : 'Depo' }}
+                            </label>
+                            <Select id="warehouse" v-model="movement.warehouseId" :options="invStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
+                            <small v-if="submitted && !movement.warehouseId" class="text-red-500">Depo seçimi zorunludur.</small>
+                        </div>
+
+                        <div v-if="movement.movementType === 'transfer'">
+                            <label for="targetWarehouse" class="block font-bold mb-3">Hedef Depo</label>
+                            <Select id="targetWarehouse" v-model="movement.targetWarehouseId" :options="invStore.warehouses" optionLabel="name" optionValue="id" placeholder="Hedef Depo Seçin" fluid />
+                            <small v-if="submitted && movement.movementType === 'transfer' && !movement.targetWarehouseId" class="text-red-500">Hedef depo seçimi zorunludur.</small>
+                        </div>
+
+                        <div>
+                            <label for="quantity" class="block font-bold mb-3">Miktar</label>
+                            <InputNumber id="quantity" v-model="movement.quantity" :min="1" fluid />
+                            <small v-if="submitted && !movement.quantity" class="text-red-500">Miktar zorunludur.</small>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="product" class="block font-bold mb-3">Ürün</label>
-                    <Select id="product" v-model="movement.productId" :options="productStore.products" optionLabel="name" optionValue="id" placeholder="Ürün Seçin" filter fluid />
-                    <small v-if="submitted && !movement.productId" class="text-red-500">Ürün seçimi zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="warehouse" class="block font-bold mb-3">
-                        {{ movement.movementType === 'transfer' ? 'Kaynak Depo' : 'Depo' }}
-                    </label>
-                    <Select id="warehouse" v-model="movement.warehouseId" :options="invStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
-                    <small v-if="submitted && !movement.warehouseId" class="text-red-500">Depo seçimi zorunludur.</small>
-                </div>
-
-                <div v-if="movement.movementType === 'transfer'" class="col-span-12 lg:col-span-6">
-                    <label for="targetWarehouse" class="block font-bold mb-3">Hedef Depo</label>
-                    <Select id="targetWarehouse" v-model="movement.targetWarehouseId" :options="invStore.warehouses" optionLabel="name" optionValue="id" placeholder="Hedef Depo Seçin" fluid />
-                    <small v-if="submitted && movement.movementType === 'transfer' && !movement.targetWarehouseId" class="text-red-500">Hedef depo seçimi zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="quantity" class="block font-bold mb-3">Miktar</label>
-                    <InputNumber id="quantity" v-model="movement.quantity" :min="1" fluid />
-                    <small v-if="submitted && !movement.quantity" class="text-red-500">Miktar zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-12">
-                    <label for="note" class="block font-bold mb-3">Not</label>
-                    <Textarea id="note" v-model="movement.note" rows="3" fluid />
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                        <div class="md:col-span-2 lg:col-span-2">
+                            <label for="note" class="block font-bold mb-3">Not</label>
+                            <Textarea id="note" v-model="movement.note" rows="3" fluid />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-12 gap-4">
+            <div class="grid grid-cols-12 gap-4 mt-8">
                 <div class="col-span-6">
                     <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
                 </div>
@@ -177,3 +185,5 @@ function goBack() {
         </div>
     </div>
 </template>
+
+

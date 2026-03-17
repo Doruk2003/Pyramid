@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
@@ -53,9 +53,17 @@ const account = ref<AccountForm>({
 const submitted = ref(false);
 
 const accountTypes: Array<{ label: string; value: AccountType }> = [
-    { label: 'M??teri', value: 'customer' },
-    { label: 'Tedarik?i', value: 'supplier' },
-    { label: 'Her ?kisi', value: 'both' }
+    { label: 'Müşteri', value: 'customer' },
+    { label: 'Tedarikçi', value: 'supplier' },
+    { label: 'Her İkisi', value: 'both' }
+];
+const statusOptions = [
+    { label: 'Aktif', value: true },
+    { label: 'Pasif', value: false }
+];
+const dealerOptions = [
+    { label: 'Evet', value: true },
+    { label: 'Hayır', value: false }
 ];
 
 async function loadAccount() {
@@ -68,7 +76,7 @@ async function loadAccount() {
 
     const found = financeStore.accounts.find((item) => item.id === id);
     if (!found) {
-        toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamad?', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamadı', life: 3000 });
         router.push('/finance/accounts');
         return;
     }
@@ -93,19 +101,19 @@ async function saveAccount() {
     if (!account.value.name?.trim()) return;
 
     if (account.value.iban && !isValidIban(account.value.iban)) {
-        toast.add({ severity: 'warn', summary: 'Do?rulama', detail: 'IBAN format? ge?ersiz', life: 3000 });
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'IBAN formatı geçersiz', life: 3000 });
         return;
     }
     if (account.value.taxNumber && !isValidTaxNumber(account.value.taxNumber)) {
-        toast.add({ severity: 'warn', summary: 'Do?rulama', detail: 'Vergi No / TC format? ge?ersiz', life: 3000 });
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Vergi No / TC formatı geçersiz', life: 3000 });
         return;
     }
     if (account.value.authorizedGsm && !isValidGsm(account.value.authorizedGsm)) {
-        toast.add({ severity: 'warn', summary: 'Do?rulama', detail: 'Yetkili GSM format? ge?ersiz', life: 3000 });
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Yetkili GSM formatı geçersiz', life: 3000 });
         return;
     }
     if (account.value.phone && !isValidGsm(account.value.phone)) {
-        toast.add({ severity: 'warn', summary: 'Do?rulama', detail: 'Telefon format? ge?ersiz', life: 3000 });
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Telefon formatı geçersiz', life: 3000 });
         return;
     }
 
@@ -140,7 +148,7 @@ async function saveAccount() {
 
     const result = await financeStore.saveAccount(acc);
     if (result.success) {
-        toast.add({ severity: 'success', summary: 'Ba?ar?l?', detail: 'Cari hesap g?ncellendi', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Cari hesap güncellendi', life: 3000 });
         router.push('/finance/accounts');
     } else {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
@@ -192,156 +200,146 @@ function goBack() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-3">
-        <div class="card p-6 min-h-32 flex flex-col gap-3">
-            <h4 class="m-0 text-xl font-bold">Cari Hesap D?zenle: {{ account.name }}</h4>
+    <div class="flex flex-col gap-0">
+        <div class="card p-6 min-h-32 flex flex-col gap-0">
+            <h4 class="m-0 text-xl font-bold"> {{ account.name }}</h4>
             <div class="text-surface-600 dark:text-surface-400">
-                <p>Cari hesap bilgilerini g?ncellerken zorunlu alanlar? kontrol edin.</p>
-                <p>Yetkili ki?i ve banka bilgileri tahsilat s?re?lerinde ?nemlidir.</p>
-                <p>De?i?iklikleri tamamlad?ktan sonra "G?ncelle" butonu ile kaydedebilirsiniz.</p>
+                <p>Değişiklikleri tamamladıktan sonra "Güncelle" butonu ile kaydedebilirsiniz.</p>
             </div>
         </div>
 
-        <div class="card">
-            <div class="grid grid-cols-12 gap-6 mb-6">
-                <div class="col-span-12">
-                    <label for="name" class="block font-bold mb-3">Ad? - ?nvan?</label>
-                    <InputText id="name" v-model.trim="account.name" required="true" :invalid="submitted && !account.name" fluid />
-                    <small v-if="submitted && !account.name" class="text-red-500">Ad zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
-                    <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="taxNumber" class="block font-bold mb-3">Vergi No - TC</label>
-                    <InputText id="taxNumber" v-model.trim="account.taxNumber" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="taxOffice" class="block font-bold mb-3">Vergi Dairesi</label>
-                    <InputText id="taxOffice" v-model.trim="account.taxOffice" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="email" class="block font-bold mb-3">E-posta</label>
-                    <InputText id="email" v-model.trim="account.email" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="phone" class="block font-bold mb-3">Telefon</label>
-                    <InputText id="phone" v-model.trim="account.phone" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="authorizedPerson" class="block font-bold mb-3">Yetkili Ki?i</label>
-                    <InputText id="authorizedPerson" v-model.trim="account.authorizedPerson" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="authorizedGsm" class="block font-bold mb-3">Yetkili GSM</label>
-                    <InputText id="authorizedGsm" v-model.trim="account.authorizedGsm" fluid />
-                </div>
-
-                <div class="col-span-12">
-                    <label for="address" class="block font-bold mb-3">Adres</label>
-                    <Textarea id="address" v-model="account.address" rows="3" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="city" class="block font-bold mb-3">?l</label>
-                    <InputText id="city" v-model.trim="account.city" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="district" class="block font-bold mb-3">?l?e</label>
-                    <InputText id="district" v-model.trim="account.district" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="country" class="block font-bold mb-3">?lke</label>
-                    <InputText id="country" v-model.trim="account.country" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="bankName" class="block font-bold mb-3">?al??t??? Banka</label>
-                    <InputText id="bankName" v-model.trim="account.bankName" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="accountOwner" class="block font-bold mb-3">Hesap Sahibi</label>
-                    <InputText id="accountOwner" v-model.trim="account.accountOwner" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="iban" class="block font-bold mb-3">IBAN</label>
-                    <InputText id="iban" v-model.trim="account.iban" fluid @blur="onIbanBlur" />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="creditLimit" class="block font-bold mb-3">Kredi Limiti</label>
-                    <InputNumber id="creditLimit" v-model="account.creditLimit" mode="currency" currency="TRY" locale="tr-TR" fluid />
-                </div>
-
-                <div class="col-span-12">
-                    <label for="description" class="block font-bold mb-3">A??klama</label>
-                    <Textarea id="description" v-model="account.description" rows="3" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label class="block font-bold mb-3">Durum</label>
-                    <div class="flex items-center gap-4">
-                        <div class="flex items-center">
-                            <RadioButton v-model="account.isActive" inputId="active" name="status" :value="true" />
-                            <label for="active" class="ml-2">Aktif</label>
+                <div class="card">
+            <div class="flex flex-col gap-8 mb-6">
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="name" class="block font-bold mb-3">Adı - Ünvanı</label>
+                            <InputText id="name" v-model.trim="account.name" required="true" :invalid="submitted && !account.name" fluid />
+                            <small v-if="submitted && !account.name" class="text-red-500">Ad zorunludur.</small>
                         </div>
-                        <div class="flex items-center">
-                            <RadioButton v-model="account.isActive" inputId="passive" name="status" :value="false" />
-                            <label for="passive" class="ml-2">Pasif</label>
+
+                        <div>
+                            <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
+                            <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
+                        </div>
+
+                        <div>
+                            <label for="taxNumber" class="block font-bold mb-3">Vergi No - TC</label>
+                            <InputText id="taxNumber" v-model.trim="account.taxNumber" fluid />
+                        </div>
+
+                        <div>
+                            <label for="taxOffice" class="block font-bold mb-3">Vergi Dairesi</label>
+                            <InputText id="taxOffice" v-model.trim="account.taxOffice" fluid />
+                        </div>
+
+                        <div>
+                            <label for="email" class="block font-bold mb-3">E-posta</label>
+                            <InputText id="email" v-model.trim="account.email" fluid />
+                        </div>
+
+                        <div>
+                            <label for="phone" class="block font-bold mb-3">Telefon</label>
+                            <InputText id="phone" v-model.trim="account.phone" fluid />
+                        </div>
+
+                        <div>
+                            <label for="authorizedPerson" class="block font-bold mb-3">Yetkili Kişi</label>
+                            <InputText id="authorizedPerson" v-model.trim="account.authorizedPerson" fluid />
+                        </div>
+
+                        <div>
+                            <label for="authorizedGsm" class="block font-bold mb-3">Yetkili GSM</label>
+                            <InputText id="authorizedGsm" v-model.trim="account.authorizedGsm" fluid />
                         </div>
                     </div>
                 </div>
 
-                <div class="col-span-12 lg:col-span-6">
-                    <label class="block font-bold mb-3">Bayi</label>
-                    <div class="flex items-center gap-4">
-                        <div class="flex items-center">
-                            <RadioButton v-model="account.isDealer" inputId="dealerYes" name="dealer" :value="true" />
-                            <label for="dealerYes" class="ml-2">Evet</label>
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="bankName" class="block font-bold mb-3">Çalıştığı Banka</label>
+                            <InputText id="bankName" v-model.trim="account.bankName" fluid />
                         </div>
-                        <div class="flex items-center">
-                            <RadioButton v-model="account.isDealer" inputId="dealerNo" name="dealer" :value="false" />
-                            <label for="dealerNo" class="ml-2">Hay?r</label>
+                        <div>
+                            <label for="accountOwner" class="block font-bold mb-3">Hesap Sahibi</label>
+                            <InputText id="accountOwner" v-model.trim="account.accountOwner" fluid />
+                        </div>
+                        <div>
+                            <label for="iban" class="block font-bold mb-3">IBAN</label>
+                            <InputText id="iban" v-model.trim="account.iban" fluid @blur="onIbanBlur" />
+                        </div>
+                        <div>
+                            <label for="creditLimit" class="block font-bold mb-3">Kredi Limiti</label>
+                            <InputNumber id="creditLimit" v-model="account.creditLimit" mode="currency" currency="TRY" locale="tr-TR" fluid />
                         </div>
                     </div>
                 </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="dealerDiscount1" class="block font-bold mb-3">Bayi ?skontosu (1)</label>
-                    <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="dealer" class="block font-bold mb-3">Bayi</label>
+                            <Select id="dealer" v-model="account.isDealer" :options="dealerOptions" optionLabel="label" optionValue="value" placeholder="Seçin" fluid />
+                        </div>
+
+                        <div>
+                            <label for="dealerDiscount1" class="block font-bold mb-3">Bayi İskontosu (1)</label>
+                            <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
+                        </div>
+
+                        <div>
+                            <label for="dealerDiscount2" class="block font-bold mb-3">Bayi İskontosu (2)</label>
+                            <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
+                        </div>
+
+                        <div>
+                            <label for="dealerDiscount3" class="block font-bold mb-3">Bayi İskontosu (3)</label>
+                            <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
+                        </div>
+                    </div>
                 </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="dealerDiscount2" class="block font-bold mb-3">Bayi ?skontosu (2)</label>
-                    <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="dealerDiscount3" class="block font-bold mb-3">Bayi ?skontosu (3)</label>
-                    <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label for="address" class="block font-bold mb-3">Adres</label>
+                            <Textarea id="address" v-model="account.address" rows="3" fluid />
+                        </div>
+                        <div>
+                            <label for="description" class="block font-bold mb-3">Açıklama</label>
+                            <Textarea id="description" v-model="account.description" rows="3" fluid />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                        <div>
+                            <label for="city" class="block font-bold mb-3">İl</label>
+                            <InputText id="city" v-model.trim="account.city" fluid />
+                        </div>
+                        <div>
+                            <label for="district" class="block font-bold mb-3">İlçe</label>
+                            <InputText id="district" v-model.trim="account.district" fluid />
+                        </div>
+                        <div>
+                            <label for="country" class="block font-bold mb-3">Ülke</label>
+                            <InputText id="country" v-model.trim="account.country" fluid />
+                        </div>
+                        <div>
+                            <label for="status" class="block font-bold mb-3">Durum</label>
+                            <Select id="status" v-model="account.isActive" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Seçin" fluid />
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div class="grid grid-cols-12 gap-4">
+            <div class="grid grid-cols-12 gap-4 mt-8">
                 <div class="col-span-6">
-                    <Button label="?ptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
+                    <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
                 </div>
                 <div class="col-span-6">
-                    <Button label="G?ncelle" icon="pi pi-check" class="w-full" @click="saveAccount" />
+                    <Button label="Güncelle" icon="pi pi-check" class="w-full" @click="saveAccount" />
                 </div>
             </div>
         </div>
     </div>
 </template>
+

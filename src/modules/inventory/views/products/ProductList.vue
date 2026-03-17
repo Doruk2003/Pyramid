@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { FilterMatchMode } from '@primevue/core/api';
@@ -308,52 +308,51 @@ function getPriceUnitLabel(value: string | null | undefined) {
 
                 <template #end>
                     <Button label="Ürün Sil" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedProducts || !selectedProducts.length" />
-                    <Button label="Filtrele" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
+                    <Button label="Ürün Ara" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
                     <Button label="Dışa Aktar" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
                 </template>
             </Toolbar>
         </div>
 
-        <!-- 2. Card: Filtre Alanları + DataTable -->
-        <div class="card">
-            <!-- Filtre Alanları (showFilters true ise görünür) -->
-            <div v-if="showFilters" class="mb-2 py-2">
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
-                    <div class="col-span-1">
-                        <InputText v-model="filterForm.name" placeholder="Ürün Adı" fluid />
-                    </div>
+        <!-- 2. Card: Filtre Alanları (showFilters true ise görünür) -->
+        <div v-if="showFilters" class="card mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                <div class="col-span-1">
+                    <InputText v-model="filterForm.name" placeholder="Ürün Adı" fluid />
+                </div>
 
-                    <div class="col-span-1">
-                        <InputText v-model="filterForm.barcode" placeholder="Barkod No" fluid />
-                    </div>
+                <div class="col-span-1">
+                    <InputText v-model="filterForm.barcode" placeholder="Barkod No" fluid />
+                </div>
 
-                    <div class="col-span-1">
-                        <Select v-model="filterForm.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori" fluid />
-                    </div>
+                <div class="col-span-1">
+                    <Select v-model="filterForm.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori" fluid />
+                </div>
 
-                    <div class="col-span-1">
-                        <Select v-model="filterForm.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip" fluid />
-                    </div>
+                <div class="col-span-1">
+                    <Select v-model="filterForm.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip" fluid />
+                </div>
 
-                    <div class="col-span-1">
-                        <Select v-model="filterForm.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka" fluid />
-                    </div>
+                <div class="col-span-1">
+                    <Select v-model="filterForm.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka" fluid />
+                </div>
 
-                    <div class="col-span-1">
-                        <Select v-model="filterForm.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
-                    </div>
+                <div class="col-span-1">
+                    <Select v-model="filterForm.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
+                </div>
 
-                    <div class="col-span-1 flex items-end">
-                        <Button label="Filtrele" class="w-full" @click="applyFilters" />
-                    </div>
+                <div class="col-span-1 flex items-end">
+                    <Button label="Filtrele" class="w-full" @click="applyFilters" />
+                </div>
 
-                    <div class="col-span-1 flex items-end">
-                        <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
-                    </div>
+                <div class="col-span-1 flex items-end">
+                    <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
                 </div>
             </div>
+        </div>
 
-            <!-- DataTable -->
+        <!-- 3. Card: DataTable -->
+        <div class="card">
             <DataTable
                 ref="dt"
                 v-model:selection="selectedProducts"

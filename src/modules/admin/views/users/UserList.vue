@@ -84,6 +84,10 @@ const saveUser = async () => {
 
     // ── MEVCUT KULLANICI GÜNCELLEME ───────────────────────────────────────────
     if (!user.value.email || !user.value.fullName) return;
+    if (!user.value.id) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Kullanıcı kimliği bulunamadı', life: 3000 });
+        return;
+    }
 
     const userEntity = User.create({
         id: user.value.id,
@@ -133,6 +137,10 @@ const confirmDeleteUser = (u: User) => {
 };
 
 const deleteUser = async () => {
+    if (!user.value.id) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Kullanıcı kimliği bulunamadı', life: 3000 });
+        return;
+    }
     const result = await userStore.deleteUser(user.value.id);
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Kullanıcı silindi', life: 3000 });

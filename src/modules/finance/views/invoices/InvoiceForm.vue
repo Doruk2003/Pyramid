@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
@@ -178,100 +178,103 @@ function goBack() {
         </div>
 
         <div class="card">
-            <!-- Üst Bilgiler -->
-            <div class="grid grid-cols-12 gap-6 mb-8">
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="type" class="block font-bold mb-3">Fatura Tipi</label>
-                    <Select id="type" v-model="invoice.invoiceType" :options="invoiceTypes" optionLabel="label" optionValue="value" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="number" class="block font-bold mb-3">Fatura No</label>
-                    <InputText id="number" v-model="invoice.invoiceNumber" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="account" class="block font-bold mb-3">Cari Hesap</label>
-                    <Select id="account" v-model="invoice.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="date" class="block font-bold mb-3">Tarih</label>
-                    <DatePicker id="date" v-model="invoice.issueDate" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="dueDate" class="block font-bold mb-3">Vade Tarihi</label>
-                    <DatePicker id="dueDate" v-model="invoice.dueDate" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="currency" class="block font-bold mb-3">Döviz</label>
-                    <InputText id="currency" v-model="invoice.currency" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-3">
-                    <label for="rate" class="block font-bold mb-3">Kur</label>
-                    <InputNumber id="rate" v-model="invoice.exchangeRate" :minFractionDigits="4" fluid />
-                </div>
-            </div>
-
-            <!-- Kalemler -->
-            <div class="mb-8">
-                <h5 class="font-bold mb-4">Fatura Kalemleri</h5>
-                <DataTable :value="invoice.lines" class="p-datatable-sm">
-                    <Column header="Ürün" style="width: 30%">
-                        <template #body="slotProps">
-                            <Select v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
-                        </template>
-                    </Column>
-                    <Column header="Miktar" style="width: 10%">
-                        <template #body="slotProps">
-                            <InputNumber v-model="slotProps.data.quantity" :min="1" fluid />
-                        </template>
-                    </Column>
-                    <Column header="Birim Fiyat" style="width: 15%">
-                        <template #body="slotProps">
-                            <InputNumber v-model="slotProps.data.unitPrice" :minFractionDigits="2" fluid />
-                        </template>
-                    </Column>
-                    <Column header="KDV %" style="width: 10%">
-                        <template #body="slotProps">
-                            <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
-                        </template>
-                    </Column>
-                    <Column header="İndirim %" style="width: 10%">
-                        <template #body="slotProps">
-                            <InputNumber v-model="slotProps.data.discountRate" :min="0" :max="100" fluid />
-                        </template>
-                    </Column>
-                    <Column header="Toplam" style="width: 15%">
-                        <template #body="slotProps">
-                            <span class="font-bold">{{ slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
-                        </template>
-                    </Column>
-                    <Column style="width: 10%">
-                        <template #body="slotProps">
-                            <Button icon="pi pi-trash" severity="danger" text rounded @click="removeLine(slotProps.index)" />
-                        </template>
-                    </Column>
-                </DataTable>
-                <Button label="Kalem Ekle" icon="pi pi-plus" text class="mt-4" @click="addLine" />
-            </div>
-
-            <!-- Özet ve Not -->
-            <div class="grid grid-cols-12 gap-8">
-                <div class="col-span-12 lg:col-span-8">
-                    <label for="notes" class="block font-bold mb-3">Notlar</label>
-                    <Textarea id="notes" v-model="invoice.notes" rows="5" fluid />
-                </div>
-                <div class="col-span-12 lg:col-span-4">
-                    <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
-                        <div class="flex justify-between">
-                            <span>Ara Toplam:</span>
-                            <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+            <div class="flex flex-col gap-8 mb-6">
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="type" class="block font-bold mb-3">Fatura Tipi</label>
+                            <Select id="type" v-model="invoice.invoiceType" :options="invoiceTypes" optionLabel="label" optionValue="value" fluid />
                         </div>
-                        <div class="flex justify-between">
-                            <span>KDV Toplam:</span>
-                            <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        <div>
+                            <label for="number" class="block font-bold mb-3">Fatura No</label>
+                            <InputText id="number" v-model="invoice.invoiceNumber" fluid />
                         </div>
-                        <div class="flex justify-between text-xl font-bold border-t pt-4">
-                            <span>Genel Toplam:</span>
-                            <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                        <div class="md:col-span-2 lg:col-span-2">
+                            <label for="account" class="block font-bold mb-3">Cari Hesap</label>
+                            <Select id="account" v-model="invoice.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
+                        </div>
+                        <div>
+                            <label for="date" class="block font-bold mb-3">Tarih</label>
+                            <DatePicker id="date" v-model="invoice.issueDate" fluid />
+                        </div>
+                        <div>
+                            <label for="dueDate" class="block font-bold mb-3">Vade Tarihi</label>
+                            <DatePicker id="dueDate" v-model="invoice.dueDate" fluid />
+                        </div>
+                        <div>
+                            <label for="currency" class="block font-bold mb-3">Döviz</label>
+                            <InputText id="currency" v-model="invoice.currency" fluid />
+                        </div>
+                        <div>
+                            <label for="rate" class="block font-bold mb-3">Kur</label>
+                            <InputNumber id="rate" v-model="invoice.exchangeRate" :minFractionDigits="4" fluid />
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h5 class="font-bold mb-4">Fatura Kalemleri</h5>
+                    <DataTable :value="invoice.lines" class="p-datatable-sm">
+                        <Column header="Ürün" style="width: 30%">
+                            <template #body="slotProps">
+                                <Select v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                            </template>
+                        </Column>
+                        <Column header="Miktar" style="width: 10%">
+                            <template #body="slotProps">
+                                <InputNumber v-model="slotProps.data.quantity" :min="1" fluid />
+                            </template>
+                        </Column>
+                        <Column header="Birim Fiyat" style="width: 15%">
+                            <template #body="slotProps">
+                                <InputNumber v-model="slotProps.data.unitPrice" :minFractionDigits="2" fluid />
+                            </template>
+                        </Column>
+                        <Column header="KDV %" style="width: 10%">
+                            <template #body="slotProps">
+                                <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
+                            </template>
+                        </Column>
+                        <Column header="İndirim %" style="width: 10%">
+                            <template #body="slotProps">
+                                <InputNumber v-model="slotProps.data.discountRate" :min="0" :max="100" fluid />
+                            </template>
+                        </Column>
+                        <Column header="Toplam" style="width: 15%">
+                            <template #body="slotProps">
+                                <span class="font-bold">{{ slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                            </template>
+                        </Column>
+                        <Column style="width: 10%">
+                            <template #body="slotProps">
+                                <Button icon="pi pi-trash" severity="danger" text rounded @click="removeLine(slotProps.index)" />
+                            </template>
+                        </Column>
+                    </DataTable>
+                    <Button label="Kalem Ekle" icon="pi pi-plus" text class="mt-4" @click="addLine" />
+                </div>
+
+                <div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label for="notes" class="block font-bold mb-3">Notlar</label>
+                            <Textarea id="notes" v-model="invoice.notes" rows="5" fluid />
+                        </div>
+                        <div>
+                            <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
+                                <div class="flex justify-between">
+                                    <span>Ara Toplam:</span>
+                                    <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>KDV Toplam:</span>
+                                    <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                </div>
+                                <div class="flex justify-between text-xl font-bold border-t pt-4">
+                                    <span>Genel Toplam:</span>
+                                    <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -289,3 +292,6 @@ function goBack() {
         </div>
     </div>
 </template>
+
+
+

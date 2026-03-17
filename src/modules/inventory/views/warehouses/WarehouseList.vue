@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
+﻿<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useAuthStore } from '@/core/auth/auth.store';
 import { Warehouse, type WarehouseProps } from '@/modules/inventory/domain/warehouse.entity';
@@ -14,6 +14,26 @@ const warehouseDialog = ref(false);
 type WarehouseForm = Partial<WarehouseProps>;
 const warehouse = ref<WarehouseForm>({});
 const submitted = ref(false);
+const showFilters = ref(false);
+
+interface WarehouseFilterForm {
+    name: string;
+    location: string;
+    isActive: boolean | null;
+}
+
+const filterForm = ref<WarehouseFilterForm>({
+    name: '',
+    location: '',
+    isActive: null
+});
+
+const activeFilters = ref<WarehouseFilterForm>({ ...filterForm.value });
+
+const statusOptions = [
+    { label: 'Aktif', value: true },
+    { label: 'Pasif', value: false }
+];
 
 onMounted(() => {
     invStore.fetchWarehouses();
@@ -52,31 +72,96 @@ async function saveWarehouse() {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
+
+const filteredWarehouses = computed(() => {
+    let list = invStore.warehouses ?? [];
+    const filters = activeFilters.value;
+
+    if (filters.name) {
+        const query = filters.name.toLowerCase();
+        list = list.filter((item) => (item.name || '').toLowerCase().includes(query));
+    }
+    if (filters.location) {
+        const query = filters.location.toLowerCase();
+        list = list.filter((item) => (item.location || '').toLowerCase().includes(query));
+    }
+    if (filters.isActive !== null) {
+        list = list.filter((item) => item.isActive === filters.isActive);
+    }
+
+    return list;
+});
+
+function toggleFilters() {
+    showFilters.value = !showFilters.value;
+}
+
+function applyFilters() {
+    activeFilters.value = { ...filterForm.value };
+}
+
+function clearFilters() {
+    filterForm.value = {
+        name: '',
+        location: '',
+        isActive: null
+    };
+    activeFilters.value = { ...filterForm.value };
+}
 </script>
 
 <template>
-    <div class="card">
-        <Toolbar class="mb-6">
-            <template #start>
-                <Button label="Yeni Depo" icon="pi pi-plus" severity="secondary" @click="openNew" />
-            </template>
-        </Toolbar>
+    <div>
+        <div class="card mb-4">
+            <div class="flex items-center justify-between mb-0">
+                <h4 class="m-0 text-xl font-semibold">Depo Yönetimi</h4>
+            </div>
+            <Toolbar>
+                <template #start>
+                    <Button label="Yeni Depo" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                </template>
+                <template #end>
+                    <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
+                </template>
+            </Toolbar>
+        </div>
 
-        <h4 class="m-0 mb-4">Depo Yönetimi</h4>
-        <DataTable :value="invStore.warehouses" dataKey="id" :paginator="true" :rows="10">
-            <Column field="name" header="Depo Adı" sortable></Column>
-            <Column field="location" header="Konum" sortable></Column>
-            <Column field="isActive" header="Durum" sortable>
-                <template #body="slotProps">
-                    <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
-                </template>
-            </Column>
-            <Column header="İşlemler">
-                <template #body="slotProps">
-                    <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editWarehouse(slotProps.data)" />
-                </template>
-            </Column>
-        </DataTable>
+        <div v-if="showFilters" class="card mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                <div class="col-span-1">
+                    <InputText v-model="filterForm.name" placeholder="Depo Adı" fluid />
+                </div>
+                <div class="col-span-1">
+                    <InputText v-model="filterForm.location" placeholder="Konum" fluid />
+                </div>
+                <div class="col-span-1">
+                    <Select v-model="filterForm.isActive" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
+                </div>
+                <div class="col-span-1 flex items-end">
+                    <Button label="Filtrele" class="w-full" @click="applyFilters" />
+                </div>
+                <div class="col-span-1 flex items-end">
+                    <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <DataTable :value="filteredWarehouses" dataKey="id" :paginator="true" :rows="10">
+                <Column field="name" header="Depo Adı" sortable></Column>
+                <Column field="location" header="Konum" sortable></Column>
+                <Column field="isActive" header="Durum" sortable>
+                    <template #body="slotProps">
+                        <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
+                    </template>
+                </Column>
+                <Column header="İşlemler">
+                    <template #body="slotProps">
+                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editWarehouse(slotProps.data)" />
+                    </template>
+                </Column>
+            </DataTable>
+        </div>
 
         <Dialog v-model:visible="warehouseDialog" :style="{ width: '450px' }" header="Depo Detayları" :modal="true">
             <div class="flex flex-col gap-6">
