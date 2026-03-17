@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
+import type { InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
 
 const financeStore = useFinanceStore();
 const router = useRouter();
-const toast = useToast();
 
 onMounted(() => {
     financeStore.fetchInvoices();
@@ -20,32 +19,32 @@ function viewInvoice(id: string) {
     router.push(`/finance/invoices/edit/${id}`);
 }
 
-function getInvoiceTypeLabel(type: string) {
-    const map: any = {
-        'sale': 'Satış',
-        'purchase': 'Alış',
-        'return_sale': 'Satış İade',
-        'return_purchase': 'Alış İade'
+function getInvoiceTypeLabel(type: InvoiceType) {
+    const map: Record<InvoiceType, string> = {
+        sale: 'Satış',
+        purchase: 'Alış',
+        return_sale: 'Satış İade',
+        return_purchase: 'Alış İade'
     };
     return map[type] || type;
 }
 
-function getStatusLabel(status: string) {
-    const map: any = {
-        'draft': 'Taslak',
-        'issued': 'Onaylı',
-        'paid': 'Ödendi',
-        'cancelled': 'İptal'
+function getStatusLabel(status: InvoiceStatus) {
+    const map: Record<InvoiceStatus, string> = {
+        draft: 'Taslak',
+        issued: 'Onaylı',
+        paid: 'Ödendi',
+        cancelled: 'İptal'
     };
     return map[status] || status;
 }
 
-function getStatusSeverity(status: string) {
-    const map: any = {
-        'draft': 'secondary',
-        'issued': 'info',
-        'paid': 'success',
-        'cancelled': 'danger'
+function getStatusSeverity(status: InvoiceStatus) {
+    const map: Record<InvoiceStatus, 'secondary' | 'info' | 'success' | 'danger'> = {
+        draft: 'secondary',
+        issued: 'info',
+        paid: 'success',
+        cancelled: 'danger'
     };
     return map[status] || 'secondary';
 }
@@ -94,4 +93,3 @@ function formatCurrency(value: number, currency: string) {
         </DataTable>
     </div>
 </template>
-

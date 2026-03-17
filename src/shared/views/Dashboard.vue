@@ -1,10 +1,10 @@
 <script setup>
+import InventoryStatsWidget from '@/modules/inventory/views/components/InventoryStatsWidget.vue';
 import BestSellingWidget from '@/shared/components/dashboard/BestSellingWidget.vue';
 import NotificationsWidget from '@/shared/components/dashboard/NotificationsWidget.vue';
 import RecentSalesWidget from '@/shared/components/dashboard/RecentSalesWidget.vue';
 import RevenueStreamWidget from '@/shared/components/dashboard/RevenueStreamWidget.vue';
 import StatsWidget from '@/shared/components/dashboard/StatsWidget.vue';
-import InventoryStatsWidget from '@/modules/inventory/views/components/InventoryStatsWidget.vue';
 </script>
 
 <template>
@@ -22,4 +22,3 @@ import InventoryStatsWidget from '@/modules/inventory/views/components/Inventory
         </div>
     </div>
 </template>
-

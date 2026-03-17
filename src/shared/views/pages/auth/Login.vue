@@ -12,20 +12,20 @@ const password = ref('');
 const errorMessage = ref('');
 
 async function handleLogin() {
-  errorMessage.value = '';
+    errorMessage.value = '';
 
-  if (!email.value || !password.value) {
-    errorMessage.value = 'E-posta ve şifre zorunludur.';
-    return;
-  }
+    if (!email.value || !password.value) {
+        errorMessage.value = 'E-posta ve şifre zorunludur.';
+        return;
+    }
 
-  const result = await authStore.login(email.value, password.value);
+    const result = await authStore.login(email.value, password.value);
 
-  if (result.success) {
-    router.push('/');
-  } else {
-    errorMessage.value = authStore.error || 'Giriş başarısız. Bilgilerinizi kontrol edin.';
-  }
+    if (result.success) {
+        router.push('/');
+    } else {
+        errorMessage.value = authStore.error || 'Giriş başarısız. Bilgilerinizi kontrol edin.';
+    }
 }
 </script>
 
@@ -36,51 +36,24 @@ async function handleLogin() {
             <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%)">
                 <div class="w-full bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20" style="border-radius: 53px">
                     <div class="text-center mb-8">
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-bold mb-2">
-                            🔺 Pyramid ERP
-                        </div>
+                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-bold mb-2">🔺 Pyramid ERP</div>
                         <span class="text-muted-color font-medium">Devam etmek için giriş yapın</span>
                     </div>
 
                     <div>
                         <label for="login-email" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">E-posta</label>
-                        <InputText
-                            id="login-email"
-                            type="email"
-                            placeholder="ornek@sirket.com"
-                            class="w-full md:w-[30rem] mb-6"
-                            v-model="email"
-                            @keyup.enter="handleLogin"
-                        />
+                        <InputText id="login-email" type="email" placeholder="ornek@sirket.com" class="w-full md:w-[30rem] mb-6" v-model="email" @keyup.enter="handleLogin" />
 
                         <label for="login-password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Şifre</label>
-                        <Password
-                            id="login-password"
-                            v-model="password"
-                            placeholder="Şifrenizi girin"
-                            :toggleMask="true"
-                            class="mb-4"
-                            fluid
-                            :feedback="false"
-                            @keyup.enter="handleLogin"
-                        />
+                        <Password id="login-password" v-model="password" placeholder="Şifrenizi girin" :toggleMask="true" class="mb-4" fluid :feedback="false" @keyup.enter="handleLogin" />
 
                         <!-- Hata mesajı -->
-                        <div v-if="errorMessage" class="mb-4 p-3 rounded-lg flex items-center gap-2"
-                             style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3)">
+                        <div v-if="errorMessage" class="mb-4 p-3 rounded-lg flex items-center gap-2" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3)">
                             <i class="pi pi-exclamation-triangle" style="color: #ef4444"></i>
                             <span style="color: #ef4444; font-size: 0.9rem">{{ errorMessage }}</span>
                         </div>
 
-                        <Button
-                            id="login-btn"
-                            label="Giriş Yap"
-                            icon="pi pi-sign-in"
-                            class="w-full mt-4"
-                            :loading="authStore.loading"
-                            :disabled="authStore.loading"
-                            @click="handleLogin"
-                        />
+                        <Button id="login-btn" label="Giriş Yap" icon="pi pi-sign-in" class="w-full mt-4" :loading="authStore.loading" :disabled="authStore.loading" @click="handleLogin" />
                     </div>
                 </div>
             </div>

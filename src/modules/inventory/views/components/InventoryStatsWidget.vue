@@ -13,14 +13,7 @@ onMounted(async () => {
 });
 
 const totalProducts = computed(() => productStore.products.length);
-const totalWarehouses = computed(() => invStore.warehouses.length);
 const totalMovements = computed(() => invStore.movements.length);
-
-const lastMovementDate = computed(() => {
-    if (invStore.movements.length === 0) return '-';
-    const dates = invStore.movements.map((m) => new Date(m.createdAt).getTime());
-    return new Date(Math.max(...dates)).toLocaleDateString();
-});
 </script>
 
 <template>

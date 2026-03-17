@@ -3,9 +3,10 @@ import { onMounted, ref, computed } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { useAuthStore } from '@/core/auth/auth.store';
-import { Invoice, type InvoiceLineProps } from '@/modules/finance/domain/invoice.entity';
+import { Invoice, type InvoiceStatus, type InvoiceType } from '@/modules/finance/domain/invoice.entity';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const financeStore = useFinanceStore();
 const productStore = useProductStore();
@@ -17,7 +18,33 @@ const toast = useToast();
 const invoiceId = route.params.id as string;
 const isEdit = !!invoiceId;
 
-const invoice = ref<any>({
+interface InvoiceLineForm {
+    id: string;
+    productId: string;
+    description?: string;
+    quantity: number;
+    unitPrice: number;
+    vatRate: number;
+    discountRate: number;
+    lineTotal: number;
+}
+
+interface InvoiceFormModel {
+    invoiceType: InvoiceType;
+    invoiceNumber: string;
+    accountId: string;
+    issueDate: Date;
+    dueDate: Date | null;
+    status: InvoiceStatus;
+    currency: string;
+    exchangeRate: number;
+    notes: string;
+    lines: InvoiceLineForm[];
+    paidAmount?: number;
+    createdAt?: Date;
+}
+
+const invoice = ref<InvoiceFormModel>({
     invoiceType: 'sale',
     invoiceNumber: '',
     accountId: '',
@@ -30,7 +57,7 @@ const invoice = ref<any>({
     lines: []
 });
 
-const invoiceTypes = [
+const invoiceTypes: Array<{ label: string; value: InvoiceType }> = [
     { label: 'Satış', value: 'sale' },
     { label: 'Alış', value: 'purchase' },
     { label: 'Satış İade', value: 'return_sale' },
@@ -50,8 +77,8 @@ onMounted(async () => {
     if (productStore.products.length === 0) await productStore.fetchProducts();
 
     if (isEdit) {
-        const result = await financeStore.fetchInvoices(); // Basitlik için tümünü çekip içinden bulalım
-        const found = financeStore.invoices.find(i => i.id === invoiceId);
+        await financeStore.fetchInvoices(); // Basitlik için tümünü çekip içinden bulalım
+        const found = financeStore.invoices.find((i) => i.id === invoiceId);
         if (found) {
             const obj = found.toObject();
             invoice.value = { ...obj, issueDate: new Date(obj.issueDate), dueDate: obj.dueDate ? new Date(obj.dueDate) : null };
@@ -65,7 +92,7 @@ function addLine() {
         productId: '',
         description: '',
         quantity: 1,
-        unitUnitPrice: 0,
+        unitPrice: 0,
         vatRate: 20,
         discountRate: 0,
         lineTotal: 0
@@ -76,8 +103,8 @@ function removeLine(index: number) {
     invoice.value.lines.splice(index, 1);
 }
 
-function onProductChange(line: any) {
-    const product = productStore.products.find(p => p.id === line.productId);
+function onProductChange(line: InvoiceLineForm) {
+    const product = productStore.products.find((p) => p.id === line.productId);
     if (product) {
         line.unitPrice = product.price || 0;
         line.vatRate = product.taxRate || 20;
@@ -88,11 +115,11 @@ const totals = computed(() => {
     let subtotal = 0;
     let vatTotal = 0;
 
-    invoice.value.lines.forEach((line: any) => {
+    invoice.value.lines.forEach((line) => {
         const lineSubtotal = line.quantity * (line.unitPrice || 0) * (1 - line.discountRate / 100);
         const lineVat = lineSubtotal * (line.vatRate / 100);
         line.lineTotal = lineSubtotal + lineVat;
-        
+
         subtotal += lineSubtotal;
         vatTotal += lineVat;
     });
@@ -121,7 +148,7 @@ async function saveInvoice() {
         paidAmount: invoice.value.paidAmount || 0,
         createdAt: invoice.value.createdAt || new Date(),
         updatedAt: new Date(),
-        lines: invoice.value.lines.map((l: any) => ({
+        lines: invoice.value.lines.map((l) => ({
             ...l,
             invoiceId: invoiceId || ''
         }))
@@ -132,7 +159,7 @@ async function saveInvoice() {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Fatura kaydedildi', life: 3000 });
         router.push('/finance/invoices');
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 
@@ -262,4 +289,3 @@ function goBack() {
         </div>
     </div>
 </template>
-

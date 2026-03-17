@@ -15,7 +15,7 @@ onMounted(() => {
 
 <template>
     <div class="card">
-        <div class="font-semibold text-xl mb-4">Recent Sales</div>
+        <div class="font-semibold text-xl mb-4">Son Satışlar</div>
         <DataTable :value="products" :rows="5" :paginator="true" responsiveLayout="scroll">
             <Column style="width: 15%" header="Image">
                 <template #body="slotProps">
@@ -36,4 +36,3 @@ onMounted(() => {
         </DataTable>
     </div>
 </template>
-

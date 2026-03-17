@@ -5,14 +5,12 @@ import type { Currency } from '@/modules/inventory/domain/currency.entity';
 import type { Result } from '@/shared/types/result';
 
 export interface ILookupRepository {
-  getCategories(): Promise<Result<Category[]>>;
-  getBrands(): Promise<Result<Brand[]>>;
-  getProductTypes(): Promise<Result<ProductType[]>>;
-  getCurrencies(): Promise<Result<Currency[]>>;
-  
-  saveCategory(category: Category): Promise<Result<void>>;
-  saveBrand(brand: Brand): Promise<Result<void>>;
-  saveProductType(type: ProductType): Promise<Result<void>>;
+    getCategories(): Promise<Result<Category[]>>;
+    getBrands(): Promise<Result<Brand[]>>;
+    getProductTypes(): Promise<Result<ProductType[]>>;
+    getCurrencies(): Promise<Result<Currency[]>>;
+
+    saveCategory(category: Category): Promise<Result<void>>;
+    saveBrand(brand: Brand): Promise<Result<void>>;
+    saveProductType(type: ProductType): Promise<Result<void>>;
 }
-
-

@@ -1,29 +1,33 @@
 <script setup lang="ts">
+import { useLookupStore } from '@/modules/inventory/application/lookup.store';
+import { useProductStore } from '@/modules/inventory/application/product.store';
 import { FilterMatchMode } from '@primevue/core/api';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useProductStore } from '@/modules/inventory/application/product.store';
-import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 
 const router = useRouter();
 const productStore = useProductStore();
 const lookupStore = useLookupStore();
 const toast = useToast();
 
-const dt = ref();
+type ExportableTable = { exportCSV: () => void };
+const dt = ref<ExportableTable | null>(null);
 const deleteProductDialog = ref(false);
 const deleteProductsDialog = ref(false);
 const categoryDialog = ref(false);
 const brandDialog = ref(false);
 const typeDialog = ref(false);
-const product = ref<any>({});
-const selectedProducts = ref<any[]>([]);
+type ProductListItem = (typeof productStore.products)[number];
+type CategoryListItem = (typeof lookupStore.categories)[number];
+type BrandListItem = (typeof lookupStore.brands)[number];
+type ProductTypeListItem = (typeof lookupStore.productTypes)[number];
+type CurrencyListItem = (typeof lookupStore.currencies)[number];
+const product = ref<ProductListItem | null>(null);
+const selectedProducts = ref<ProductListItem[]>([]);
 const newCategoryName = ref('');
 const newBrandName = ref('');
 const newTypeName = ref('');
-const imageFiles = ref<any[]>([]);
-const imageUploading = ref(false);
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -31,7 +35,16 @@ const filters = ref({
 
 const showFilters = ref(false);
 
-const filterForm = ref<any>({
+interface ProductFilterForm {
+    name: string;
+    barcode: string;
+    category_id: string | null;
+    type_id: string | null;
+    brand_id: string | null;
+    status: string | null;
+}
+
+const filterForm = ref<ProductFilterForm>({
     name: '',
     barcode: '',
     category_id: null,
@@ -40,25 +53,11 @@ const filterForm = ref<any>({
     status: null
 });
 
-const activeFilters = ref<any>({ ...filterForm.value });
-const submitted = ref(false);
-
-const statuses = ref([
-    { label: 'Stok Takibi Evet', value: 'TRACKED' },
-    { label: 'Stok Takibi Hayır', value: 'UNTRACKED' }
-]);
+const activeFilters = ref<ProductFilterForm>({ ...filterForm.value });
 
 const productStatuses = ref([
     { label: 'Aktif', value: 'ACTIVE' },
     { label: 'Pasif', value: 'PASSIVE' }
-]);
-
-const taxRates = ref([
-    { label: '%0', value: 0 },
-    { label: '%1', value: 1 },
-    { label: '%8', value: 8 },
-    { label: '%20', value: 20 },
-    { label: '%25', value: 25 }
 ]);
 
 const priceUnits = ref([
@@ -76,42 +75,29 @@ const priceUnits = ref([
     { label: 'Kutu', value: 'box' }
 ]);
 
-const selectedCurrencyCode = computed(() => {
-    if (!product.value.currencyId) return 'USD';
-    return getCurrencyCode(product.value.currencyId) || 'USD';
-});
-
-const selectedCurrencyLocale = computed(() => {
-    switch (selectedCurrencyCode.value) {
-        case 'TRY': return 'tr-TR';
-        case 'EUR': return 'de-DE';
-        case 'USD': default: return 'en-US';
-    }
-});
-
 const filteredProducts = computed(() => {
     let list = productStore.products ?? [];
-    const filtersValue = activeFilters.value as any;
+    const filtersValue = activeFilters.value;
 
     if (filtersValue.name) {
         const query = filtersValue.name.toLowerCase();
-        list = list.filter((item: any) => (item.name || '').toLowerCase().includes(query));
+        list = list.filter((item) => (item.name || '').toLowerCase().includes(query));
     }
     if (filtersValue.barcode) {
         const query = filtersValue.barcode.toLowerCase();
-        list = list.filter((item: any) => (item.barcode || '').toLowerCase().includes(query));
+        list = list.filter((item) => (item.barcode || '').toLowerCase().includes(query));
     }
     if (filtersValue.category_id) {
-        list = list.filter((item: any) => item.categoryId === filtersValue.category_id);
+        list = list.filter((item) => item.categoryId === filtersValue.category_id);
     }
     if (filtersValue.type_id) {
-        list = list.filter((item: any) => item.typeId === filtersValue.type_id);
+        list = list.filter((item) => item.typeId === filtersValue.type_id);
     }
     if (filtersValue.brand_id) {
-        list = list.filter((item: any) => item.brandId === filtersValue.brand_id);
+        list = list.filter((item) => item.brandId === filtersValue.brand_id);
     }
     if (filtersValue.status) {
-        list = list.filter((item: any) => item.status === filtersValue.status);
+        list = list.filter((item) => item.status === filtersValue.status);
     }
 
     return list;
@@ -122,7 +108,7 @@ onMounted(async () => {
     lookupStore.fetchAll();
 });
 
-function formatCurrency(value: number | null | undefined, currencyId: any) {
+function formatCurrency(value: number | null | undefined, currencyId: string | null | undefined) {
     if (value === null || value === undefined) return '';
     const currencyCode = getCurrencyCode(currencyId) || 'USD';
     const locale = currencyCode === 'TRY' ? 'tr-TR' : currencyCode === 'EUR' ? 'de-DE' : 'en-US';
@@ -131,11 +117,6 @@ function formatCurrency(value: number | null | undefined, currencyId: any) {
 
 function openNew() {
     router.push('/inventory/products/create');
-}
-
-function hideDialog() {
-    submitted.value = false;
-    imageFiles.value = [];
 }
 
 function toggleFilters() {
@@ -158,29 +139,30 @@ function clearFilters() {
     activeFilters.value = { ...filterForm.value };
 }
 
-function resolveImageUrl(image: any) {
+function resolveImageUrl(image: string | null | undefined) {
     if (!image) return '';
     if (image.startsWith('http')) return image;
     return `https://primefaces.org/cdn/primevue/images/product/${image}`;
 }
 
-function resolveProductImage(item: any) {
+function resolveProductImage(item: ProductListItem) {
     const images = Array.isArray(item.images) ? item.images : [];
     if (images.length) return resolveImageUrl(images[0]);
     if (item.image) return resolveImageUrl(item.image);
     return '';
 }
 
-function editProduct(prod: any) {
+function editProduct(prod: ProductListItem) {
     router.push(`/inventory/products/edit/${prod.id}`);
 }
 
-function confirmDeleteProduct(prod: any) {
+function confirmDeleteProduct(prod: ProductListItem) {
     product.value = prod;
     deleteProductDialog.value = true;
 }
 
 async function deleteProduct() {
+    if (!product.value) return;
     const result = await productStore.deleteProduct(product.value.id);
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Ürün silindi', life: 3000 });
@@ -188,20 +170,11 @@ async function deleteProduct() {
         toast.add({ severity: 'error', summary: 'Hata', detail: 'Silme başarısız', life: 3000 });
     }
     deleteProductDialog.value = false;
-    product.value = {};
-}
-
-function createId() {
-    let id = '';
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 5; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return id;
+    product.value = null;
 }
 
 function exportCSV() {
-    dt.value.exportCSV();
+    dt.value?.exportCSV();
 }
 
 function confirmDeleteSelected() {
@@ -210,33 +183,21 @@ function confirmDeleteSelected() {
 
 async function deleteSelectedProducts() {
     const toDelete = selectedProducts.value ?? [];
-    await Promise.all(toDelete.map((item: any) => productStore.deleteProduct(item.id)));
+    await Promise.all(toDelete.map((item) => productStore.deleteProduct(item.id)));
     deleteProductsDialog.value = false;
     selectedProducts.value = [];
     toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Ürünler silindi', life: 3000 });
 }
 
-function getStatusLabel(status: any): "success" | "info" | "warn" | "secondary" | "contrast" | "danger" | undefined {
+function getStatusLabel(status: string | null | undefined): 'success' | 'info' | 'warn' | 'secondary' | 'contrast' | 'danger' | undefined {
     switch (status) {
-        case 'TRACKED': return 'success';
-        case 'UNTRACKED': return 'info';
-        default: return 'secondary';
+        case 'TRACKED':
+            return 'success';
+        case 'UNTRACKED':
+            return 'info';
+        default:
+            return 'secondary';
     }
-}
-
-function openCategoryDialog() {
-    newCategoryName.value = '';
-    categoryDialog.value = true;
-}
-
-function openBrandDialog() {
-    newBrandName.value = '';
-    brandDialog.value = true;
-}
-
-function openTypeDialog() {
-    newTypeName.value = '';
-    typeDialog.value = true;
 }
 
 async function saveCategory() {
@@ -251,27 +212,36 @@ async function saveCategory() {
     }
 }
 
-function getStatusText(status: any) {
+function getStatusText(status: string | null | undefined) {
     switch (status) {
-        case 'TRACKED': return 'Takip Ediliyor';
-        case 'UNTRACKED': return 'Takip Edilmiyor';
-        default: return status || '';
+        case 'TRACKED':
+            return 'Takip Ediliyor';
+        case 'UNTRACKED':
+            return 'Takip Edilmiyor';
+        default:
+            return status || '';
     }
 }
 
-function getProductStatusLabel(status: any) {
+function getProductStatusLabel(status: string | null | undefined) {
     switch (status) {
-        case 'ACTIVE': return 'success';
-        case 'PASSIVE': return 'secondary';
-        default: return 'secondary';
+        case 'ACTIVE':
+            return 'success';
+        case 'PASSIVE':
+            return 'secondary';
+        default:
+            return 'secondary';
     }
 }
 
-function getProductStatusText(status: any) {
+function getProductStatusText(status: string | null | undefined) {
     switch (status) {
-        case 'ACTIVE': return 'Aktif';
-        case 'PASSIVE': return 'Pasif';
-        default: return status || '';
+        case 'ACTIVE':
+            return 'Aktif';
+        case 'PASSIVE':
+            return 'Pasif';
+        default:
+            return status || '';
     }
 }
 
@@ -300,75 +270,90 @@ async function saveType() {
 }
 
 function getCategoryName(id: string) {
-    return lookupStore.categories.find((item: any) => item.id === id)?.name || '-';
+    return lookupStore.categories.find((item: CategoryListItem) => item.id === id)?.name || '-';
 }
 
 function getBrandName(id: string) {
-    return lookupStore.brands.find((item: any) => item.id === id)?.name || '-';
+    return lookupStore.brands.find((item: BrandListItem) => item.id === id)?.name || '-';
 }
 
 function getTypeName(id: string) {
-    return lookupStore.productTypes.find((item: any) => item.id === id)?.name || '-';
+    return lookupStore.productTypes.find((item: ProductTypeListItem) => item.id === id)?.name || '-';
 }
 
-function getCurrencyCode(id: string) {
-    return lookupStore.currencies.find((item: any) => item.id === id)?.code || '-';
+function getCurrencyCode(id: string | null | undefined) {
+    if (!id) return '-';
+    return lookupStore.currencies.find((item: CurrencyListItem) => item.id === id)?.code || '-';
 }
 
-function getPriceUnitLabel(value: any) {
+function getPriceUnitLabel(value: string | null | undefined) {
     return priceUnits.value.find((item) => item.value === value)?.label || value || '-';
 }
 </script>
 
 <template>
     <div>
-        <div class="card">
-            <Toolbar class="mb-6">
+        <!-- 1. Card: Başlık + Toolbar -->
+        <div class="card mb-4">
+            <!-- Üst Satır: Başlık (Solda) + Filtreler Butonu (Sağda) -->
+            <div class="flex items-center justify-between mb-0">
+                <h4 class="m-0 text-xl font-semibold">Ürün Yönetimi</h4>
+            </div>
+
+            <!-- Alt Satır: Toolbar (Yeni, Sil, Dışa Aktar butonları) -->
+            <Toolbar>
                 <template #start>
-                    <Button label="Yeni" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
-                    <Button label="Sil" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedProducts || !selectedProducts.length" />
+                    <Button label="Yeni Ürün Oluştur" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
                 </template>
 
                 <template #end>
+                    <Button label="Ürün Sil" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedProducts || !selectedProducts.length" />
+                    <Button label="Filtrele" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
                     <Button label="Dışa Aktar" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
                 </template>
             </Toolbar>
+        </div>
 
-            <div v-if="showFilters" class="card mb-4">
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Ürün</label>
+        <!-- 2. Card: Filtre Alanları + DataTable -->
+        <div class="card">
+            <!-- Filtre Alanları (showFilters true ise görünür) -->
+            <div v-if="showFilters" class="mb-2 py-2">
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                    <div class="col-span-1">
                         <InputText v-model="filterForm.name" placeholder="Ürün Adı" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Barkod</label>
+
+                    <div class="col-span-1">
                         <InputText v-model="filterForm.barcode" placeholder="Barkod No" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Kategori</label>
-                        <Select v-model="filterForm.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori Seç" fluid />
+
+                    <div class="col-span-1">
+                        <Select v-model="filterForm.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Tip</label>
-                        <Select v-model="filterForm.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
+
+                    <div class="col-span-1">
+                        <Select v-model="filterForm.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Marka</label>
-                        <Select v-model="filterForm.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka Seç" fluid />
+
+                    <div class="col-span-1">
+                        <Select v-model="filterForm.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2">
-                        <label class="block text-xs font-semibold mb-2 tracking-widest text-surface-500">Kapsam</label>
-                        <Select v-model="filterForm.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid />
+
+                    <div class="col-span-1">
+                        <Select v-model="filterForm.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
                     </div>
-                    <div class="col-span-12 lg:col-span-2 flex items-end">
+
+                    <div class="col-span-1 flex items-end">
                         <Button label="Filtrele" class="w-full" @click="applyFilters" />
                     </div>
-                    <div class="col-span-12 lg:col-span-2 flex items-end">
+
+                    <div class="col-span-1 flex items-end">
                         <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
                     </div>
                 </div>
             </div>
 
+            <!-- DataTable -->
             <DataTable
                 ref="dt"
                 v-model:selection="selectedProducts"
@@ -381,15 +366,6 @@ function getPriceUnitLabel(value: any) {
                 :rowsPerPageOptions="[5, 10, 25]"
                 currentPageReportTemplate="Gösterilen {first} - {last} / {totalRecords} ürün"
             >
-                <template #header>
-                    <div class="flex flex-wrap gap-2 items-center justify-between">
-                        <h4 class="m-0">Ürün Yönetimi</h4>
-                        <div class="flex items-center gap-2">
-                            <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
-                        </div>
-                    </div>
-                </template>
-
                 <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
 
                 <Column field="image" header="Görsel">
@@ -463,10 +439,13 @@ function getPriceUnitLabel(value: any) {
             </DataTable>
         </div>
 
+        <!-- Dialog'lar aynı kalır -->
         <Dialog v-model:visible="deleteProductDialog" :style="{ width: '450px' }" header="Onay" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle text-3xl!" />
-                <span v-if="product">Silmek istediğinize emin misiniz <b>{{ product.name }}</b></span>
+                <span v-if="product"
+                    >Silmek istediğinize emin misiniz <b>{{ product.name }}</b></span
+                >
             </div>
             <template #footer>
                 <Button label="Hayır" icon="pi pi-times" text @click="deleteProductDialog = false" />
@@ -477,7 +456,7 @@ function getPriceUnitLabel(value: any) {
         <Dialog v-model:visible="deleteProductsDialog" :style="{ width: '450px' }" header="Onay" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle text-3xl!" />
-                <span v-if="product">Seçili ürünleri silmek istediğinize emin misiniz</span>
+                <span>Seçili ürünleri silmek istediğinize emin misiniz</span>
             </div>
             <template #footer>
                 <Button label="Hayır" icon="pi pi-times" text @click="deleteProductsDialog = false" />
@@ -519,7 +498,6 @@ function getPriceUnitLabel(value: any) {
         </Dialog>
     </div>
 </template>
-
 <style scoped>
 .product-dialog :deep(.p-dialog-content) {
     scrollbar-width: none;
@@ -530,4 +508,3 @@ function getPriceUnitLabel(value: any) {
     height: 0;
 }
 </style>
-

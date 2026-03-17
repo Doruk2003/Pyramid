@@ -2,9 +2,9 @@ import type { IProductRepository } from '@/modules/inventory/domain/product.repo
 import type { Result } from '@/shared/types/result';
 
 export class DeleteProductUseCase {
-  constructor(private productRepo: IProductRepository) {}
+    constructor(private productRepo: IProductRepository) {}
 
-  async execute(id: string): Promise<Result<void>> {
-    return await this.productRepo.delete(id);
-  }
+    async execute(id: string): Promise<Result<void>> {
+        return await this.productRepo.delete(id);
+    }
 }

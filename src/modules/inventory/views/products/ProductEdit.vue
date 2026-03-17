@@ -6,7 +6,9 @@ import { useProductStore } from '@/modules/inventory/application/product.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useAuthStore } from '@/core/auth/auth.store';
 import { Product } from '@/modules/inventory/domain/product.entity';
+import type { Currency } from '@/modules/inventory/domain/currency.entity';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const toast = useToast();
 const router = useRouter();
@@ -16,9 +18,33 @@ const productStore = useProductStore();
 const lookupStore = useLookupStore();
 const authStore = useAuthStore();
 
-const product = ref<any>({});
+interface ProductForm {
+    id?: string;
+    companyId?: string;
+    name?: string;
+    description?: string;
+    price?: number | null;
+    currency_id?: string | null;
+    tax_rate?: number | null;
+    price_unit?: string | null;
+    category_id?: string | null;
+    brand_id?: string | null;
+    type_id?: string | null;
+    inventoryStatus?: string | null;
+    initial_stock?: number | null;
+    min_stock?: number | null;
+    max_stock?: number | null;
+    barcode?: string | null;
+    status?: string;
+    images?: string[];
+    image?: string;
+    code?: string;
+    createdAt?: Date;
+}
+
+const product = ref<ProductForm>({});
 const submitted = ref(false);
-const imageFiles = ref<any[]>([]);
+const imageFiles = ref<File[]>([]);
 const imageUploading = ref(false);
 
 const statuses = ref([
@@ -56,15 +82,19 @@ const priceUnits = ref([
 
 const selectedCurrencyCode = computed(() => {
     if (!product.value.currency_id) return 'USD';
-    const curr = lookupStore.currencies.find((c: any) => c.id === product.value.currency_id);
+    const curr = lookupStore.currencies.find((c: Currency) => c.id === product.value.currency_id);
     return curr ? curr.code : 'USD';
 });
 
 const selectedCurrencyLocale = computed(() => {
     switch (selectedCurrencyCode.value) {
-        case 'TRY': return 'tr-TR';
-        case 'EUR': return 'de-DE';
-        case 'USD': default: return 'en-US';
+        case 'TRY':
+            return 'tr-TR';
+        case 'EUR':
+            return 'de-DE';
+        case 'USD':
+        default:
+            return 'en-US';
     }
 });
 
@@ -78,10 +108,10 @@ async function loadProduct() {
         if (productStore.products.length === 0) {
             await productStore.fetchProducts();
         }
-        const prod = productStore.products.find(p => p.id === id);
+        const prod = productStore.products.find((p) => p.id === id);
         if (prod) {
             const obj = prod.toObject();
-            product.value = { 
+            product.value = {
                 ...obj,
                 category_id: obj.categoryId,
                 brand_id: obj.brandId,
@@ -104,10 +134,10 @@ onMounted(async () => {
     await Promise.all([loadLookups(), loadProduct()]);
 });
 
-function normalizeInventoryStatus(value: any) {
+function normalizeInventoryStatus(value: unknown): string | null {
     if (!value) return null;
-    const resolved = value?.value ? value.value : value;
-    return typeof resolved === 'string' ? resolved.toUpperCase() : resolved;
+    const resolved = typeof value === 'object' && value && 'value' in value ? (value as { value: unknown }).value : value;
+    return typeof resolved === 'string' ? resolved.toUpperCase() : null;
 }
 
 function buildProductPayload() {
@@ -133,8 +163,8 @@ function buildProductPayload() {
     };
 }
 
-function onImageSelected(event: any) {
-    const files = event?.files ?? event?.target?.files ?? [];
+function onImageSelected(event: { files?: File[]; target?: HTMLInputElement | null } | Event) {
+    const files = 'files' in event && Array.isArray(event.files) ? event.files : (event as Event).target && 'files' in (event as Event).target ? Array.from(((event as Event).target as HTMLInputElement).files || []) : [];
     imageFiles.value = Array.from(files).slice(0, 6);
 }
 
@@ -147,7 +177,7 @@ async function uploadImage() {
     const safeCode = product.value.code || Math.random().toString(36).substring(7);
     try {
         const uploads = await Promise.all(
-            imageFiles.value.map(async (file) => {
+            imageFiles.value.map(async (file: File) => {
                 const fileName = `${safeCode}-${Date.now()}-${file.name}`;
                 const { error } = await supabase.storage.from('product-images').upload(fileName, file, { upsert: true });
                 if (error) throw error;
@@ -159,7 +189,7 @@ async function uploadImage() {
         product.value.image = uploads[0] ?? product.value.image ?? 'product-placeholder.svg';
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Görseller yüklendi', life: 3000 });
     } catch (error) {
-        toast.add({ severity: 'error', summary: 'Hata', detail: 'Görsel yükleme başarısız', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(error), life: 3000 });
     } finally {
         imageUploading.value = false;
     }
@@ -199,7 +229,7 @@ async function saveProduct() {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Ürün güncellendi', life: 3000 });
         router.push('/inventory/products');
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 
@@ -330,4 +360,3 @@ function goBack() {
         </div>
     </div>
 </template>
-

@@ -6,8 +6,8 @@
 ---
 
 ## Son Güncelleme
-**Tarih**: 15 Mart 2024  
-**Oturum**: #5  
+**Tarih**: 17 Mart 2026  
+**Oturum**: #6  
 
 ---
 
@@ -111,3 +111,8 @@
 - `src/core`, `src/shared`, `src/lib` klasörleri oluşturularak cross-cutting concern'ler merkezi hale getirildi.
 - Tüm importlar absoulte alias (@/) kullanacak şekilde güncellendi ve `vue-tsc` ile doğrulandı.
 - Finans ve Envanter modülleri tamamen modüler yapıya taşındı.
+
+### Oturum #6 — Prettier & Type Standardizasyonu
+- UI bileşenleri ve store'larda `any` kullanımları kaldırıldı, tipler netleştirildi.
+- Prettier uyarıları giderildi ve biçimlendirme standardı uygulandı.
+- `ProductList.vue` filtreleme ve seçim tipleri düzeltildi, `null` güvenliği iyileştirildi.

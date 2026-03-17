@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useUserStore } from '@/modules/admin/application/user.store';
-import { User } from '@/modules/admin/domain/user.entity';
+import { User, type UserProps } from '@/modules/admin/domain/user.entity';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
@@ -11,11 +12,27 @@ const toast = useToast();
 
 const userDialog = ref(false);
 const deleteUserDialog = ref(false);
-const user = ref<any>({});
+type UserRole = UserProps['role'];
+
+interface UserForm {
+    id?: string;
+    fullName?: string;
+    email?: string;
+    role: UserRole;
+    isActive: boolean;
+    password?: string;
+    createdAt?: Date;
+}
+
+const user = ref<UserForm>({
+    role: 'user',
+    isActive: true,
+    password: ''
+});
 const submitted = ref(false);
 const isEditMode = ref(false); // true → güncelleme, false → yeni oluşturma
 
-const roles = ref([
+const roles = ref<Array<{ label: string; value: UserRole }>>([
     { label: 'ADMIN', value: 'admin' },
     { label: 'MANAGER', value: 'manager' },
     { label: 'USER', value: 'user' },
@@ -58,9 +75,9 @@ const saveUser = async () => {
         if (result.success) {
             toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Kullanıcı oluşturuldu', life: 3000 });
             userDialog.value = false;
-            user.value = {};
+            user.value = { role: 'user', isActive: true, password: '' };
         } else {
-            toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+            toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
         }
         return;
     }
@@ -82,13 +99,13 @@ const saveUser = async () => {
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Kullanıcı güncellendi', life: 3000 });
         userDialog.value = false;
-        user.value = {};
+        user.value = { role: 'user', isActive: true, password: '' };
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 };
 
-const editUser = (u: any) => {
+const editUser = (u: User) => {
     // User bir class instance — spread ({ ...u }) getter'ları kopyalamaz.
     // Property'leri açıkça atıyoruz.
     user.value = {
@@ -103,8 +120,15 @@ const editUser = (u: any) => {
     userDialog.value = true;
 };
 
-const confirmDeleteUser = (u: any) => {
-    user.value = u;
+const confirmDeleteUser = (u: User) => {
+    user.value = {
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        role: u.role,
+        isActive: u.isActive,
+        createdAt: u.createdAt
+    };
     deleteUserDialog.value = true;
 };
 
@@ -113,13 +137,13 @@ const deleteUser = async () => {
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Kullanıcı silindi', life: 3000 });
         deleteUserDialog.value = false;
-        user.value = {};
+        user.value = { role: 'user', isActive: true, password: '' };
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 };
 
-const getBadgeSeverity = (role: string) => {
+const getBadgeSeverity = (role: UserRole) => {
     switch (role) {
         case 'admin':
             return 'danger';

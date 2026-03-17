@@ -3,7 +3,7 @@
         <div class="card mb-0">
             <div class="flex justify-between mb-4">
                 <div>
-                    <span class="block text-muted-color font-medium mb-4">Orders</span>
+                    <span class="block text-muted-color font-medium mb-4">Siparişler</span>
                     <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">152</div>
                 </div>
                 <div class="flex items-center justify-center bg-blue-100 dark:bg-blue-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -18,7 +18,7 @@
         <div class="card mb-0">
             <div class="flex justify-between mb-4">
                 <div>
-                    <span class="block text-muted-color font-medium mb-4">Revenue</span>
+                    <span class="block text-muted-color font-medium mb-4">Gelirler</span>
                     <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">$2.100</div>
                 </div>
                 <div class="flex items-center justify-center bg-orange-100 dark:bg-orange-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">
@@ -33,7 +33,7 @@
         <div class="card mb-0">
             <div class="flex justify-between mb-4">
                 <div>
-                    <span class="block text-muted-color font-medium mb-4">Customers</span>
+                    <span class="block text-muted-color font-medium mb-4">Müşteriler</span>
                     <div class="text-surface-900 dark:text-surface-0 font-medium text-xl">28441</div>
                 </div>
                 <div class="flex items-center justify-center bg-cyan-100 dark:bg-cyan-400/10 rounded-border" style="width: 2.5rem; height: 2.5rem">

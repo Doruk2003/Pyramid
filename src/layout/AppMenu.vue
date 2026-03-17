@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import AppMenuItem from './AppMenuItem.vue';
 import { useAuthStore } from '@/core/auth/auth.store';
 

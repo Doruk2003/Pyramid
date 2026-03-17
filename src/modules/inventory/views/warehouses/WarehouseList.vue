@@ -2,15 +2,17 @@
 import { ref, onMounted } from 'vue';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useAuthStore } from '@/core/auth/auth.store';
-import { Warehouse } from '@/modules/inventory/domain/warehouse.entity';
+import { Warehouse, type WarehouseProps } from '@/modules/inventory/domain/warehouse.entity';
 import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const invStore = useInventoryStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
 const warehouseDialog = ref(false);
-const warehouse = ref<any>({});
+type WarehouseForm = Partial<WarehouseProps>;
+const warehouse = ref<WarehouseForm>({});
 const submitted = ref(false);
 
 onMounted(() => {
@@ -23,8 +25,8 @@ function openNew() {
     warehouseDialog.value = true;
 }
 
-function editWarehouse(w: any) {
-    warehouse.value = { ...w };
+function editWarehouse(w: Warehouse) {
+    warehouse.value = w.toObject();
     warehouseDialog.value = true;
 }
 
@@ -47,7 +49,7 @@ async function saveWarehouse() {
         warehouseDialog.value = false;
         await invStore.fetchWarehouses();
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 </script>
@@ -109,4 +111,3 @@ async function saveWarehouse() {
         </Dialog>
     </div>
 </template>
-

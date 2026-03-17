@@ -9,11 +9,16 @@ const roles = ref([
 
 const getBadgeSeverity = (role: string) => {
     switch (role) {
-        case 'admin': return 'danger';
-        case 'manager': return 'warn';
-        case 'user': return 'info';
-        case 'viewer': return 'secondary';
-        default: return 'secondary';
+        case 'admin':
+            return 'danger';
+        case 'manager':
+            return 'warn';
+        case 'user':
+            return 'info';
+        case 'viewer':
+            return 'secondary';
+        default:
+            return 'secondary';
     }
 };
 </script>

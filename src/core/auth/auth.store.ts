@@ -1,6 +1,7 @@
 import { AuthService } from '@/core/auth/auth.service';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/modules/admin/domain/user.entity';
+import { getErrorMessage } from '@/shared/utils/error';
 import { defineStore } from 'pinia';
 
 const authService = new AuthService();
@@ -57,7 +58,7 @@ export const useAuthStore = defineStore('auth', {
                 });
                 this.initialized = true;
             } else {
-                this.error = (result as any).error.message;
+                this.error = getErrorMessage(result.error);
             }
             this.loading = false;
             return result;

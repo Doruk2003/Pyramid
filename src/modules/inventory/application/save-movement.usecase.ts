@@ -3,12 +3,12 @@ import type { StockMovement } from '@/modules/inventory/domain/stock-movement.en
 import type { Result } from '@/shared/types/result';
 
 export class SaveMovementUseCase {
-  constructor(private inventoryRepo: IInventoryRepository) {}
+    constructor(private inventoryRepo: IInventoryRepository) {}
 
-  async execute(movement: StockMovement | StockMovement[]): Promise<Result<void>> {
-    if (Array.isArray(movement)) {
-      return await this.inventoryRepo.saveStockMovements(movement);
+    async execute(movement: StockMovement | StockMovement[]): Promise<Result<void>> {
+        if (Array.isArray(movement)) {
+            return await this.inventoryRepo.saveStockMovements(movement);
+        }
+        return await this.inventoryRepo.saveStockMovement(movement);
     }
-    return await this.inventoryRepo.saveStockMovement(movement);
-  }
 }

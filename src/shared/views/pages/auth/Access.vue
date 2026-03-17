@@ -24,4 +24,3 @@ import FloatingConfigurator from '@/shared/components/FloatingConfigurator.vue';
         </div>
     </div>
 </template>
-

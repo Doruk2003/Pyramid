@@ -3,11 +3,9 @@ import type { User } from '@/modules/admin/domain/user.entity';
 import type { Result } from '@/shared/types/result';
 
 export class ListUsersUseCase {
-  constructor(private userRepository: IUserRepository) {}
+    constructor(private userRepository: IUserRepository) {}
 
-  async execute(): Promise<Result<User[]>> {
-    return this.userRepository.list();
-  }
+    async execute(): Promise<Result<User[]>> {
+        return this.userRepository.list();
+    }
 }
-
-

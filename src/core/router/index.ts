@@ -70,6 +70,16 @@ const router = createRouter({
                     component: () => import('@/modules/finance/views/accounts/AccountList.vue')
                 },
                 {
+                    path: '/finance/accounts/create',
+                    name: 'finance-account-create',
+                    component: () => import('@/modules/finance/views/accounts/AccountCreate.vue')
+                },
+                {
+                    path: '/finance/accounts/edit/:id',
+                    name: 'finance-account-edit',
+                    component: () => import('@/modules/finance/views/accounts/AccountEdit.vue')
+                },
+                {
                     path: '/finance/invoices',
                     name: 'finance-invoices',
                     component: () => import('@/modules/finance/views/invoices/InvoiceList.vue')

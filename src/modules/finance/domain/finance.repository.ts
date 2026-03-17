@@ -1,19 +1,26 @@
-import type { Account } from '@/modules/finance/domain/account.entity';
-import type { Invoice } from '@/modules/finance/domain/invoice.entity';
+import type { Account, AccountType } from '@/modules/finance/domain/account.entity';
+import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
 import type { Result } from '@/shared/types/result';
 
-export interface IFinanceRepository {
-  // Account
-  getAccounts(filters?: any): Promise<Result<Account[]>>;
-  getAccountById(id: string): Promise<Result<Account>>;
-  saveAccount(account: Account): Promise<Result<void>>;
-  deleteAccount(id: string): Promise<Result<void>>;
-
-  // Invoice
-  getInvoices(filters?: any): Promise<Result<Invoice[]>>;
-  getInvoiceById(id: string): Promise<Result<Invoice>>;
-  saveInvoice(invoice: Invoice): Promise<Result<void>>;
-  updateInvoiceStatus(id: string, status: string): Promise<Result<void>>;
+export interface AccountFilters {
+    accountType?: AccountType;
 }
 
+export interface InvoiceFilters {
+    invoiceType?: InvoiceType;
+    accountId?: string;
+}
 
+export interface IFinanceRepository {
+    // Account
+    getAccounts(filters?: AccountFilters): Promise<Result<Account[]>>;
+    getAccountById(id: string): Promise<Result<Account>>;
+    saveAccount(account: Account): Promise<Result<void>>;
+    deleteAccount(id: string): Promise<Result<void>>;
+
+    // Invoice
+    getInvoices(filters?: InvoiceFilters): Promise<Result<Invoice[]>>;
+    getInvoiceById(id: string): Promise<Result<Invoice>>;
+    saveInvoice(invoice: Invoice): Promise<Result<void>>;
+    updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>>;
+}

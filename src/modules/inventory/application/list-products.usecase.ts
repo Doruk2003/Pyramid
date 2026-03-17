@@ -3,9 +3,9 @@ import type { Product } from '@/modules/inventory/domain/product.entity';
 import type { Result } from '@/shared/types/result';
 
 export class ListProductsUseCase {
-  constructor(private productRepo: IProductRepository) {}
+    constructor(private productRepo: IProductRepository) {}
 
-  async execute(): Promise<Result<Product[]>> {
-    return await this.productRepo.list();
-  }
+    async execute(): Promise<Result<Product[]>> {
+        return await this.productRepo.list();
+    }
 }

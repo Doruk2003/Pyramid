@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import type { MovementType } from '@/modules/inventory/domain/stock-movement.entity';
 
 import { useRouter } from 'vue-router';
 
@@ -19,25 +20,25 @@ function openNew() {
 }
 
 function getProductName(id: string) {
-    return productStore.products.find(p => p.id === id)?.name || '-';
+    return productStore.products.find((p) => p.id === id)?.name || '-';
 }
 
-function getMovementTypeLabel(type: string) {
-    const map: any = {
-        'in': 'Giriş',
-        'out': 'Çıkış',
-        'transfer': 'Transfer',
-        'adjustment': 'Düzeltme'
+function getMovementTypeLabel(type: MovementType) {
+    const map: Record<MovementType, string> = {
+        in: 'Giriş',
+        out: 'Çıkış',
+        transfer: 'Transfer',
+        adjustment: 'Düzeltme'
     };
     return map[type] || type;
 }
 
-function getMovementSeverity(type: string) {
-    const map: any = {
-        'in': 'success',
-        'out': 'danger',
-        'transfer': 'info',
-        'adjustment': 'warn'
+function getMovementSeverity(type: MovementType) {
+    const map: Record<MovementType, 'success' | 'danger' | 'info' | 'warn'> = {
+        in: 'success',
+        out: 'danger',
+        transfer: 'info',
+        adjustment: 'warn'
     };
     return map[type] || 'secondary';
 }
@@ -72,4 +73,3 @@ function getMovementSeverity(type: string) {
         </DataTable>
     </div>
 </template>
-

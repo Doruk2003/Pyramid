@@ -4,8 +4,9 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
-import { StockMovement } from '@/modules/inventory/domain/stock-movement.entity';
+import { StockMovement, type MovementType } from '@/modules/inventory/domain/stock-movement.entity';
 import { useAuthStore } from '@/core/auth/auth.store';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const toast = useToast();
 const router = useRouter();
@@ -13,7 +14,16 @@ const invStore = useInventoryStore();
 const productStore = useProductStore();
 const authStore = useAuthStore();
 
-const movement = ref({
+interface MovementForm {
+    movementType: MovementType;
+    productId: string;
+    warehouseId: string;
+    targetWarehouseId: string;
+    quantity: number;
+    note: string;
+}
+
+const movement = ref<MovementForm>({
     movementType: 'in',
     productId: '',
     warehouseId: '',
@@ -38,7 +48,7 @@ onMounted(async () => {
 
 async function saveMovement() {
     submitted.value = true;
-    
+
     if (!movement.value.productId || !movement.value.warehouseId || !movement.value.quantity) {
         toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 });
         return;
@@ -61,7 +71,7 @@ async function saveMovement() {
             warehouseId: movement.value.warehouseId,
             movementType: 'out',
             quantity: movement.value.quantity,
-            note: `Transfer (Hedef: ${invStore.warehouses.find(w => w.id === movement.value.targetWarehouseId)?.name}) - ${movement.value.note}`,
+            note: `Transfer (Hedef: ${invStore.warehouses.find((w) => w.id === movement.value.targetWarehouseId)?.name}) - ${movement.value.note}`,
             createdBy: userId,
             createdAt: new Date()
         });
@@ -73,7 +83,7 @@ async function saveMovement() {
             warehouseId: movement.value.targetWarehouseId,
             movementType: 'in',
             quantity: movement.value.quantity,
-            note: `Transfer (Kaynak: ${invStore.warehouses.find(w => w.id === movement.value.warehouseId)?.name}) - ${movement.value.note}`,
+            note: `Transfer (Kaynak: ${invStore.warehouses.find((w) => w.id === movement.value.warehouseId)?.name}) - ${movement.value.note}`,
             createdBy: userId,
             createdAt: new Date()
         });
@@ -85,7 +95,7 @@ async function saveMovement() {
             companyId,
             productId: movement.value.productId,
             warehouseId: movement.value.warehouseId,
-            movementType: movement.value.movementType as any,
+            movementType: movement.value.movementType,
             quantity: movement.value.quantity,
             note: movement.value.note,
             createdBy: userId,
@@ -99,7 +109,7 @@ async function saveMovement() {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Hareket kaydedildi', life: 3000 });
         router.push('/inventory/movements');
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 
@@ -167,4 +177,3 @@ function goBack() {
         </div>
     </div>
 </template>
-

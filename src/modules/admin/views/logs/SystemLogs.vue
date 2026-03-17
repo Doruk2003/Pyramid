@@ -10,11 +10,16 @@ const logs = ref([
 
 const getSeverity = (action: string) => {
     switch (action) {
-        case 'LOGIN': return 'success';
-        case 'UPDATE': return 'info';
-        case 'CREATE': return 'warn';
-        case 'DELETE': return 'danger';
-        default: return 'secondary';
+        case 'LOGIN':
+            return 'success';
+        case 'UPDATE':
+            return 'info';
+        case 'CREATE':
+            return 'warn';
+        case 'DELETE':
+            return 'danger';
+        default:
+            return 'secondary';
     }
 };
 </script>
@@ -22,7 +27,7 @@ const getSeverity = (action: string) => {
 <template>
     <div class="card">
         <span class="text-xl font-semibold block mb-4">Sistem Logları</span>
-        
+
         <DataTable :value="logs" paginator :rows="10" tableStyle="min-width: 50rem">
             <Column field="date" header="Tarih">
                 <template #body="slotProps">

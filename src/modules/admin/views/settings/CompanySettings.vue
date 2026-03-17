@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useSettingsStore } from '@/modules/admin/application/settings.store';
-import { CompanySettings } from '@/modules/admin/domain/settings.entity';
+import { CompanySettings, type CompanySettingsProps } from '@/modules/admin/domain/settings.entity';
 import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const settingsStore = useSettingsStore();
 const toast = useToast();
-const settingsData = ref<any>({});
+const settingsData = ref<CompanySettingsProps>({
+    id: '',
+    companyName: '',
+    currency: 'TRY'
+});
 
 onMounted(async () => {
     await settingsStore.fetchSettings();
@@ -18,11 +23,11 @@ onMounted(async () => {
 const saveSettings = async () => {
     const newSettings = CompanySettings.create(settingsData.value);
     const result = await settingsStore.updateSettings(newSettings);
-    
+
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Ayarlar güncellendi', life: 3000 });
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: (result as any).error.message, life: 3000 });
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 };
 </script>
@@ -69,5 +74,3 @@ const saveSettings = async () => {
         </div>
     </div>
 </template>
-
-

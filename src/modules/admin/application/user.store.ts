@@ -4,6 +4,7 @@ import { CreateUserUseCase, SaveUserUseCase } from '@/modules/admin/application/
 import type { User } from '@/modules/admin/domain/user.entity';
 import type { NewUserPayload } from '@/modules/admin/domain/user.repository';
 import { SupabaseUserRepository } from '@/modules/admin/infra/supabase-user.repository';
+import { getErrorMessage } from '@/shared/utils/error';
 import { defineStore } from 'pinia';
 
 const userRepository = new SupabaseUserRepository();
@@ -26,7 +27,7 @@ export const useUserStore = defineStore('user', {
             if (result.success) {
                 this.users = result.data;
             } else {
-                this.error = (result as any).error.message;
+                this.error = getErrorMessage(result.error);
             }
             this.loading = false;
         },
@@ -38,7 +39,7 @@ export const useUserStore = defineStore('user', {
             if (result.success) {
                 await this.fetchUsers();
             } else {
-                this.error = (result as any).error.message;
+                this.error = getErrorMessage(result.error);
             }
             this.loading = false;
             return result;
@@ -51,7 +52,7 @@ export const useUserStore = defineStore('user', {
             if (result.success) {
                 await this.fetchUsers();
             } else {
-                this.error = (result as any).error.message;
+                this.error = getErrorMessage(result.error);
             }
             this.loading = false;
             return result;
@@ -63,7 +64,7 @@ export const useUserStore = defineStore('user', {
             if (result.success) {
                 await this.fetchUsers();
             } else {
-                this.error = (result as any).error.message;
+                this.error = getErrorMessage(result.error);
             }
             this.loading = false;
             return result;
