@@ -8,7 +8,7 @@ const authStore = useAuthStore();
 const model = computed(() => {
     const menu = [
         {
-            label: 'Ana Sayfa',
+            label: '',
             items: [
                 {
                     label: 'Dashboard',
@@ -18,7 +18,7 @@ const model = computed(() => {
             ]
         },
         {
-            label: 'Envanter Yönetimi',
+            label: '',
             items: [
                 {
                     label: 'Envanter',
@@ -45,7 +45,7 @@ const model = computed(() => {
             ]
         },
         {
-            label: 'Finans Yönetimi',
+            label: '',
             items: [
                 {
                     label: 'Finans',
@@ -72,7 +72,7 @@ const model = computed(() => {
             ]
         },
         {
-            label: 'Satış & Crm',
+            label: '',
             items: [
                 {
                     label: 'Satış',
@@ -102,7 +102,7 @@ const model = computed(() => {
 
     if (authStore.isAdmin) {
         menu.push({
-            label: 'Sistem Yönetimi',
+            label: '',
             items: [
                 {
                     label: 'Yönetim',
@@ -122,7 +122,7 @@ const model = computed(() => {
 
     menu.push(
         {
-            label: 'Rapor Yönetimi',
+            label: '',
             items: [
                 {
                     label: 'Raporlar',
@@ -133,7 +133,7 @@ const model = computed(() => {
             ]
         },
         {
-            label: 'Ayarlar',
+            label: '',
             items: [
                 {
                     label: 'Ayarlar',
@@ -144,7 +144,7 @@ const model = computed(() => {
             ]
         },
         {
-            label: 'Parametreler',
+            label: '',
             items: [
                 {
                     label: 'Parametreler',
