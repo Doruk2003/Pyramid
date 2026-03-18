@@ -48,4 +48,18 @@ export class SupabaseLookupRepository implements ILookupRepository {
         if (error) return err(new Error(error.message));
         return ok(undefined);
     }
+
+    async saveCurrency(currency: Currency): Promise<Result<void>> {
+        const { error } = await supabase
+            .from('currencies')
+            .upsert({ id: currency.id || undefined, code: currency.code.toUpperCase().trim(), name: currency.name.trim() });
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async deleteCurrency(id: string): Promise<Result<void>> {
+        const { error } = await supabase.from('currencies').delete().eq('id', id);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
 }

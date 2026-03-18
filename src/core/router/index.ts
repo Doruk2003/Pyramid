@@ -50,6 +50,11 @@ const router = createRouter({
                     component: () => import('@/modules/admin/views/logs/SystemLogs.vue')
                 },
                 {
+                    path: '/admin/currencies',
+                    name: 'admin-currencies',
+                    component: () => import('@/modules/admin/views/currencies/CurrencyList.vue')
+                },
+                {
                     path: '/inventory/warehouses',
                     name: 'inventory-warehouses',
                     component: () => import('@/modules/inventory/views/warehouses/WarehouseList.vue')
@@ -93,6 +98,21 @@ const router = createRouter({
                     path: '/finance/invoices/edit/:id',
                     name: 'finance-invoice-edit',
                     component: () => import('@/modules/finance/views/invoices/InvoiceForm.vue')
+                },
+                {
+                    path: '/finance/exchange-rates',
+                    name: 'finance-exchange-rates',
+                    component: () => import('@/modules/finance/views/exchange-rates/ExchangeRateList.vue')
+                },
+                {
+                    path: '/sales/quotes',
+                    name: 'sales-quotes',
+                    component: () => import('@/modules/sales/views/quotes/QuoteList.vue')
+                },
+                {
+                    path: '/sales/orders',
+                    name: 'sales-orders',
+                    component: () => import('@/modules/sales/views/orders/OrderList.vue')
                 }
             ]
         },

@@ -15,7 +15,7 @@ export class AuthService {
                 error: sessionError
             } = await withTimeout(
                 supabase.auth.getSession(),
-                5000 // 5 saniye içinde cevap gelmezse timeout
+                10000 // 10 saniye içinde cevap gelmezse timeout
             );
 
             if (sessionError) return err(new Error(sessionError.message));

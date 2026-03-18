@@ -1,10 +1,10 @@
 ﻿<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { Warehouse, type WarehouseProps } from '@/modules/inventory/domain/warehouse.entity';
-import { useToast } from 'primevue/usetoast';
 import { getErrorMessage } from '@/shared/utils/error';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
 
 const invStore = useInventoryStore();
 const authStore = useAuthStore();
@@ -59,7 +59,7 @@ async function saveWarehouse() {
         companyId: authStore.user?.companyId || '',
         name: warehouse.value.name.trim(),
         location: warehouse.value.location,
-        isActive: warehouse.value.isActive,
+        isActive: warehouse.value.isActive ?? true,
         createdAt: warehouse.value.createdAt || new Date()
     });
 
@@ -127,7 +127,7 @@ function clearFilters() {
         </div>
 
         <div v-if="showFilters" class="card mb-4">
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                 <div class="col-span-1">
                     <InputText v-model="filterForm.name" placeholder="Depo Adı" fluid />
                 </div>
@@ -147,7 +147,11 @@ function clearFilters() {
         </div>
 
         <div class="card">
-            <DataTable :value="filteredWarehouses" dataKey="id" :paginator="true" :rows="10">
+            <DataTable :value="filteredWarehouses" dataKey="id" :paginator="true" :rows="10"
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                :rowsPerPageOptions="[5, 10, 25]"
+                currentPageReportTemplate="Gösterilen {first} - {last} / {totalRecords} depo"
+            >
                 <Column field="name" header="Depo Adı" sortable></Column>
                 <Column field="location" header="Konum" sortable></Column>
                 <Column field="isActive" header="Durum" sortable>

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useInactivityTimer } from '@/core/auth/useInactivityTimer';
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
-// Tüm eski Supabase session key'lerini temizle (pyramid-auth hariç)
-Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('sb-') && key !== 'pyramid-auth') {
-        localStorage.removeItem(key);
+// 15 dakika hareketsizlik sonrası otomatik oturum kapatma
+useInactivityTimer(async () => {
+    if (authStore.isAuthenticated) {
+        await authStore.logout();
+        router.push('/auth/login');
     }
 });
 

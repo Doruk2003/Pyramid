@@ -1,15 +1,20 @@
 ﻿<script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { useLookupStore } from '@/modules/inventory/application/lookup.store';
+import { useExchangeRateStore } from '@/modules/finance/application/exchange-rate.store';
 import { useAuthStore } from '@/core/auth/auth.store';
 import { Invoice, type InvoiceStatus, type InvoiceType } from '@/modules/finance/domain/invoice.entity';
+import { CurrencyConversionService } from '@/modules/finance/domain/currency-conversion.service';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { getErrorMessage } from '@/shared/utils/error';
 
 const financeStore = useFinanceStore();
 const productStore = useProductStore();
+const lookupStore = useLookupStore();
+const exchangeRateStore = useExchangeRateStore();
 const authStore = useAuthStore();
 const router = useRouter();
 const route = useRoute();
@@ -75,6 +80,8 @@ const taxRates = [
 onMounted(async () => {
     await financeStore.fetchAccounts();
     if (productStore.products.length === 0) await productStore.fetchProducts();
+    if (lookupStore.currencies.length === 0) await lookupStore.fetchAll();
+    await exchangeRateStore.fetchCurrentRates();
 
     if (isEdit) {
         await financeStore.fetchInvoices(); // Basitlik için tümünü çekip içinden bulalım
@@ -84,6 +91,32 @@ onMounted(async () => {
             invoice.value = { ...obj, issueDate: new Date(obj.issueDate), dueDate: obj.dueDate ? new Date(obj.dueDate) : null };
         }
     }
+});
+
+// Döviz değiştiğinde güncel kuru otomatik doldur
+watch(
+    () => invoice.value.currency,
+    (newCode) => {
+        if (!newCode || newCode === 'TRY') {
+            invoice.value.exchangeRate = 1;
+            return;
+        }
+        const rate = exchangeRateStore.getRateByCode(newCode);
+        if (rate > 0) invoice.value.exchangeRate = rate;
+    }
+);
+
+// TRY karşılığı toplamlar (yabancı dövizli faturalar için)
+const isForeignCurrency = computed(() => invoice.value.currency && invoice.value.currency !== 'TRY');
+
+const totalsTRY = computed(() => {
+    if (!isForeignCurrency.value) return null;
+    const rate = invoice.value.exchangeRate || 1;
+    return {
+        subtotal: CurrencyConversionService.toTRY(totals.value.subtotal, rate),
+        vatTotal: CurrencyConversionService.toTRY(totals.value.vatTotal, rate),
+        total: CurrencyConversionService.toTRY(totals.value.total, rate)
+    };
 });
 
 function addLine() {
@@ -203,11 +236,37 @@ function goBack() {
                         </div>
                         <div>
                             <label for="currency" class="block font-bold mb-3">Döviz</label>
-                            <InputText id="currency" v-model="invoice.currency" fluid />
+                            <Select
+                                id="currency"
+                                v-model="invoice.currency"
+                                :options="lookupStore.currencies"
+                                optionLabel="code"
+                                optionValue="code"
+                                fluid
+                            >
+                                <template #option="slotProps">
+                                    <span>
+                                        <Tag severity="info" :value="slotProps.option.code" class="mr-2" />
+                                        {{ slotProps.option.name }}
+                                    </span>
+                                </template>
+                            </Select>
                         </div>
                         <div>
-                            <label for="rate" class="block font-bold mb-3">Kur</label>
-                            <InputNumber id="rate" v-model="invoice.exchangeRate" :minFractionDigits="4" fluid />
+                            <label for="rate" class="block font-bold mb-3">
+                                Kur
+                                <span v-if="isForeignCurrency" class="font-normal text-surface-500 text-sm ml-1">
+                                    (1 {{ invoice.currency }} = ? ₺)
+                                </span>
+                            </label>
+                            <InputNumber
+                                id="rate"
+                                v-model="invoice.exchangeRate"
+                                :minFractionDigits="4"
+                                :maxFractionDigits="6"
+                                :disabled="!isForeignCurrency"
+                                fluid
+                            />
                         </div>
                     </div>
                 </div>
@@ -264,15 +323,23 @@ function goBack() {
                             <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
                                 <div class="flex justify-between">
                                     <span>Ara Toplam:</span>
-                                    <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                    <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span>KDV Toplam:</span>
-                                    <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                    <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
                                 </div>
                                 <div class="flex justify-between text-xl font-bold border-t pt-4">
                                     <span>Genel Toplam:</span>
-                                    <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
+                                    <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
+                                </div>
+                                <!-- TRY karşılığı (yabancı döviz ise göster) -->
+                                <div v-if="isForeignCurrency && totalsTRY" class="border-t pt-3 mt-1">
+                                    <div class="text-surface-500 text-sm mb-1">TRY Karşılığı (Kur: {{ invoice.exchangeRate }})</div>
+                                    <div class="flex justify-between font-bold text-primary">
+                                        <span>≈ TRY Toplam:</span>
+                                        <span>{{ totalsTRY.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} ₺</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

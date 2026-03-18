@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { Category } from '@/modules/inventory/domain/category.entity';
 import { Brand } from '@/modules/inventory/domain/brand.entity';
 import { ProductType } from '@/modules/inventory/domain/product-type.entity';
-import type { Currency } from '@/modules/inventory/domain/currency.entity';
+import { Currency } from '@/modules/inventory/domain/currency.entity';
 import { SupabaseLookupRepository } from '@/modules/inventory/infra/supabase-lookup.repository';
 import { FetchLookupsUseCase } from './fetch-lookups.usecase';
 
@@ -48,6 +48,26 @@ export const useLookupStore = defineStore('lookup', {
         async addProductType(name: string) {
             const type = ProductType.create({ id: '', name });
             const result = await lookupRepo.saveProductType(type); // UseCase eklenebilir
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async addCurrency(code: string, name: string) {
+            const currency = Currency.create({ id: '', code, name });
+            const result = await lookupRepo.saveCurrency(currency);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async editCurrency(id: string, code: string, name: string) {
+            const currency = Currency.create({ id, code, name });
+            const result = await lookupRepo.saveCurrency(currency);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async removeCurrency(id: string) {
+            const result = await lookupRepo.deleteCurrency(id);
             if (result.success) await this.fetchAll();
             return result;
         }

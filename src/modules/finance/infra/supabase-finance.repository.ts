@@ -14,6 +14,37 @@ function normalizeAddress(address: unknown): AddressValue {
     return null;
 }
 
+function rowToAccount(row: DbAccount): Account {
+    return Account.create({
+        id: row.id,
+        companyId: row.company_id,
+        accountType: row.account_type,
+        name: row.name,
+        taxNumber: row.tax_number,
+        taxOffice: row.tax_office,
+        email: row.email,
+        phone: row.phone,
+        address: normalizeAddress(row.address),
+        authorizedPerson: row.authorized_person,
+        authorizedGsm: row.authorized_gsm,
+        city: row.city,
+        district: row.district,
+        country: row.country,
+        bankName: row.bank_name,
+        accountOwner: row.account_owner,
+        iban: row.iban,
+        description: row.description,
+        isDealer: row.is_dealer,
+        dealerDiscount1: row.dealer_discount1 !== undefined ? Number(row.dealer_discount1) : undefined,
+        dealerDiscount2: row.dealer_discount2 !== undefined ? Number(row.dealer_discount2) : undefined,
+        dealerDiscount3: row.dealer_discount3 !== undefined ? Number(row.dealer_discount3) : undefined,
+        creditLimit: Number(row.credit_limit),
+        isActive: row.is_active,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+    });
+}
+
 export class SupabaseFinanceRepository implements IFinanceRepository {
     async getAccounts(filters?: AccountFilters): Promise<Result<Account[]>> {
         let query = supabase.from('accounts').select('*').eq('is_active', true);
@@ -22,46 +53,13 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const { data, error } = await query;
         if (error) return err(new Error(error.message));
 
-        return ok(
-            ((data as DbAccount[]) || []).map((row: DbAccount) =>
-                Account.create({
-                    id: row.id,
-                    companyId: row.company_id,
-                    accountType: row.account_type,
-                    name: row.name,
-                    taxNumber: row.tax_number,
-                    email: row.email,
-                    phone: row.phone,
-                    address: normalizeAddress(row.address),
-                    creditLimit: Number(row.credit_limit),
-                    isActive: row.is_active,
-                    createdAt: new Date(row.created_at),
-                    updatedAt: new Date(row.updated_at)
-                })
-            )
-        );
+        return ok(((data as DbAccount[]) || []).map(rowToAccount));
     }
 
     async getAccountById(id: string): Promise<Result<Account>> {
         const { data, error } = await supabase.from('accounts').select('*').eq('id', id).single();
         if (error) return err(new Error(error.message));
-        const row = data as DbAccount;
-        return ok(
-            Account.create({
-                id: row.id,
-                companyId: row.company_id,
-                accountType: row.account_type,
-                name: row.name,
-                taxNumber: row.tax_number,
-                email: row.email,
-                phone: row.phone,
-                address: normalizeAddress(row.address),
-                creditLimit: Number(row.credit_limit),
-                isActive: row.is_active,
-                createdAt: new Date(row.created_at),
-                updatedAt: new Date(row.updated_at)
-            })
-        );
+        return ok(rowToAccount(data as DbAccount));
     }
 
     async saveAccount(account: Account): Promise<Result<void>> {
@@ -72,9 +70,23 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             account_type: obj.accountType,
             name: obj.name,
             tax_number: obj.taxNumber,
+            tax_office: obj.taxOffice,
             email: obj.email,
             phone: obj.phone,
             address: obj.address,
+            authorized_person: obj.authorizedPerson,
+            authorized_gsm: obj.authorizedGsm,
+            city: obj.city,
+            district: obj.district,
+            country: obj.country,
+            bank_name: obj.bankName,
+            account_owner: obj.accountOwner,
+            iban: obj.iban,
+            description: obj.description,
+            is_dealer: obj.isDealer,
+            dealer_discount1: obj.dealerDiscount1,
+            dealer_discount2: obj.dealerDiscount2,
+            dealer_discount3: obj.dealerDiscount3,
             credit_limit: obj.creditLimit,
             is_active: obj.isActive,
             updated_at: new Date().toISOString()

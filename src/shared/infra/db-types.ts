@@ -30,9 +30,23 @@ export interface DbAccount {
     account_type: 'customer' | 'supplier' | 'both';
     name: string;
     tax_number?: string;
+    tax_office?: string;
     email?: string;
     phone?: string;
     address?: unknown;
+    authorized_person?: string;
+    authorized_gsm?: string;
+    city?: string;
+    district?: string;
+    country?: string;
+    bank_name?: string;
+    account_owner?: string;
+    iban?: string;
+    description?: string;
+    is_dealer?: boolean;
+    dealer_discount1?: number;
+    dealer_discount2?: number;
+    dealer_discount3?: number;
     credit_limit: number;
     is_active: boolean;
     created_at: string;
@@ -105,4 +119,20 @@ export interface DbUser {
     role: 'admin' | 'manager' | 'user' | 'viewer';
     is_active: boolean;
     created_at: string;
+}
+
+export interface DbExchangeRate {
+    id: string;
+    company_id: string;
+    currency_id: string;
+    rate: number;
+    effective_date: string;
+    notes?: string;
+    created_by?: string;
+    created_at: string;
+    // JOIN sonucu
+    currencies?: {
+        code: string;
+        name: string;
+    };
 }

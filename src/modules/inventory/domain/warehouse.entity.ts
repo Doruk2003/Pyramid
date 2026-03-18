@@ -9,6 +9,7 @@ export interface WarehouseProps {
 
 export class Warehouse {
     constructor(private props: WarehouseProps) {}
+
     get id(): string {
         return this.props.id;
     }
@@ -18,6 +19,10 @@ export class Warehouse {
     get location(): string | undefined {
         return this.props.location;
     }
+    get isActive(): boolean {
+        return this.props.isActive;
+    }
+
     static create(props: WarehouseProps): Warehouse {
         return new Warehouse(props);
     }
