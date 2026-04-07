@@ -1,4 +1,4 @@
-# 🚀 ANTİGRAVİTY AI — OTURUM BAŞLANGIÇ TALİMATLARI
+﻿# 🚀 ANTİGRAVİTY AI — OTURUM BAŞLANGIÇ TALİMATLARI
 
 ## Bu Dosyayı Her Oturum Başında Oku
 

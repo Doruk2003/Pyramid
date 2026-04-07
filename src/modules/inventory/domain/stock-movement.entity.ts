@@ -32,6 +32,9 @@ export class StockMovement {
     get movementType(): MovementType {
         return this.props.movementType;
     }
+    get note(): string | undefined {
+        return this.props.note;
+    }
     get createdAt(): Date {
         return this.props.createdAt;
     }

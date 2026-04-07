@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { Warehouse, type WarehouseProps } from '@/modules/inventory/domain/warehouse.entity';
@@ -11,6 +11,8 @@ const authStore = useAuthStore();
 const toast = useToast();
 
 const warehouseDialog = ref(false);
+const deleteDialog = ref(false);
+const warehouseToDelete = ref<Warehouse | null>(null);
 type WarehouseForm = Partial<WarehouseProps>;
 const warehouse = ref<WarehouseForm>({});
 const submitted = ref(false);
@@ -35,8 +37,12 @@ const statusOptions = [
     { label: 'Pasif', value: false }
 ];
 
-onMounted(() => {
-    invStore.fetchWarehouses();
+onMounted(async () => {
+    try {
+        await invStore.fetchWarehouses();
+    } catch (err) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Depolar yüklenirken bir sorun oluştu', life: 3000 });
+    }
 });
 
 function openNew() {
@@ -71,6 +77,23 @@ async function saveWarehouse() {
     } else {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
+}
+
+function confirmDelete(w: Warehouse) {
+    warehouseToDelete.value = w;
+    deleteDialog.value = true;
+}
+
+async function deleteWarehouse() {
+    if (!warehouseToDelete.value?.id) return;
+    const result = await invStore.deleteWarehouse(warehouseToDelete.value.id);
+    deleteDialog.value = false;
+    if (result.success) {
+        toast.add({ severity: 'success', summary: 'Silindi', detail: 'Depo başarıyla silindi', life: 3000 });
+    } else {
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
+    }
+    warehouseToDelete.value = null;
 }
 
 const filteredWarehouses = computed(() => {
@@ -114,7 +137,7 @@ function clearFilters() {
     <div>
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Depo Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Depo Yönetimi</div>
             </div>
             <Toolbar>
                 <template #start>
@@ -159,9 +182,22 @@ function clearFilters() {
                         <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                     </template>
                 </Column>
-                <Column header="İşlemler">
+                <Column header="İşlemler" style="min-width: 100px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editWarehouse(slotProps.data)" />
+                        <Button
+                            icon="pi pi-pencil"
+                            outlined rounded
+                            class="mr-2"
+                            v-tooltip.top="'Düzenle'"
+                            @click="editWarehouse(slotProps.data)"
+                        />
+                        <Button
+                            icon="pi pi-trash"
+                            outlined rounded
+                            severity="danger"
+                            v-tooltip.top="'Sil'"
+                            @click="confirmDelete(slotProps.data)"
+                        />
                     </template>
                 </Column>
             </DataTable>
@@ -196,6 +232,29 @@ function clearFilters() {
             <template #footer>
                 <Button label="İptal" icon="pi pi-times" text @click="warehouseDialog = false" />
                 <Button label="Kaydet" icon="pi pi-check" @click="saveWarehouse" />
+            </template>
+        </Dialog>
+
+        <!-- Silme Onay Dialogu -->
+        <Dialog
+            v-model:visible="deleteDialog"
+            :style="{ width: '420px' }"
+            header="Depo Silme Onayı"
+            :modal="true"
+        >
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500" />
+                <div>
+                    <p class="font-semibold mb-1">Bu depoyu silmek istediğinizden emin misiniz?</p>
+                    <p class="text-surface-600 dark:text-surface-400 text-sm">
+                        <strong>{{ warehouseToDelete?.name }}</strong> deposu soft-delete ile işaretlenecek.
+                        Stok hareketleri ve geçmiş kayıtlar korunacaktır.
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="İptal" icon="pi pi-times" text @click="deleteDialog = false" />
+                <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteWarehouse" />
             </template>
         </Dialog>
     </div>

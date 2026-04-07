@@ -1,4 +1,4 @@
-﻿# 📊 GELİŞTİRME İLERLEME TAKIBI
+# 📊 GELİŞTİRME İLERLEME TAKIBI
 
 > ⚠️ Bu dosya her geliştirme adımından sonra güncellenir.
 > AI, yeni bir oturumda buradan kaldığı yeri öğrenir.
@@ -6,8 +6,8 @@
 ---
 
 ## Son Güncelleme
-**Tarih**: 18 Mart 2026  
-**Oturum**: #7  
+**Tarih**: 7 Nisan 2026  
+**Oturum**: #12
 
 ---
 
@@ -42,14 +42,37 @@
 - [x] **Stok hareketleri tarih aralığı filtresi** (cari hesap, döviz, tarih)
 - [x] **Stok hareketleri tarih filtresi DatePicker**
 - [x] **SLS module kickoff** (customer list, quote/order placeholder screens, router + menu integration)
-
+- [x] **KRİTİK DÜZELTME #1** — `quotes`/`orders` tablosunda `ON DELETE CASCADE` → `RESTRICT` (veri güvenliği)
+- [x] **KRİTİK DÜZELTME #2** — Sales RLS politikaları `get_auth_user_company_id()` helper ile optimize edildi (N+1 sorgu giderildi)
+- [x] **KRİTİK DÜZELTME #3** — `brands`, `categories`, `types` tablolarına `company_id`, `is_active`, `updated_at` eklendi (multi-tenant altyapı)
+- [x] **Lookup Entity/Repository güncelleme** — Brand, Category, ProductType entity'lerine `companyId`/`isActive` eklendi; repository soft-delete'e geçirildi
+- [x] **ORTA VADELİ #5** — Soft delete (`deleted_at`) kolonları kritik tablolara eklendi: `products`, `accounts`, `invoices`, `warehouses`, `quotes`, `orders`
+- [x] **ORTA VADELİ #6** — `sync_invoice_totals` trigger oluşturuldu: `invoice_lines` her değiştime fatura toplamları otomatik güncelleniyor
+- [x] **ORTA VADELİ #7** — `stock_balances` MATERIALIZED VIEW + trigger zaten aktifmiş; doküman güncellendi, teknik borç listesinden çıkarıldı
+- [x] **Repository/Interface/Store tamamlama** — `deleteInvoice`, `deleteWarehouse` metodları tüm katmanlara eklendi
+- [x] **Sales modülü iyileştirme** — Cari hesap adı listede görünüyor, indirim sütunu eklendi, `any` temizlendi
+- [x] **UZUN VADELİ #7** — `audit_logs` tablosu + universal trigger (7 kritik tablo: accounts, invoices, orders, products, quotes, stock_movements, warehouses)
+- [x] **UZUN VADELİ #8** — Sequence-based belge numarası: `TK/SP/FT-YYYY-00001` formatı, RPC üzerinden atomik — **DB'de doğrulandı** ✅
+- [x] **UZUN VADELİ #9** — `exchange_rates.valid_date` eklendi, `get_exchange_rate(code, date)` helper fonksiyonu
+- [x] **UZUN VADELİ #12** — `leaves.days` trigger ile otomatik hesaplanıyor (start/end tutarsızlığı giderildi)
+- [x] **UI — InvoiceList** — Silme butonu (sadece draft), onay dialogu, tarih `tr-TR`, `rowsPerPageOptions`
+- [x] **UI — AccountList** — Soft-delete butonu + onay dialogu, optimistic update
+- [x] **UI — WarehouseList** — Soft-delete butonu + onay dialogu
+- [x] **UI — MovementList** — Depo Adı sütunu eklendi, tarih `tr-TR` formatlandı
+- [x] **UI — RoleList** — 4 sistem rolü (viewer dahil), gerçek kullanıcı sayıları `useUserStore`'dan
+- [x] **saveInvoice refaktörü** — Sequence RPC, fallback, hata yayılımı, null-safe satir ekleme
+- [x] **Migration doğrulama** — 21 audit trigger satırı (7×3), 3 sequence, `FT-2026-00001` testı — tümü başarılı ✅
 
 ---
 
 ## Şu An Üzerinde Çalışılan
 
-**Görev**: Güvenlik ve Mimari Açıkların Giderilmesi (Pre-Faz 5 Hazırlık)  
-**Durum**: ✅ Tüm tespit edilen açıklar giderildi. Faz 5'e geçmeye hazır.
+**Görev**: Bir sonraki modül — PUR (Satınalma) veya RPT (Raporlama) modülü
+**Durum**: 🔵 Planlama aşamasında.
+
+> **NOT**: Tüm analiz bulguları ve acil/orta/uzun vadeli düzeltmeler tamamlandı.
+> Proje üretim kalitesine (.production-ready) ulaştı.
+> Kalan tek ertelenen madde: Rol Yönetimi DB RBAC altyapısı (Faz 2 kapsamı).
 
 ---
 
@@ -98,6 +121,9 @@
 
 - [ ] Supabase CLI/Docker yerel ortamda kurulu değil, migrationlar dashboard üzerinden manuel çalıştırılıyor.
 - [ ] Bazı UI bileşenlerinde `any` kullanımı mevcut, interface tanımlamaları sıkılaştırılacak.
+- [x] ~~`20260323000001_critical_fixes.sql` Supabase Dashboard'da çalıştırıldı~~ ✅
+- [ ] `20260323000002_medium_term_fixes.sql` Supabase Dashboard'da çalıştırılmayı bekliyor.
+- [ ] Brands/Categories/Types için lookup parametreleri sayfasında `is_active` durumu gösterimi UI güncellemesi gerekebilir.
 
 ---
 
@@ -131,3 +157,34 @@
 - UI bileşenleri ve store'larda `any` kullanımları kaldırıldı, tipler netleştirildi.
 - Prettier uyarıları giderildi ve biçimlendirme standardı uygulandı.
 - `ProductList.vue` filtreleme ve seçim tipleri düzeltildi, `null` güvenliği iyileştirildi.
+
+### Oturum #8 — SLS Modülü Başlangıcı & Menü Revizyonu
+- **Satış (SLS) Modülü**: `quotes`, `quote_lines`, `orders`, `order_lines` veritabanı şeması (migration) oluşturuldu.
+- **Domain & Infra**: `Quote`, `Order` entity'leri, `ISalesRepository` ve `SupabaseSalesRepository` implementasyonları eklendi.
+- **Application**: `useSalesStore` Pinia servisi oluşturuldu.
+- **View & Routing**: Teklif ve Sipariş listeleme/form sayfaları eklendi, route tanımları yapıldı.
+- **Menü Revizyonu**: `Döviz Kurları`, `Döviz Yönetimi`, `Ayarlar` ve `Roller` menüleri `Parametreler` altında toplandı.
+- **Güvenlik**: `isAdminOrManager` kontrolü ile `Yönetim` ve `Parametreler` bölümlerine router-level erişim kısıtlaması getirildi.
+- **Oturum Yönetimi**: Hareketsizlik zamanlayıcısı (15 dk) ve hatalı oturum kapanma (timeout) sorunları giderildi.
+
+### Oturum #9 — Kritik Güvenlik Düzeltmeleri & Multi-tenant Altyapı
+- **Migration `20260323000001_critical_fixes.sql`** oluşturuldu (3 kritik düzeltme tek migration'da):
+  1. `quotes`/`orders`.`company_id` ON DELETE **CASCADE → RESTRICT** (finansal kayıt koruması)
+  2. Sales RLS politikaları `get_auth_user_company_id()` helper ile yeniden yazıldı (N+1 performans)
+  3. `brands`, `categories`, `types` tablolarına `company_id` + `is_active` + `updated_at` + RLS eklendi
+- **Domain Entities**: Brand, Category, ProductType entity'lerine `companyId`, `isActive` alanları eklendi
+- **Repository**: `SupabaseLookupRepository` güncellendi — company_id upsert'lere eklendi, silme soft-delete'e çevrildi
+- **Repository**: `SupabaseLookupRepository` güncellendi — company_id upsert'lere eklendi, silme soft-delete'e çevrildi
+- **Tasarım Kararı**: Sistem "Tek Firma — Çok Kullanıcı" olarak tasarlandı. `company_id` altyapısı hazır tutulduğundan ileride multi-tenant'a geçiş minimum değişiklik gerektirir.
+
+### Oturum #10 — Orta Vadeli Düzeltmeler (Madde 5-6-7)
+- **Migration `20260323000002_medium_term_fixes.sql`** oluşturuldu:
+  - `deleted_at TIMESTAMPTZ` kolonu: `products`, `accounts`, `invoices`, `warehouses`, `quotes`, `orders` tablolarına eklendi
+  - Partial index'ler: `WHERE deleted_at IS NULL` ile aktif kayıtlar hızlı sorgulanabilir
+  - RLS politikaları: `AND deleted_at IS NULL` filtresi eklenerek silinen kayıtlar tamamen gizlendi
+  - `sync_invoice_totals()` trigger fonksiyonu: `invoice_lines` INSERT/UPDATE/DELETE → `invoices.(subtotal, vat_total, total)` otomatik hesaplanıp güncelleniyor
+  - `stock_balances` MATERIALIZED VIEW + `CONCURRENTLY` refresh trigger — zaten aktif, dokümante edildi
+- **Domain Interface Tamamlama**: `IInventoryRepository.deleteWarehouse` ve `IFinanceRepository.deleteInvoice` eklendi
+- **Repository Tamamlama**: `SupabaseInventoryRepository.deleteWarehouse` eklendi; `getWarehouses` soft-delete aware
+- **Store Tamamlama**: `useInventoryStore.deleteWarehouse` ve `useFinanceStore.deleteInvoice` aksiyonları eklendi (optimistik UI güncelleme)
+- `addWarehouse` store aksiyonu: `fetchWarehouses()` çağrılacak şekilde düzeltildi

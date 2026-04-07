@@ -1,12 +1,17 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useRouter } from 'vue-router';
-import type { InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
+import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '@/shared/utils/error';
+import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
 
 const financeStore = useFinanceStore();
 const router = useRouter();
+const toast = useToast();
 const showFilters = ref(false);
+const deleteDialog = ref(false);
+const invoiceToDelete = ref<Invoice | null>(null);
 
 interface InvoiceFilterForm {
     invoiceNumber: string;
@@ -46,6 +51,7 @@ const statusOptions: Array<{ label: string; value: InvoiceStatus }> = [
 
 onMounted(() => {
     financeStore.fetchInvoices();
+    financeStore.fetchAccounts(); // Filtre için cari hesaplar
 });
 
 function openNew() {
@@ -54,6 +60,27 @@ function openNew() {
 
 function viewInvoice(id: string) {
     router.push(`/finance/invoices/edit/${id}`);
+}
+
+function confirmDeleteInvoice(inv: Invoice) {
+    if (inv.status !== 'draft') {
+        toast.add({ severity: 'warn', summary: 'Uyarı', detail: 'Sadece Taslak statüsündeki faturalar silinebilir.', life: 4000 });
+        return;
+    }
+    invoiceToDelete.value = inv;
+    deleteDialog.value = true;
+}
+
+async function deleteInvoice() {
+    if (!invoiceToDelete.value?.id) return;
+    const result = await financeStore.deleteInvoice(invoiceToDelete.value.id);
+    deleteDialog.value = false;
+    if (result.success) {
+        toast.add({ severity: 'success', summary: 'Silindi', detail: 'Fatura silindi', life: 3000 });
+    } else {
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
+    }
+    invoiceToDelete.value = null;
 }
 
 function getInvoiceTypeLabel(type: InvoiceType) {
@@ -152,7 +179,7 @@ function clearFilters() {
     <div>
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Faturalar</h4>
+                <div class="m-0 text-2xl font-medium">Faturalar</div>
             </div>
             <Toolbar>
                 <template #start>
@@ -187,44 +214,86 @@ function clearFilters() {
                 <div class="col-span-1">
                     <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" fluid />
                 </div>
-                <div class="col-span-1 flex items-end">
+                <div class="col-span-1 flex items-end gap-1">
                     <Button label="Filtrele" class="w-full" @click="applyFilters" />
-                </div>
-                <div class="col-span-1 flex items-end">
                     <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <DataTable :value="filteredInvoices" dataKey="id" :paginator="true" :rows="10">
-                <Column field="invoiceNumber" header="Fatura No" sortable></Column>
-                <Column field="invoiceType" header="Tip" sortable>
+            <DataTable
+                :value="filteredInvoices"
+                dataKey="id"
+                :paginator="true"
+                :rows="10"
+                :rowsPerPageOptions="[10, 25, 50]"
+                emptyMessage="Kayıtlı fatura bulunamadı."
+            >
+                <Column field="invoiceNumber" header="Fatura No" sortable style="min-width: 130px" />
+                <Column field="invoiceType" header="Tip" sortable style="min-width: 110px">
                     <template #body="slotProps">
                         {{ getInvoiceTypeLabel(slotProps.data.invoiceType) }}
                     </template>
                 </Column>
-                <Column field="issueDate" header="Tarih" sortable>
+                <Column field="issueDate" header="Tarih" sortable style="min-width: 110px">
                     <template #body="slotProps">
-                        {{ new Date(slotProps.data.issueDate).toLocaleDateString() }}
+                        {{ new Date(slotProps.data.issueDate).toLocaleDateString('tr-TR') }}
                     </template>
                 </Column>
-                <Column field="status" header="Durum" sortable>
+                <Column field="status" header="Durum" sortable style="min-width: 110px">
                     <template #body="slotProps">
                         <Tag :severity="getStatusSeverity(slotProps.data.status)" :value="getStatusLabel(slotProps.data.status)" />
                     </template>
                 </Column>
-                <Column field="total" header="Toplam" sortable>
+                <Column field="total" header="Toplam" sortable style="min-width: 130px">
                     <template #body="slotProps">
-                        {{ formatCurrency(slotProps.data.total, slotProps.data.currency) }}
+                        <span class="font-semibold">{{ formatCurrency(slotProps.data.total, slotProps.data.currency) }}</span>
                     </template>
                 </Column>
-                <Column header="İşlemler">
+                <Column header="İşlemler" style="min-width: 110px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-search" outlined rounded class="mr-2" @click="viewInvoice(slotProps.data.id)" />
+                        <Button
+                            icon="pi pi-pencil"
+                            outlined rounded
+                            class="mr-2"
+                            v-tooltip.top="'Düzenle'"
+                            @click="viewInvoice(slotProps.data.id)"
+                        />
+                        <Button
+                            icon="pi pi-trash"
+                            outlined rounded
+                            severity="danger"
+                            v-tooltip.top="slotProps.data.status === 'draft' ? 'Sil' : 'Sadece taslak faturalar silinebilir'"
+                            :disabled="slotProps.data.status !== 'draft'"
+                            @click="confirmDeleteInvoice(slotProps.data)"
+                        />
                     </template>
                 </Column>
             </DataTable>
         </div>
+
+        <!-- Silme Onay Dialogu -->
+        <Dialog
+            v-model:visible="deleteDialog"
+            :style="{ width: '420px' }"
+            header="Fatura Silme Onayı"
+            :modal="true"
+        >
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500" />
+                <div>
+                    <p class="font-semibold mb-1">Bu faturayı silmek istediğinizden emin misiniz?</p>
+                    <p class="text-surface-600 dark:text-surface-400 text-sm">
+                        Fatura No: <strong>{{ invoiceToDelete?.invoiceNumber }}</strong> soft-delete ile işaretlenecek.
+                        Fatura geçmişi ve audit kaydı korunacaktır.
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="İptal" icon="pi pi-times" text @click="deleteDialog = false" />
+                <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteInvoice" />
+            </template>
+        </Dialog>
     </div>
 </template>

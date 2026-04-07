@@ -13,7 +13,12 @@ export class SupabaseProductRepository implements IProductRepository {
     }
 
     async list(): Promise<Result<Product[]>> {
-        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+        // Soft-delete: deleted_at IS NULL filtresi (RLS de uygular, çift güvence)
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
 
         if (error) return err(new Error(error.message));
         return ok(((data as DbProduct[]) || []).map((row) => this.mapToEntity(row)));
@@ -50,7 +55,12 @@ export class SupabaseProductRepository implements IProductRepository {
     }
 
     async delete(id: string): Promise<Result<void>> {
-        const { error } = await supabase.from('products').delete().eq('id', id);
+        // Soft delete: kayıt fiziksel olarak silinmez, deleted_at damgalanır.
+        // RLS politikası deleted_at IS NULL olmayan kayıtları otomatik gizler.
+        const { error } = await supabase
+            .from('products')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
 
         if (error) return err(new Error(error.message));
         return ok(undefined);

@@ -55,6 +55,11 @@ const router = createRouter({
                     component: () => import('@/modules/admin/views/currencies/CurrencyList.vue')
                 },
                 {
+                    path: '/admin/inventory-definitions',
+                    name: 'admin-inventory-definitions',
+                    component: () => import('@/modules/admin/views/inventory/InventoryDefinitions.vue')
+                },
+                {
                     path: '/inventory/warehouses',
                     name: 'inventory-warehouses',
                     component: () => import('@/modules/inventory/views/warehouses/WarehouseList.vue')
@@ -110,9 +115,29 @@ const router = createRouter({
                     component: () => import('@/modules/sales/views/quotes/QuoteList.vue')
                 },
                 {
+                    path: '/sales/quotes/create',
+                    name: 'sales-quote-create',
+                    component: () => import('@/modules/sales/views/quotes/QuoteForm.vue')
+                },
+                {
+                    path: '/sales/quotes/edit/:id',
+                    name: 'sales-quote-edit',
+                    component: () => import('@/modules/sales/views/quotes/QuoteForm.vue')
+                },
+                {
                     path: '/sales/orders',
                     name: 'sales-orders',
                     component: () => import('@/modules/sales/views/orders/OrderList.vue')
+                },
+                {
+                    path: '/sales/orders/create',
+                    name: 'sales-order-create',
+                    component: () => import('@/modules/sales/views/orders/OrderForm.vue')
+                },
+                {
+                    path: '/sales/orders/edit/:id',
+                    name: 'sales-order-edit',
+                    component: () => import('@/modules/sales/views/orders/OrderForm.vue')
                 }
             ]
         },
@@ -158,8 +183,10 @@ router.beforeEach(async (to) => {
         return '/auth/login';
     }
 
-    if (to.path.startsWith('/admin') && !authStore.isAdmin) {
-        return '/auth/access';
+    if (to.path.startsWith('/admin') || to.path.startsWith('/finance/exchange-rates')) {
+        if (!authStore.isAdminOrManager) {
+            return '/auth/access';
+        }
     }
 });
 

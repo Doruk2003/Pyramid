@@ -26,7 +26,7 @@ const getSeverity = (action: string) => {
 
 <template>
     <div class="card">
-        <span class="text-xl font-semibold block mb-4">Sistem Logları</span>
+        <div class="text-2xl font-medium block mb-4">Sistem Logları</div>
 
         <DataTable :value="logs" paginator :rows="10" tableStyle="min-width: 50rem">
             <Column field="date" header="Tarih">

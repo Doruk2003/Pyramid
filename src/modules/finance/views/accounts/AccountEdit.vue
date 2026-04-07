@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
@@ -202,7 +202,7 @@ function goBack() {
 <template>
     <div class="flex flex-col gap-0">
         <div class="card p-6 min-h-32 flex flex-col gap-0">
-            <h4 class="m-0 text-xl font-bold"> {{ account.name }}</h4>
+            <div class="m-0 text-2xl font-medium"> {{ account.name }}</div>
             <div class="text-surface-600 dark:text-surface-400">
                 <p>Değişiklikleri tamamladıktan sonra "Güncelle" butonu ile kaydedebilirsiniz.</p>
             </div>

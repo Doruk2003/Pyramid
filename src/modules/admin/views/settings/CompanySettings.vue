@@ -34,7 +34,7 @@ const saveSettings = async () => {
 
 <template>
     <div class="card">
-        <span class="text-xl font-semibold block mb-4">Şirket Ayarları</span>
+        <div class="text-2xl font-medium block mb-4">Şirket Ayarları</div>
         <div class="grid grid-cols-12 gap-4">
             <div class="col-span-12 md:col-span-6">
                 <label for="companyName" class="block font-bold mb-2">Şirket Adı</label>

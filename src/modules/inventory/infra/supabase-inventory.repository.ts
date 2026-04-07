@@ -15,7 +15,12 @@ interface DbStockBalance {
 
 export class SupabaseInventoryRepository implements IInventoryRepository {
     async getWarehouses(): Promise<Result<Warehouse[]>> {
-        const { data, error } = await supabase.from('warehouses').select('*').eq('is_active', true);
+        // Soft-delete: silinmiş depolar gösterilmez
+        const { data, error } = await supabase
+            .from('warehouses')
+            .select('*')
+            .eq('is_active', true)
+            .is('deleted_at', null);
         if (error) return err(new Error(error.message));
         return ok(
             ((data as DbWarehouse[]) || []).map((row: DbWarehouse) =>
@@ -29,6 +34,17 @@ export class SupabaseInventoryRepository implements IInventoryRepository {
                 })
             )
         );
+    }
+
+    async deleteWarehouse(id: string): Promise<Result<void>> {
+        // Soft delete: depo fiziksel olarak silinmez.
+        // Stok hareketleri ve geçmiş kayıtlar korunur.
+        const { error } = await supabase
+            .from('warehouses')
+            .update({ is_active: false, deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
     }
 
     async saveWarehouse(warehouse: Warehouse): Promise<Result<void>> {

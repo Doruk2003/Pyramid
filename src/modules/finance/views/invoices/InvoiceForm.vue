@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
@@ -88,7 +88,12 @@ onMounted(async () => {
         const found = financeStore.invoices.find((i) => i.id === invoiceId);
         if (found) {
             const obj = found.toObject();
-            invoice.value = { ...obj, issueDate: new Date(obj.issueDate), dueDate: obj.dueDate ? new Date(obj.dueDate) : null };
+            invoice.value = { 
+                ...obj, 
+                notes: obj.notes || '',
+                issueDate: new Date(obj.issueDate), 
+                dueDate: obj.dueDate ? new Date(obj.dueDate) : null 
+            };
         }
     }
 });
@@ -173,6 +178,7 @@ async function saveInvoice() {
     const t = totals.value;
     const inv = Invoice.create({
         ...invoice.value,
+        dueDate: invoice.value.dueDate || undefined,
         id: invoiceId || crypto.randomUUID(),
         companyId: authStore.user?.companyId || '',
         subtotal: t.subtotal,
@@ -204,7 +210,7 @@ function goBack() {
 <template>
     <div class="flex flex-col gap-0">
         <div class="card p-6 min-h-32 flex flex-col gap-0">
-            <h4 class="m-0 text-xl font-bold">{{ isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura' }}</h4>
+            <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura' }}</div>
             <div class="text-surface-600 dark:text-surface-400">
                 <p>Fatura bilgilerini ve kalemlerini buradan yönetebilirsiniz.</p>
             </div>

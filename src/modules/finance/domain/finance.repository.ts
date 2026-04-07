@@ -23,4 +23,6 @@ export interface IFinanceRepository {
     getInvoiceById(id: string): Promise<Result<Invoice>>;
     saveInvoice(invoice: Invoice): Promise<Result<void>>;
     updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>>;
+    // Soft delete: sadece 'draft' statüsündeki faturalar silinebilir
+    deleteInvoice(id: string): Promise<Result<void>>;
 }

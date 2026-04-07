@@ -226,7 +226,7 @@ const getBadgeSeverity = (role: UserRole) => {
         <!-- ── BAŞLIK + TOOLBAR ───────────────────────────────────────────── -->
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Kullanıcı Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Kullanıcı Yönetimi</div>
             </div>
 
             <Toolbar>

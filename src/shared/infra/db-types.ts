@@ -136,3 +136,70 @@ export interface DbExchangeRate {
         name: string;
     };
 }
+
+export interface DbQuote {
+    id: string;
+    company_id: string;
+    account_id: string;
+    quote_number: string;
+    issue_date: string;
+    valid_until?: string;
+    status: string;
+    subtotal: number;
+    vat_total: number;
+    total: number;
+    currency: string;
+    exchange_rate: number;
+    notes?: string;
+    created_at: string;
+    updated_at: string;
+    quote_lines?: DbQuoteLine[];
+}
+
+export interface DbQuoteLine {
+    id: string;
+    quote_id: string;
+    product_id: string;
+    description?: string;
+    quantity: number;
+    unit_price: number;
+    vat_rate: number;
+    discount_rate: number;
+    line_total: number;
+    sort_order: number;
+    created_at: string;
+}
+
+export interface DbOrder {
+    id: string;
+    company_id: string;
+    account_id: string;
+    quote_id?: string;
+    order_number: string;
+    issue_date: string;
+    due_date?: string;
+    status: string;
+    subtotal: number;
+    vat_total: number;
+    total: number;
+    currency: string;
+    exchange_rate: number;
+    notes?: string;
+    created_at: string;
+    updated_at: string;
+    order_lines?: DbOrderLine[];
+}
+
+export interface DbOrderLine {
+    id: string;
+    order_id: string;
+    product_id: string;
+    description?: string;
+    quantity: number;
+    unit_price: number;
+    vat_rate: number;
+    discount_rate: number;
+    line_total: number;
+    sort_order: number;
+    created_at: string;
+}

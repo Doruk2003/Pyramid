@@ -41,10 +41,7 @@ export class AuthService {
             // Timeout veya beklenmedik hata — bozuk session'ı temizle
             const message = e instanceof Error ? e.message : 'Unknown error';
             if (message === 'TIMEOUT') {
-                // Tüm sb- key'lerini temizle
-                Object.keys(localStorage).forEach((key) => {
-                    if (key.startsWith('sb-')) localStorage.removeItem(key);
-                });
+                console.warn('Supabase getSession timeout');
             }
             return ok(null); // null dönünce router guard login'e yönlendirir
         }

@@ -182,7 +182,7 @@ onMounted(async () => {
         <!-- Başlık & Toolbar -->
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Döviz Kur Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Döviz Kur Yönetimi</div>
             </div>
             <Toolbar>
                 <template #start>
@@ -250,9 +250,9 @@ onMounted(async () => {
                     </template>
                 </Column>
                 <Column field="currencyName" header="Döviz Adı" sortable></Column>
-                <Column field="rate" header="Güncel Kur (TRY Karşılığı)" sortable>
+                <Column field="rate" header="Güncel Kur - TL Karşılığı " sortable>
                     <template #body="slotProps">
-                        <span class="font-bold text-lg">
+                        <span class="font-medium text-md">
                             1 {{ slotProps.data.currencyCode }} = {{ formatRate(slotProps.data.rate) }} ₺
                         </span>
                     </template>

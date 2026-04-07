@@ -18,6 +18,7 @@ export const useAuthStore = defineStore('auth', {
         isAuthenticated: (state) => !!state.user,
         isAdmin: (state) => state.user?.role === 'admin',
         isManager: (state) => state.user?.role === 'manager',
+        isAdminOrManager: (state) => state.user?.role === 'admin' || state.user?.role === 'manager',
         isUser: (state) => state.user?.role === 'user',
         isViewer: (state) => state.user?.role === 'viewer'
     },
@@ -31,10 +32,8 @@ export const useAuthStore = defineStore('auth', {
                 if (result.success) {
                     this.user = result.data;
                 }
-            } catch {
-                // Bozuk session varsa temizle
-                localStorage.clear();
-                sessionStorage.clear();
+            } catch (e) {
+                console.error("Auth initialize error:", e);
             }
             this.initialized = true;
             this.loading = false;

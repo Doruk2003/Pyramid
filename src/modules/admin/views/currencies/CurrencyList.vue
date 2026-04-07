@@ -131,7 +131,7 @@ onMounted(() => {
         <!-- Başlık & Toolbar -->
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Döviz Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Döviz Yönetimi</div>
             </div>
             <Toolbar>
                 <template #start>

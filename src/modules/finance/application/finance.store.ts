@@ -31,7 +31,10 @@ export const useFinanceStore = defineStore('finance', {
 
         async deleteAccount(id: string) {
             const result = await financeRepo.deleteAccount(id);
-            if (result.success) await this.fetchAccounts();
+            if (result.success) {
+                // Optimistic: silinen hesabı store'dan anında kaldır
+                this.accounts = this.accounts.filter((a) => a.id !== id);
+            }
             return result;
         },
 
@@ -52,6 +55,16 @@ export const useFinanceStore = defineStore('finance', {
         async updateStatus(id: string, status: InvoiceStatus) {
             const result = await financeRepo.updateInvoiceStatus(id, status);
             if (result.success) await this.fetchInvoices();
+            return result;
+        },
+
+        // Soft delete: sadece 'draft' statüsündeki faturalar silinebilir
+        async deleteInvoice(id: string) {
+            const result = await financeRepo.deleteInvoice(id);
+            if (result.success) {
+                // Store'dan anında kaldır (UI güncelle)
+                this.invoices = this.invoices.filter((inv) => inv.id !== id);
+            }
             return result;
         }
     }

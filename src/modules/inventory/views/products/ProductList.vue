@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { FilterMatchMode } from '@primevue/core/api';
@@ -297,7 +297,7 @@ function getPriceUnitLabel(value: string | null | undefined) {
         <div class="card mb-4">
             <!-- Üst Satır: Başlık (Solda) + Filtreler Butonu (Sağda) -->
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Ürün Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Ürün Yönetimi</div>
             </div>
 
             <!-- Alt Satır: Toolbar (Yeni, Sil, Dışa Aktar butonları) -->

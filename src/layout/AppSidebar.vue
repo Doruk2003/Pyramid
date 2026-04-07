@@ -60,7 +60,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="sidebarRef" class="layout-sidebar">
-        <AppMenu />
+    <div ref="sidebarRef" class="layout-sidebar flex flex-col justify-between overflow-y-hidden">
+        <div class="flex-1 overflow-y-auto pr-1">
+            <AppMenu />
+        </div>
+        <div class="sidebar-footer pt-4 pb-2 border-t border-surface-200 dark:border-surface-700 text-center text-xs">
+            <span class="text-surface-600 dark:text-surface-400">PYRAMID by</span>
+            <a href="https://primevue.org" target="_blank" rel="noopener noreferrer" class="ml-1 text-primary font-bold hover:underline">Oğuz TÜRKYILMAZ</a>
+        </div>
     </div>
 </template>

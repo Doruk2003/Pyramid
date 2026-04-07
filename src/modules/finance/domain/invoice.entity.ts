@@ -61,6 +61,30 @@ export class Invoice {
     get vatTotal(): number {
         return this.props.vatTotal;
     }
+    get invoiceType(): InvoiceType {
+        return this.props.invoiceType;
+    }
+    get issueDate(): Date {
+        return this.props.issueDate;
+    }
+    get dueDate(): Date | undefined {
+        return this.props.dueDate;
+    }
+    get currency(): string {
+        return this.props.currency;
+    }
+    get exchangeRate(): number {
+        return this.props.exchangeRate;
+    }
+    get notes(): string | undefined {
+        return this.props.notes;
+    }
+    get paidAmount(): number {
+        return this.props.paidAmount;
+    }
+    get createdAt(): Date {
+        return this.props.createdAt;
+    }
     get lines(): readonly InvoiceLineProps[] {
         return this.props.lines;
     }

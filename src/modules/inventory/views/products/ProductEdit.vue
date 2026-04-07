@@ -82,7 +82,7 @@ const priceUnits = ref([
 
 const selectedCurrencyCode = computed(() => {
     if (!product.value.currency_id) return 'USD';
-    const curr = lookupStore.currencies.find((c: Currency) => c.id === product.value.currency_id);
+    const curr = lookupStore.currencies.find((c: any) => c.id === product.value.currency_id);
     return curr ? curr.code : 'USD';
 });
 
@@ -143,19 +143,19 @@ function normalizeInventoryStatus(value: unknown): string | null {
 function buildProductPayload() {
     return {
         name: product.value.name?.trim() || '',
-        description: product.value.description || '',
-        price: product.value.price || null,
-        currency_id: product.value.currency_id || null,
-        tax_rate: product.value.tax_rate || 0,
+        description: product.value.description || undefined,
+        price: product.value.price || 0,
+        currency_id: product.value.currency_id || undefined,
+        tax_rate: product.value.tax_rate ?? 0,
         price_unit: product.value.price_unit || 'pcs',
-        category_id: product.value.category_id || null,
-        brand_id: product.value.brand_id || null,
-        type_id: product.value.type_id || null,
-        inventoryStatus: normalizeInventoryStatus(product.value.inventoryStatus),
-        initial_stock: product.value.initial_stock || null,
-        min_stock: product.value.min_stock || null,
-        max_stock: product.value.max_stock || null,
-        barcode: product.value.barcode?.trim() || null,
+        category_id: product.value.category_id || undefined,
+        brand_id: product.value.brand_id || undefined,
+        type_id: product.value.type_id || undefined,
+        inventoryStatus: normalizeInventoryStatus(product.value.inventoryStatus) || undefined,
+        initial_stock: product.value.initial_stock ?? undefined,
+        min_stock: product.value.min_stock ?? undefined,
+        max_stock: product.value.max_stock ?? undefined,
+        barcode: product.value.barcode?.trim() || undefined,
         status: product.value.status || 'ACTIVE',
         images: product.value.images ?? [],
         image: product.value.image || 'product-placeholder.svg',
@@ -163,9 +163,10 @@ function buildProductPayload() {
     };
 }
 
-function onImageSelected(event: { files?: File[]; target?: HTMLInputElement | null } | Event) {
-    const files = 'files' in event && Array.isArray(event.files) ? event.files : (event as Event).target && 'files' in (event as Event).target ? Array.from(((event as Event).target as HTMLInputElement).files || []) : [];
-    imageFiles.value = Array.from(files).slice(0, 6);
+function onImageSelected(event: any) {
+    const target = event.target as HTMLInputElement;
+    const files: File[] = event.files || (target && target.files ? Array.from(target.files) : []);
+    imageFiles.value = files.slice(0, 6);
 }
 
 async function uploadImage() {
@@ -209,9 +210,17 @@ async function saveProduct() {
 
     const payload = buildProductPayload();
     const productEntity = Product.create({
-        id: product.value.id,
+        id: product.value.id || '',
         companyId: product.value.companyId || authStore.user?.companyId || '',
-        ...payload,
+        name: payload.name,
+        description: payload.description,
+        price: payload.price,
+        status: payload.status,
+        images: payload.images,
+        image: payload.image,
+        code: payload.code,
+        barcode: payload.barcode,
+        inventoryStatus: payload.inventoryStatus,
         categoryId: payload.category_id,
         brandId: payload.brand_id,
         typeId: payload.type_id,
@@ -233,6 +242,8 @@ async function saveProduct() {
     }
 }
 
+
+
 function goBack() {
     router.push('/inventory/products');
 }
@@ -242,7 +253,7 @@ function goBack() {
     <div class="flex flex-col gap-3">
         <!-- Bilgilendirme Card'ı -->
         <div class="card p-6 min-h-32 flex flex-col gap-3">
-            <h4 class="m-0 text-xl font-bold">Ürün Düzenle: {{ product.name }}</h4>
+            <div class="m-0 text-2xl font-medium">Ürün Düzenle: {{ product.name }}</div>
             <div class="text-surface-600 dark:text-surface-400">
                 <p>Ürün bilgilerini güncellerken stok miktarlarını kontrol etmeyi unutmayın.</p>
                 <p>KDV oranı ve döviz birimi fiyatlandırma hesaplamalarını doğrudan etkiler.</p>
@@ -270,19 +281,28 @@ function goBack() {
                 </div>
 
                 <div class="col-span-12 lg:col-span-4">
-                    <label for="brand" class="block font-bold mb-3">Marka</label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="brand" class="font-bold">Marka</label>
+                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    </div>
                     <Select id="brand" v-model="product.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka Seç" fluid />
                     <small v-if="submitted && !product.brand_id" class="text-red-500">Marka zorunludur.</small>
                 </div>
 
                 <div class="col-span-12 lg:col-span-4">
-                    <label for="category" class="block font-bold mb-3">Kategori</label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="category" class="font-bold">Kategori</label>
+                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    </div>
                     <Select id="category" v-model="product.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori Seç" fluid />
                     <small v-if="submitted && !product.category_id" class="text-red-500">Kategori zorunludur.</small>
                 </div>
 
                 <div class="col-span-12 lg:col-span-4">
-                    <label for="type" class="block font-bold mb-3">Tip</label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="type" class="font-bold">Tip</label>
+                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    </div>
                     <Select id="type" v-model="product.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
                     <small v-if="submitted && !product.type_id" class="text-red-500">Tip zorunludur.</small>
                 </div>

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
@@ -49,7 +49,11 @@ function openNew() {
 }
 
 function getProductName(id: string) {
-    return productStore.products.find((p) => p.id === id)?.name || '-';
+    return productStore.products.find((p) => p.id === id)?.name || '—';
+}
+
+function getWarehouseName(id: string) {
+    return invStore.warehouses.find((w) => w.id === id)?.name || '—';
 }
 
 function getMovementTypeLabel(type: MovementType) {
@@ -129,7 +133,7 @@ function clearFilters() {
     <div>
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Stok Hareketleri</h4>
+                <div class="m-0 text-2xl font-medium">Stok Hareketleri</div>
             </div>
             <Toolbar>
                 <template #start>
@@ -171,24 +175,36 @@ function clearFilters() {
         </div>
 
         <div class="card">
-            <DataTable :value="filteredMovements" dataKey="id" :paginator="true" :rows="10">
-                <Column field="createdAt" header="Tarih" sortable>
+            <DataTable
+                :value="filteredMovements"
+                dataKey="id"
+                :paginator="true"
+                :rows="10"
+                :rowsPerPageOptions="[10, 25, 50]"
+                emptyMessage="Stok hareketi bulunamadı."
+            >
+                <Column field="createdAt" header="Tarih" sortable style="min-width: 130px">
                     <template #body="slotProps">
-                        {{ new Date(slotProps.data.createdAt).toLocaleString() }}
+                        {{ new Date(slotProps.data.createdAt).toLocaleString('tr-TR') }}
                     </template>
                 </Column>
-                <Column field="productId" header="Ürün" sortable>
+                <Column field="productId" header="Ürün" sortable style="min-width: 160px">
                     <template #body="slotProps">
                         {{ getProductName(slotProps.data.productId) }}
                     </template>
                 </Column>
-                <Column field="movementType" header="Tip" sortable>
+                <Column field="warehouseId" header="Depo" sortable style="min-width: 130px">
+                    <template #body="slotProps">
+                        {{ getWarehouseName(slotProps.data.warehouseId) }}
+                    </template>
+                </Column>
+                <Column field="movementType" header="Tip" sortable style="min-width: 110px">
                     <template #body="slotProps">
                         <Tag :severity="getMovementSeverity(slotProps.data.movementType)" :value="getMovementTypeLabel(slotProps.data.movementType)" />
                     </template>
                 </Column>
-                <Column field="quantity" header="Miktar" sortable></Column>
-                <Column field="note" header="Not"></Column>
+                <Column field="quantity" header="Miktar" sortable style="min-width: 80px" />
+                <Column field="note" header="Not" style="min-width: 150px" />
             </DataTable>
         </div>
     </div>

@@ -61,11 +61,6 @@ const model = computed(() => {
                             label: 'Cari Hesaplar',
                             icon: 'pi pi-fw pi-address-book',
                             to: '/finance/accounts'
-                        },
-                        {
-                            label: 'Döviz Kurları',
-                            icon: 'pi pi-fw pi-chart-line',
-                            to: '/finance/exchange-rates'
                         }
                     ]
                 }
@@ -88,11 +83,6 @@ const model = computed(() => {
                             label: 'Siparişler',
                             icon: 'pi pi-fw pi-shopping-bag',
                             to: '/sales/orders'
-                        },
-                        {
-                            label: 'Müşteriler',
-                            icon: 'pi pi-fw pi-users',
-                            to: '/sales/customers'
                         }
                     ]
                 }
@@ -100,25 +90,20 @@ const model = computed(() => {
         }
     ];
 
-    if (authStore.isAdmin) {
-        menu.push({
-            label: '',
-            items: [
-                {
-                    label: 'Yönetim',
-                    icon: 'pi pi-fw pi-cog',
-                    path: '/admin',
-                    items: [
-                        { label: 'Kullanıcılar', icon: 'pi pi-fw pi-user', to: '/admin/users' },
-                        { label: 'Roller', icon: 'pi pi-fw pi-shield', to: '/admin/roles' },
-                        { label: 'Döviz Yönetimi', icon: 'pi pi-fw pi-dollar', to: '/admin/currencies' },
-                        { label: 'Ayarlar', icon: 'pi pi-fw pi-sliders-h', to: '/admin/settings' },
-                        { label: 'Loglar', icon: 'pi pi-fw pi-list', to: '/admin/logs' }
-                    ]
-                }
-            ]
-        });
-    }
+    menu.push({
+        label: '',
+        items: [
+            {
+                label: 'Yönetim',
+                icon: 'pi pi-fw pi-cog',
+                path: '/admin',
+                items: [
+                    { label: 'Kullanıcılar', icon: 'pi pi-fw pi-user', to: '/admin/users' },
+                    { label: 'Loglar', icon: 'pi pi-fw pi-list', to: '/admin/logs' }
+                ]
+            }
+        ]
+    });
 
     menu.push(
         {
@@ -136,21 +121,16 @@ const model = computed(() => {
             label: '',
             items: [
                 {
-                    label: 'Ayarlar',
-                    icon: 'pi pi-fw pi-sliders-h',
-                    path: '/settings',
-                    items: []
-                }
-            ]
-        },
-        {
-            label: '',
-            items: [
-                {
                     label: 'Parametreler',
                     icon: 'pi pi-fw pi-list-check',
                     path: '/parameters',
-                    items: []
+                    items: [
+                        { label: 'Döviz Kurları', icon: 'pi pi-fw pi-chart-line', to: '/finance/exchange-rates' },
+                        { label: 'Roller', icon: 'pi pi-fw pi-shield', to: '/admin/roles' },
+                        { label: 'Döviz Yönetimi', icon: 'pi pi-fw pi-dollar', to: '/admin/currencies' },
+                        { label: 'Envanter Tanımları', icon: 'pi pi-fw pi-tags', to: '/admin/inventory-definitions' },
+                        { label: 'Ayarlar', icon: 'pi pi-fw pi-sliders-h', to: '/admin/settings' }
+                    ]
                 }
             ]
         }

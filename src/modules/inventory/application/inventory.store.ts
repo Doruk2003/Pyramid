@@ -27,7 +27,19 @@ export const useInventoryStore = defineStore('inventory', {
         },
 
         async addWarehouse(warehouse: Warehouse) {
-            return await invRepo.saveWarehouse(warehouse); // Warehouse için bir UseCase eklenebilir
+            const result = await invRepo.saveWarehouse(warehouse);
+            if (result.success) await this.fetchWarehouses();
+            return result;
+        },
+
+        async deleteWarehouse(id: string) {
+            // Soft delete: depo is_active=false + deleted_at damgalanır
+            const result = await invRepo.deleteWarehouse(id);
+            if (result.success) {
+                // Store'dan anında kaldır (UI güncelle)
+                this.warehouses = this.warehouses.filter((w) => w.id !== id);
+            }
+            return result;
         },
 
         async fetchMovements(productId?: string) {

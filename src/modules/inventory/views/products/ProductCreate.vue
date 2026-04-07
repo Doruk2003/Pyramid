@@ -92,7 +92,7 @@ const priceUnits = ref([
 
 const selectedCurrencyCode = computed(() => {
     if (!product.value.currency_id) return 'USD';
-    const curr = lookupStore.currencies.find((c) => c.id === product.value.currency_id);
+    const curr = lookupStore.currencies.find((c: any) => c.id === product.value.currency_id);
     return curr ? curr.code : 'USD';
 });
 
@@ -137,19 +137,19 @@ function createId() {
 function buildProductPayload() {
     return {
         name: product.value.name?.trim() || '',
-        description: product.value.description || '',
-        price: product.value.price || null,
-        currency_id: product.value.currency_id || null,
-        tax_rate: product.value.tax_rate || 0,
+        description: product.value.description || undefined,
+        price: product.value.price || 0,
+        currency_id: product.value.currency_id || undefined,
+        tax_rate: product.value.tax_rate ?? 0,
         price_unit: product.value.price_unit || 'pcs',
-        category_id: product.value.category_id || null,
-        brand_id: product.value.brand_id || null,
-        type_id: product.value.type_id || null,
-        inventoryStatus: normalizeInventoryStatus(product.value.inventoryStatus),
-        initial_stock: product.value.initial_stock || null,
-        min_stock: product.value.min_stock || null,
-        max_stock: product.value.max_stock || null,
-        barcode: product.value.barcode?.trim() || null,
+        category_id: product.value.category_id || undefined,
+        brand_id: product.value.brand_id || undefined,
+        type_id: product.value.type_id || undefined,
+        inventoryStatus: normalizeInventoryStatus(product.value.inventoryStatus) || undefined,
+        initial_stock: product.value.initial_stock ?? undefined,
+        min_stock: product.value.min_stock ?? undefined,
+        max_stock: product.value.max_stock ?? undefined,
+        barcode: product.value.barcode?.trim() || undefined,
         status: product.value.status || 'ACTIVE',
         images: product.value.images ?? [],
         image: product.value.image || 'product-placeholder.svg',
@@ -255,22 +255,22 @@ async function saveProduct() {
         companyId: authStore.user?.companyId || '',
         name: payload.name,
         description: payload.description,
-        price: payload.price ?? 0,
+        price: payload.price,
         status: payload.status,
         images: payload.images,
         image: payload.image,
         code: payload.code,
-        barcode: payload.barcode ?? undefined,
-        inventoryStatus: payload.inventoryStatus ?? undefined,
-        categoryId: payload.category_id ?? undefined,
-        brandId: payload.brand_id ?? undefined,
-        typeId: payload.type_id ?? undefined,
-        currencyId: payload.currency_id ?? undefined,
+        barcode: payload.barcode,
+        inventoryStatus: payload.inventoryStatus,
+        categoryId: payload.category_id,
+        brandId: payload.brand_id,
+        typeId: payload.type_id,
+        currencyId: payload.currency_id,
         taxRate: payload.tax_rate,
         priceUnit: payload.price_unit,
-        minStock: payload.min_stock ?? undefined,
-        maxStock: payload.max_stock ?? undefined,
-        initialStock: payload.initial_stock ?? undefined,
+        minStock: payload.min_stock,
+        maxStock: payload.max_stock,
+        initialStock: payload.initial_stock,
         createdAt: new Date()
     });
 
@@ -283,6 +283,8 @@ async function saveProduct() {
     }
 }
 
+
+
 function goBack() {
     router.push('/inventory/products');
 }
@@ -292,7 +294,7 @@ function goBack() {
     <div class="flex flex-col gap-0">
         <!-- Header Card -->
         <div class="card p-6 min-h-32 flex flex-col gap-0">
-            <h4 class="m-0 text-xl font-bold">Yeni Ürün Oluştur</h4>
+            <div class="m-0 text-2xl font-medium">Yeni Ürün Oluştur</div>
             <div class="text-surface-600 dark:text-surface-400">
                 <p>Ürün oluşturma işlemi sırasında tüm zorunlu alanları doldurduğunuzdan emin olun.</p>
             </div>
@@ -306,83 +308,92 @@ function goBack() {
                 <div class="grid grid-cols-12 gap-6 mb-6">
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="name" class="block font-bold mb-3">Ürün Adı</label>
+                        <label for="name" class="block font-semibold mb-3">Ürün Adı</label>
                         <InputText id="name" v-model.trim="product.name" required="true" autofocus :invalid="submitted && !product.name" fluid />
                         <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="barcode" class="block font-bold mb-3">Barkod / GTIN</label>
+                        <label for="barcode" class="block font-semibold mb-3">Barkod / GTIN</label>
                         <InputText id="barcode" v-model.trim="product.barcode" fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="inventoryStatus" class="block font-bold mb-3">Stok Takibi</label>
+                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
                         <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="brand" class="block font-bold mb-3">Marka</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="brand" class="font-semibold">Marka</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                        </div>
                         <Select id="brand" v-model="product.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka Seç" fluid />
                         <small v-if="submitted && !product.brand_id" class="text-red-500">Marka zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="category" class="block font-bold mb-3">Kategori</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="category" class="font-semibold">Kategori</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                        </div>
                         <Select id="category" v-model="product.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori Seç" fluid />
                         <small v-if="submitted && !product.category_id" class="text-red-500">Kategori zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="type" class="block font-bold mb-3">Tip</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="type" class="font-semibold">Tip</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                        </div>
                         <Select id="type" v-model="product.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
                         <small v-if="submitted && !product.type_id" class="text-red-500">Tip zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="taxRate" class="block font-bold mb-3">KDV Oran</label>
+                        <label for="taxRate" class="block font-semibold mb-3">KDV Oran</label>
                         <Select id="taxRate" v-model="product.tax_rate" :options="taxRates" optionLabel="label" optionValue="value" placeholder="KDV Oranı Seç" fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="price" class="block font-bold mb-3">Fiyat ( KDV Hariç )</label>
+                        <label for="price" class="block font-semibold mb-3">Fiyat ( KDV Hariç )</label>
                         <InputNumber id="price" v-model="product.price" mode="currency" :currency="selectedCurrencyCode" :locale="selectedCurrencyLocale" fluid />
                         <small v-if="submitted && (product.price === null || product.price === undefined)" class="text-red-500">Fiyat zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="currency" class="block font-bold mb-3">Döviz</label>
+                        <label for="currency" class="block font-semibold mb-3">Döviz</label>
                         <Select id="currency" v-model="product.currency_id" :options="lookupStore.currencies" optionLabel="code" optionValue="id" placeholder="Döviz Seç" fluid />
                         <small v-if="submitted && !product.currency_id" class="text-red-500">Döviz zorunludur.</small>
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="priceUnit" class="block font-bold mb-3">Birim</label>
+                        <label for="priceUnit" class="block font-semibold mb-3">Birim</label>
                         <Select id="priceUnit" v-model="product.price_unit" :options="priceUnits" optionLabel="label" optionValue="value" placeholder="Birim Seç" fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="minStock" class="block font-bold mb-3">Minimum Stok</label>
+                        <label for="minStock" class="block font-semibold mb-3">Minimum Stok</label>
                         <InputNumber id="minStock" v-model="product.min_stock" integeronly fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="maxStock" class="block font-bold mb-3">Maksimum Stok</label>
+                        <label for="maxStock" class="block font-semibold mb-3">Maksimum Stok</label>
                         <InputNumber id="maxStock" v-model="product.max_stock" integeronly fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
-                        <label for="initialStock" class="block font-bold mb-3">Mevcut Stok (Başlangıç)</label>
+                        <label for="initialStock" class="block font-semibold mb-3">Mevcut Stok (Başlangıç)</label>
                         <InputNumber id="initialStock" v-model="product.initial_stock" integeronly fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-8">
-                        <label for="description" class="block font-bold mb-3">Açıklama</label>
+                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
                         <Textarea id="description" v-model="product.description" rows="1" cols="20" fluid />
                     </div>    
 
                     <div class="col-span-12 lg:col-span-12">
-                        <label for="status" class="block font-bold mb-3">Durum</label>
+                        <label for="status" class="block font-semibold mb-3">Durum</label>
                         <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid />
                     </div>
 
@@ -403,7 +414,7 @@ function goBack() {
 
             <!-- RIGHT: Image Upload Panel -->
             <div class="card flex-shrink-0 flex flex-col gap-4" style="width: 320px;">
-                <h5 class="m-0 font-bold text-base">Ürün Görseli</h5>
+                <h5 class="m-0 font-semibold text-base">Ürün Görseli</h5>
 
                 <!-- Cover Image Drop Zone -->
                 <div

@@ -15,4 +15,7 @@ export interface ILookupRepository {
     saveProductType(type: ProductType): Promise<Result<void>>;
     saveCurrency(currency: Currency): Promise<Result<void>>;
     deleteCurrency(id: string): Promise<Result<void>>;
+    deleteCategory(id: string): Promise<Result<void>>;
+    deleteBrand(id: string): Promise<Result<void>>;
+    deleteProductType(id: string): Promise<Result<void>>;
 }

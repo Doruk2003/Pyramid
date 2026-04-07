@@ -47,7 +47,11 @@ function rowToAccount(row: DbAccount): Account {
 
 export class SupabaseFinanceRepository implements IFinanceRepository {
     async getAccounts(filters?: AccountFilters): Promise<Result<Account[]>> {
-        let query = supabase.from('accounts').select('*').eq('is_active', true);
+        let query = supabase
+            .from('accounts')
+            .select('*')
+            .eq('is_active', true)
+            .is('deleted_at', null); // Soft-delete: silinen cari hesaplar gizlenir
         if (filters?.accountType) query = query.eq('account_type', filters.accountType);
 
         const { data, error } = await query;
@@ -96,13 +100,21 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
     }
 
     async deleteAccount(id: string): Promise<Result<void>> {
-        const { error } = await supabase.from('accounts').update({ is_active: false }).eq('id', id);
+        // Soft delete: is_active = false + deleted_at damgalanır.
+        // Her iki alan da RLS politikasında kontrol edilir.
+        const { error } = await supabase
+            .from('accounts')
+            .update({ is_active: false, deleted_at: new Date().toISOString() })
+            .eq('id', id);
         if (error) return err(new Error(error.message));
         return ok(undefined);
     }
 
     async getInvoices(filters?: InvoiceFilters): Promise<Result<Invoice[]>> {
-        let query = supabase.from('invoices').select('*, invoice_lines(*)');
+        let query = supabase
+            .from('invoices')
+            .select('*, invoice_lines(*)')
+            .is('deleted_at', null); // Soft-delete: iptal edilmiş/silinen faturalar gizlenir
         if (filters?.invoiceType) query = query.eq('invoice_type', filters.invoiceType);
         if (filters?.accountId) query = query.eq('account_id', filters.accountId);
 
@@ -185,55 +197,106 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
     async saveInvoice(invoice: Invoice): Promise<Result<void>> {
         const obj = invoice.toObject();
+
+        // 1) Fatura numarası: boşsa DB sequence'tan atomik al
+        let invoiceNumber = obj.invoiceNumber?.trim();
+        if (!invoiceNumber) {
+            const { data: seqData, error: seqError } = await supabase.rpc('get_next_invoice_number');
+            if (seqError || !seqData) {
+                // Fallback: sequence yoksa yıl-bazlı üret
+                const { count } = await supabase
+                    .from('invoices')
+                    .select('id', { count: 'exact', head: true });
+                invoiceNumber = `FT-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(5, '0')}`;
+            } else {
+                invoiceNumber = seqData as string;
+            }
+        }
+
+        // 2) Fatura başlığını kaydet (upsert)
+        //    NOT: subtotal/vat_total/total burada da gönderiliyor ancak
+        //    sync_invoice_totals trigger'ı satır eklendikten sonra bunları
+        //    otomatik yeniden hesaplayacak — tutarlılık trigger üzerinden sağlanır.
         const { data, error } = await supabase
             .from('invoices')
             .upsert({
                 id: obj.id || undefined,
                 company_id: obj.companyId,
                 invoice_type: obj.invoiceType,
-                invoice_number: obj.invoiceNumber,
+                invoice_number: invoiceNumber, // sequence veya kullanıcının girdiği değer
                 account_id: obj.accountId,
                 issue_date: obj.issueDate.toISOString().split('T')[0],
-                due_date: obj.dueDate?.toISOString().split('T')[0],
+                due_date: obj.dueDate?.toISOString().split('T')[0] ?? null,
                 status: obj.status,
-                subtotal: obj.subtotal,
-                vat_total: obj.vatTotal,
-                total: obj.total,
+                subtotal: obj.subtotal,   // trigger tarafından ezilecek
+                vat_total: obj.vatTotal,  // trigger tarafından ezilecek
+                total: obj.total,         // trigger tarafından ezilecek
                 paid_amount: obj.paidAmount,
                 currency: obj.currency,
                 exchange_rate: obj.exchangeRate,
-                notes: obj.notes,
+                notes: obj.notes ?? null,
                 updated_at: new Date().toISOString()
             })
-            .select()
+            .select('id')
             .single();
 
         if (error) return err(new Error(error.message));
 
-        // Kalemleri sil ve tekrar ekle (basit sync)
+        const savedId: string = data.id;
+
+        // 3) Satırları sil ve yeniden ekle
+        //    Düzenleme durumunda eski satırları temizle
         if (obj.id) {
-            await supabase.from('invoice_lines').delete().eq('invoice_id', obj.id);
+            const { error: delError } = await supabase
+                .from('invoice_lines')
+                .delete()
+                .eq('invoice_id', obj.id);
+            if (delError) return err(new Error(`Satır silme hatası: ${delError.message}`));
         }
 
-        const linePayloads = obj.lines.map((l) => ({
-            invoice_id: data.id,
-            product_id: l.productId,
-            description: l.description,
-            quantity: l.quantity,
-            unit_price: l.unitPrice,
-            vat_rate: l.vatRate,
-            discount_rate: l.discountRate,
-            line_total: l.lineTotal
-        }));
+        // 4) Yeni satırları toplu ekle
+        if (obj.lines.length > 0) {
+            const linePayloads = obj.lines.map((l) => ({
+                invoice_id: savedId,
+                product_id: l.productId || null,
+                description: l.description ?? null,
+                quantity: l.quantity,
+                unit_price: l.unitPrice,
+                vat_rate: l.vatRate,
+                discount_rate: l.discountRate,
+                line_total: l.lineTotal // = net + KDV (görüntüleme için; toplamlar trigger'dan gelir)
+            }));
 
-        const { error: lineError } = await supabase.from('invoice_lines').insert(linePayloads);
-        if (lineError) return err(new Error(lineError.message));
+            const { error: lineError } = await supabase
+                .from('invoice_lines')
+                .insert(linePayloads);
 
+            if (lineError) return err(new Error(`Satır ekleme hatası: ${lineError.message}`));
+        }
+
+        // 5) Son durum: sync_invoice_totals trigger satır INSERT/DELETE sonrası
+        //    invoices.subtotal/vat_total/total'ı otomatik güncelledi.
         return ok(undefined);
     }
 
+
     async updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>> {
-        const { error } = await supabase.from('invoices').update({ status }).eq('id', id);
+        const { error } = await supabase
+            .from('invoices')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async deleteInvoice(id: string): Promise<Result<void>> {
+        // Soft delete: fatura fiziksel olarak silinmez — yasal zorunluluk.
+        // Sadece taslak (draft) faturalar silinebilir; diğerleri iptal edilmeli.
+        const { error } = await supabase
+            .from('invoices')
+            .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .eq('status', 'draft'); // Güvenlik: sadece draft faturaları sil
         if (error) return err(new Error(error.message));
         return ok(undefined);
     }

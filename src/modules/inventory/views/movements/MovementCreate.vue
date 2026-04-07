@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -121,7 +121,7 @@ function goBack() {
 <template>
     <div class="flex flex-col gap-0">
         <div class="card p-6 min-h-32 flex flex-col gap-0">
-            <h4 class="m-0 text-xl font-bold">Yeni Stok Hareketi</h4>
+            <div class="m-0 text-2xl font-medium">Yeni Stok Hareketi</div>
             <div class="text-surface-600 dark:text-surface-400">
                 <p>Ürün giriş, çıkış veya depolar arası transfer işlemlerini buradan gerçekleştirebilirsiniz.</p>
             </div>

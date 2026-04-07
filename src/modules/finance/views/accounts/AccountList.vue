@@ -1,14 +1,19 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import type { Account } from '@/modules/finance/domain/account.entity';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '@/shared/utils/error';
 
 const router = useRouter();
 const financeStore = useFinanceStore();
+const toast = useToast();
 
 const selectedAccounts = ref<Account[]>([]);
 const showFilters = ref(false);
+const deleteDialog = ref(false);
+const accountToDelete = ref<Account | null>(null);
 
 interface AccountFilterForm {
     name: string;
@@ -53,6 +58,24 @@ function openNew() {
 
 function editAccount(acc: Account) {
     router.push(`/finance/accounts/edit/${acc.id}`);
+}
+
+function confirmDeleteAccount(acc: Account) {
+    accountToDelete.value = acc;
+    deleteDialog.value = true;
+}
+
+async function deleteAccount() {
+    if (!accountToDelete.value?.id) return;
+    const result = await financeStore.deleteAccount(accountToDelete.value.id);
+    deleteDialog.value = false;
+    if (result.success) {
+        toast.add({ severity: 'success', summary: 'Silindi', detail: 'Cari hesap silindi', life: 3000 });
+    } else {
+        // Aktif fatura/teklif varsa DB RESTRICT hatası döner
+        toast.add({ severity: 'error', summary: 'Silinemedi', detail: getErrorMessage(result.error), life: 5000 });
+    }
+    accountToDelete.value = null;
 }
 
 const accounts = computed(() => financeStore.accounts ?? []);
@@ -117,7 +140,7 @@ function clearFilters() {
     <div>
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <h4 class="m-0 text-xl font-semibold">Cari Hesap Yönetimi</h4>
+                <div class="m-0 text-2xl font-medium">Cari Hesap Yönetimi</div>
             </div>
 
             <Toolbar>
@@ -187,13 +210,48 @@ function clearFilters() {
                         <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                     </template>
                 </Column>
-                <Column header="İşlemler">
+                <Column header="İşlemler" style="min-width: 100px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editAccount(slotProps.data)" />
+                        <Button
+                            icon="pi pi-pencil"
+                            outlined rounded
+                            class="mr-2"
+                            v-tooltip.top="'Düzenle'"
+                            @click="editAccount(slotProps.data)"
+                        />
+                        <Button
+                            icon="pi pi-trash"
+                            outlined rounded
+                            severity="danger"
+                            v-tooltip.top="'Sil'"
+                            @click="confirmDeleteAccount(slotProps.data)"
+                        />
                     </template>
                 </Column>
             </DataTable>
         </div>
+
+        <!-- Silme Onay Dialogu -->
+        <Dialog
+            v-model:visible="deleteDialog"
+            :style="{ width: '420px' }"
+            header="Cari Hesap Silme Onayı"
+            :modal="true"
+        >
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500" />
+                <div>
+                    <p class="font-semibold mb-1">Bu cari hesabı silmek istediğinizden emin misiniz?</p>
+                    <p class="text-surface-600 dark:text-surface-400 text-sm">
+                        <strong>{{ accountToDelete?.name }}</strong> soft-delete ile işaretlenecek.
+                        Bu hesaba ait açık fatura veya teklif varsa silme işlemi başarısız olur.
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="İptal" icon="pi pi-times" text @click="deleteDialog = false" />
+                <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteAccount" />
+            </template>
+        </Dialog>
     </div>
 </template>
-

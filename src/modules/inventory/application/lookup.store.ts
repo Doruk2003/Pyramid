@@ -47,7 +47,46 @@ export const useLookupStore = defineStore('lookup', {
 
         async addProductType(name: string) {
             const type = ProductType.create({ id: '', name });
-            const result = await lookupRepo.saveProductType(type); // UseCase eklenebilir
+            const result = await lookupRepo.saveProductType(type);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async editCategory(id: string, name: string) {
+            const cat = Category.create({ id, name });
+            const result = await lookupRepo.saveCategory(cat);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async removeCategory(id: string) {
+            const result = await lookupRepo.deleteCategory(id);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async editBrand(id: string, name: string) {
+            const brand = Brand.create({ id, name });
+            const result = await lookupRepo.saveBrand(brand);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async removeBrand(id: string) {
+            const result = await lookupRepo.deleteBrand(id);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async editProductType(id: string, name: string) {
+            const type = ProductType.create({ id, name });
+            const result = await lookupRepo.saveProductType(type);
+            if (result.success) await this.fetchAll();
+            return result;
+        },
+
+        async removeProductType(id: string) {
+            const result = await lookupRepo.deleteProductType(id);
             if (result.success) await this.fetchAll();
             return result;
         },
