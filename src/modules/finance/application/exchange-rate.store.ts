@@ -41,7 +41,7 @@ export const useExchangeRateStore = defineStore('exchangeRate', {
                 const found = state.currentRates.find(
                     (r) => r.currencyCode.toUpperCase() === code.toUpperCase()
                 );
-                return (found as any as ExchangeRate) ?? null;
+                return (found as ExchangeRate | undefined) || null;
             },
 
         /**
