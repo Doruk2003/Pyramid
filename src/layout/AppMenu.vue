@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { useAuthStore } from '@/core/auth/auth.store';
 import { computed } from 'vue';
 import AppMenuItem from './AppMenuItem.vue';
-
-const authStore = useAuthStore();
 
 const model = computed(() => {
     const menu = [
