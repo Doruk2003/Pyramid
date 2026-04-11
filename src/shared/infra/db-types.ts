@@ -59,6 +59,7 @@ export interface DbInvoice {
     invoice_type: string;
     invoice_number: string;
     account_id: string;
+    warehouse_id?: string;
     issue_date: string;
     due_date?: string;
     status: string;
@@ -78,6 +79,7 @@ export interface DbInvoiceLine {
     id: string;
     invoice_id: string;
     product_id: string;
+    warehouse_id?: string;
     description?: string;
     quantity: number;
     unit_price: number;

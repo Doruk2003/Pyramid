@@ -62,6 +62,19 @@
 - [x] **UI — RoleList** — 4 sistem rolü (viewer dahil), gerçek kullanıcı sayıları `useUserStore`'dan
 - [x] **saveInvoice refaktörü** — Sequence RPC, fallback, hata yayılımı, null-safe satir ekleme
 - [x] **Migration doğrulama** — 21 audit trigger satırı (7×3), 3 sequence, `FT-2026-00001` testı — tümü başarılı ✅
+- [x] **Fatura-Depo Entegrasyonu** — Fatura başlığına ve kalemlerine `warehouse_id` eklendi; 'Kesildi' durumunda otomatik stok hareketi oluşturma altyapısı kuruldu ✅
+
+---
+
+## Son Güncelleme
+**Tarih**: 11 Nisan 2026  
+**Oturum**: #13
+
+---
+
+## Oturum Notları
+... (existing notes)
+- [x] **Fatura-Depo Entegrasyonu** — Fatura başlığına ve kalemlerine `warehouse_id` eklendi; 'Kesildi' durumunda otomatik stok hareketi oluşturma altyapısı kuruldu ✅
 
 ---
 

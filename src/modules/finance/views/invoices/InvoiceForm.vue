@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useExchangeRateStore } from '@/modules/finance/application/exchange-rate.store';
 import { useAuthStore } from '@/core/auth/auth.store';
@@ -13,6 +14,7 @@ import { getErrorMessage } from '@/shared/utils/error';
 
 const financeStore = useFinanceStore();
 const productStore = useProductStore();
+const inventoryStore = useInventoryStore(); // Yeni eklendi
 const lookupStore = useLookupStore();
 const exchangeRateStore = useExchangeRateStore();
 const authStore = useAuthStore();
@@ -26,6 +28,7 @@ const isEdit = !!invoiceId;
 interface InvoiceLineForm {
     id: string;
     productId: string;
+    warehouseId?: string; // Yeni eklendi
     description?: string;
     quantity: number;
     unitPrice: number;
@@ -38,6 +41,7 @@ interface InvoiceFormModel {
     invoiceType: InvoiceType;
     invoiceNumber: string;
     accountId: string;
+    warehouseId: string; // Yeni eklendi (Header default)
     issueDate: Date;
     dueDate: Date | null;
     status: InvoiceStatus;
@@ -53,6 +57,7 @@ const invoice = ref<InvoiceFormModel>({
     invoiceType: 'sale',
     invoiceNumber: '',
     accountId: '',
+    warehouseId: '', // Yeni eklendi
     issueDate: new Date(),
     dueDate: null,
     status: 'draft',
@@ -80,6 +85,7 @@ const taxRates = [
 onMounted(async () => {
     await financeStore.fetchAccounts();
     if (productStore.products.length === 0) await productStore.fetchProducts();
+    if (inventoryStore.warehouses.length === 0) await inventoryStore.fetchWarehouses(); // Yeni eklendi
     if (lookupStore.currencies.length === 0) await lookupStore.fetchAll();
     await exchangeRateStore.fetchCurrentRates();
 
@@ -90,11 +96,15 @@ onMounted(async () => {
             const obj = found.toObject();
             invoice.value = { 
                 ...obj, 
+                warehouseId: obj.warehouseId || '',
                 notes: obj.notes || '',
                 issueDate: new Date(obj.issueDate), 
                 dueDate: obj.dueDate ? new Date(obj.dueDate) : null 
             };
         }
+    } else {
+        // Yeni fatura için otomatik bir satır ekle
+        addLine();
     }
 });
 
@@ -118,6 +128,8 @@ const totalsTRY = computed(() => {
     if (!isForeignCurrency.value) return null;
     const rate = invoice.value.exchangeRate || 1;
     return {
+        grossTotal: CurrencyConversionService.toTRY(totals.value.grossTotal, rate),
+        discountTotal: CurrencyConversionService.toTRY(totals.value.discountTotal, rate),
         subtotal: CurrencyConversionService.toTRY(totals.value.subtotal, rate),
         vatTotal: CurrencyConversionService.toTRY(totals.value.vatTotal, rate),
         total: CurrencyConversionService.toTRY(totals.value.total, rate)
@@ -128,6 +140,7 @@ function addLine() {
     invoice.value.lines.push({
         id: crypto.randomUUID(),
         productId: '',
+        warehouseId: invoice.value.warehouseId, // Header'daki depoyu varsayılan yap
         description: '',
         quantity: 1,
         unitPrice: 0,
@@ -150,19 +163,28 @@ function onProductChange(line: InvoiceLineForm) {
 }
 
 const totals = computed(() => {
-    let subtotal = 0;
+    let grossTotal = 0;
+    let discountTotal = 0;
     let vatTotal = 0;
 
     invoice.value.lines.forEach((line) => {
-        const lineSubtotal = line.quantity * (line.unitPrice || 0) * (1 - line.discountRate / 100);
+        const lineGross = line.quantity * (line.unitPrice || 0);
+        const lineDiscount = lineGross * (line.discountRate / 100);
+        const lineSubtotal = lineGross - lineDiscount;
         const lineVat = lineSubtotal * (line.vatRate / 100);
+        
         line.lineTotal = lineSubtotal + lineVat;
 
-        subtotal += lineSubtotal;
+        grossTotal += lineGross;
+        discountTotal += lineDiscount;
         vatTotal += lineVat;
     });
 
+    const subtotal = grossTotal - discountTotal;
+
     return {
+        grossTotal,
+        discountTotal,
         subtotal,
         vatTotal,
         total: subtotal + vatTotal
@@ -170,8 +192,8 @@ const totals = computed(() => {
 });
 
 async function saveInvoice() {
-    if (!invoice.value.accountId || !invoice.value.invoiceNumber || invoice.value.lines.length === 0) {
-        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 });
+    if (!invoice.value.accountId || !invoice.value.invoiceNumber || !invoice.value.warehouseId || invoice.value.lines.length === 0) {
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları (Cari, Fatura No, Depo ve Kalemler) doldurun', life: 3000 });
         return;
     }
 
@@ -233,6 +255,10 @@ function goBack() {
                             <Select id="account" v-model="invoice.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
                         </div>
                         <div>
+                            <label for="warehouse" class="block font-bold mb-3">Depo (Varsayılan)</label>
+                            <Select id="warehouse" v-model="invoice.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
+                        </div>
+                        <div>
                             <label for="date" class="block font-bold mb-3">Tarih</label>
                             <DatePicker id="date" v-model="invoice.issueDate" fluid />
                         </div>
@@ -274,15 +300,27 @@ function goBack() {
                                 fluid
                             />
                         </div>
+                        <div class="md:col-span-2 lg:col-span-3">
+                            <label for="notes" class="block font-bold mb-3">Notlar</label>
+                            <InputText id="notes" v-model="invoice.notes" placeholder="Fatura notu ekleyin..." fluid />
+                        </div>
                     </div>
                 </div>
 
                 <div>
-                    <h5 class="font-bold mb-4">Fatura Kalemleri</h5>
+                    <div class="flex justify-between items-center mb-4">
+                        <h5 class="font-bold m-0">Fatura Kalemleri</h5>
+                        <Button label="Kalem Ekle" icon="pi pi-plus" text size="small" @click="addLine" />
+                    </div>
                     <DataTable :value="invoice.lines" class="p-datatable-sm">
-                        <Column header="Ürün" style="width: 30%">
+                        <Column header="Ürün" style="width: 25%">
                             <template #body="slotProps">
                                 <Select v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                            </template>
+                        </Column>
+                        <Column header="Depo" style="width: 15%">
+                            <template #body="slotProps">
+                                <Select v-model="slotProps.data.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo" fluid />
                             </template>
                         </Column>
                         <Column header="Miktar" style="width: 10%">
@@ -316,18 +354,21 @@ function goBack() {
                             </template>
                         </Column>
                     </DataTable>
-                    <Button label="Kalem Ekle" icon="pi pi-plus" text class="mt-4" @click="addLine" />
                 </div>
 
                 <div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                        <div>
-                            <label for="notes" class="block font-bold mb-3">Notlar</label>
-                            <Textarea id="notes" v-model="invoice.notes" rows="5" fluid />
-                        </div>
-                        <div>
+                    <div class="flex justify-end">
+                        <div class="w-full lg:w-1/2">
                             <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
                                 <div class="flex justify-between">
+                                    <span>Brüt Toplam:</span>
+                                    <span class="font-medium">{{ totals.grossTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
+                                </div>
+                                <div class="flex justify-between text-red-500">
+                                    <span>İskonto Toplamı:</span>
+                                    <span class="font-medium">- {{ totals.discountTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
+                                </div>
+                                <div class="flex justify-between border-t pt-2 mt-1">
                                     <span>Ara Toplam:</span>
                                     <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
                                 </div>

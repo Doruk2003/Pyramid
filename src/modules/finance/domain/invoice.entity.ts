@@ -5,6 +5,7 @@ export interface InvoiceLineProps {
     id: string;
     invoiceId: string;
     productId: string;
+    warehouseId?: string; // Eklenen alan
     description?: string;
     quantity: number;
     unitPrice: number;
@@ -19,6 +20,7 @@ export interface InvoiceProps {
     invoiceType: InvoiceType;
     invoiceNumber: string;
     accountId: string;
+    warehouseId?: string; // Eklenen alan (Header default)
     issueDate: Date;
     dueDate?: Date;
     status: InvoiceStatus;
@@ -48,6 +50,9 @@ export class Invoice {
     }
     get accountId(): string {
         return this.props.accountId;
+    }
+    get warehouseId(): string | undefined {
+        return this.props.warehouseId;
     }
     get status(): InvoiceStatus {
         return this.props.status;
