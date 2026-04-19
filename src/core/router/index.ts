@@ -138,6 +138,11 @@ const router = createRouter({
                     path: '/sales/orders/edit/:id',
                     name: 'sales-order-edit',
                     component: () => import('@/modules/sales/views/orders/OrderForm.vue')
+                },
+                {
+                    path: '/todo/calendar',
+                    name: 'todo-calendar',
+                    component: () => import('@/modules/todo/views/CalendarPage.vue')
                 }
             ]
         },

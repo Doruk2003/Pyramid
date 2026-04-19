@@ -308,8 +308,13 @@ function goBack() {
                 <div class="grid grid-cols-12 gap-6 mb-6">
 
                     <div class="col-span-12 lg:col-span-4">
+                        <label for="code" class="block font-semibold mb-3">Ürün Kodu</label>
+                        <InputText id="code" v-model.trim="product.code" placeholder="Otomatik (opsiyonel)" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
                         <label for="name" class="block font-semibold mb-3">Ürün Adı</label>
-                        <InputText id="name" v-model.trim="product.name" required="true" autofocus :invalid="submitted && !product.name" fluid />
+                        <InputText id="name" v-model.trim="product.name" required="true" :invalid="submitted && !product.name" fluid />
                         <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
                     </div>
 
@@ -318,10 +323,6 @@ function goBack() {
                         <InputText id="barcode" v-model.trim="product.barcode" fluid />
                     </div>
 
-                    <div class="col-span-12 lg:col-span-4">
-                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
-                        <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
-                    </div>
 
                     <div class="col-span-12 lg:col-span-4">
                         <div class="flex justify-between items-center mb-1">
@@ -387,14 +388,19 @@ function goBack() {
                         <InputNumber id="initialStock" v-model="product.initial_stock" integeronly fluid />
                     </div>
 
-                    <div class="col-span-12 lg:col-span-8">
-                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
-                        <Textarea id="description" v-model="product.description" rows="1" cols="20" fluid />
-                    </div>    
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
+                        <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
+                    </div>
 
-                    <div class="col-span-12 lg:col-span-12">
+                    <div class="col-span-12 lg:col-span-4">
                         <label for="status" class="block font-semibold mb-3">Durum</label>
                         <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-12">
+                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
+                        <Textarea id="description" v-model="product.description" rows="2" cols="20" fluid />
                     </div>
 
 

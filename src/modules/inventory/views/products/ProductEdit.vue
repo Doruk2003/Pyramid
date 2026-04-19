@@ -265,6 +265,11 @@ function goBack() {
         <div class="card">
             <div class="grid grid-cols-12 gap-6 mb-6">
                 <div class="col-span-12 lg:col-span-4">
+                    <label for="code" class="block font-bold mb-3">Ürün Kodu</label>
+                    <InputText id="code" v-model.trim="product.code" placeholder="Otomatik (opsiyonel)" fluid />
+                </div>
+
+                <div class="col-span-12 lg:col-span-4">
                     <label for="name" class="block font-bold mb-3">Ürün Adı</label>
                     <InputText id="name" v-model.trim="product.name" required="true" :invalid="submitted && !product.name" fluid />
                     <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
@@ -275,10 +280,6 @@ function goBack() {
                     <InputText id="barcode" v-model.trim="product.barcode" fluid />
                 </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="inventoryStatus" class="block font-bold mb-3">Stok Durumu</label>
-                    <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid></Select>
-                </div>
 
                 <div class="col-span-12 lg:col-span-4">
                     <div class="flex justify-between items-center mb-1">
@@ -347,11 +348,16 @@ function goBack() {
                 </div>
 
                 <div class="col-span-12 lg:col-span-4">
+                    <label for="inventoryStatus" class="block font-bold mb-3">Stok Durumu</label>
+                    <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid></Select>
+                </div>
+
+                <div class="col-span-12 lg:col-span-4">
                     <label for="status" class="block font-bold mb-3">Durum</label>
                     <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid></Select>
                 </div>
 
-                <div class="col-span-12 lg:col-span-6">
+                <div class="col-span-12 lg:col-span-12">
                     <label for="description" class="block font-bold mb-3">Açıklama</label>
                     <Textarea id="description" v-model="product.description" rows="6" cols="20" fluid />
                 </div>

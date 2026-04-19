@@ -4,7 +4,7 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const financeStore = useFinanceStore();
@@ -17,6 +17,7 @@ interface AccountForm {
     id?: string;
     companyId?: string;
     accountType: AccountType;
+    parentId?: string;        // Alt hesap bağlantısı
     name?: string;
     taxNumber?: string;
     taxOffice?: string;
@@ -70,15 +71,18 @@ async function loadAccount() {
     const id = route.params.id as string;
     if (!id) return;
 
-    if (financeStore.accounts.length === 0) {
-        await financeStore.fetchAccounts();
-    }
+    // Önce root accounts listesinde ara
+    let found = financeStore.accounts.find((item) => item.id === id);
 
-    const found = financeStore.accounts.find((item) => item.id === id);
+    // Bulunamazsa (alt hesap olabilir) DB'den direkt çek
     if (!found) {
-        toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamadı', life: 3000 });
-        router.push('/finance/accounts');
-        return;
+        const result = await financeStore.getAccountById(id);
+        if (!result.success) {
+            toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamadı', life: 3000 });
+            router.push('/finance/accounts');
+            return;
+        }
+        found = result.data;
     }
 
     const obj = found.toObject();
@@ -94,7 +98,13 @@ async function loadAccount() {
 
 onMounted(async () => {
     await loadAccount();
+    await financeStore.fetchRootAccounts();
 });
+
+// Ana hesap seçim dropdown’ı için root hesaplar (kendisi hariç)
+const rootAccounts = computed(() =>
+    financeStore.rootAccounts.filter((a) => a.id !== account.value.id)
+);
 
 async function saveAccount() {
     submitted.value = true;
@@ -120,6 +130,7 @@ async function saveAccount() {
     const acc = Account.create({
         id: account.value.id || crypto.randomUUID(),
         companyId: account.value.companyId || authStore.user?.companyId || '',
+        parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
         taxNumber: account.value.taxNumber,
@@ -222,6 +233,23 @@ function goBack() {
                             <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
                             <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
                         </div>
+
+                        <div>
+                            <label for="parentAccountEdit" class="block font-bold mb-3">Bağlı Olduğu Ana Hesap
+                                <span class="text-surface-400 font-normal ml-1">(opsiyonel)</span>
+                            </label>
+                            <Select
+                                id="parentAccountEdit"
+                                v-model="account.parentId"
+                                :options="rootAccounts"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Ana hesap seçin (boş bırakılabilir)"
+                                showClear
+                                fluid
+                            />
+                        </div>
+
 
                         <div>
                             <label for="taxNumber" class="block font-bold mb-3">Vergi No - TC</label>

@@ -15,6 +15,12 @@ const showFilters = ref(false);
 const deleteDialog = ref(false);
 const accountToDelete = ref<Account | null>(null);
 
+// Alt hesap panel yönetimi
+const expandedAccount = ref<Account | null>(null);
+const showSubPanel = ref(false);
+const subAccountDeleteDialog = ref(false);
+const subAccountToDelete = ref<Account | null>(null);
+
 interface AccountFilterForm {
     name: string;
     phone: string;
@@ -49,7 +55,8 @@ const statusOptions = ref([
 ]);
 
 onMounted(() => {
-    financeStore.fetchAccounts();
+    // Sadece ana hesapları yükle (parent_id IS NULL)
+    financeStore.fetchAccounts({ parentId: null });
 });
 
 function openNew() {
@@ -71,14 +78,56 @@ async function deleteAccount() {
     deleteDialog.value = false;
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Silindi', detail: 'Cari hesap silindi', life: 3000 });
+        if (expandedAccount.value?.id === accountToDelete.value.id) {
+            showSubPanel.value = false;
+            expandedAccount.value = null;
+        }
     } else {
-        // Aktif fatura/teklif varsa DB RESTRICT hatası döner
         toast.add({ severity: 'error', summary: 'Silinemedi', detail: getErrorMessage(result.error), life: 5000 });
     }
     accountToDelete.value = null;
 }
 
+// Ana hesaba tıklanınca alt hesap panelini aç/kapat
+async function toggleSubAccounts(acc: Account) {
+    if (expandedAccount.value?.id === acc.id) {
+        showSubPanel.value = !showSubPanel.value;
+        return;
+    }
+    expandedAccount.value = acc;
+    showSubPanel.value = true;
+    await financeStore.fetchSubAccounts(acc.id);
+}
+
+// Yeni alt hesap oluştur (parent_id ile)
+function openNewSubAccount(parentId: string) {
+    router.push(`/finance/accounts/create?parentId=${parentId}`);
+}
+
+function editSubAccount(acc: Account) {
+    router.push(`/finance/accounts/edit/${acc.id}`);
+}
+
+function confirmDeleteSubAccount(acc: Account) {
+    subAccountToDelete.value = acc;
+    subAccountDeleteDialog.value = true;
+}
+
+async function deleteSubAccount() {
+    if (!subAccountToDelete.value?.id) return;
+    const result = await financeStore.deleteAccount(subAccountToDelete.value.id);
+    subAccountDeleteDialog.value = false;
+    if (result.success) {
+        toast.add({ severity: 'success', summary: 'Silindi', detail: 'Alt hesap silindi', life: 3000 });
+    } else {
+        toast.add({ severity: 'error', summary: 'Silinemedi', detail: getErrorMessage(result.error), life: 5000 });
+    }
+    subAccountToDelete.value = null;
+}
+
+// Ana hesaplar listesi (zaten sadece root yüklendi)
 const accounts = computed(() => financeStore.accounts ?? []);
+const subAccounts = computed(() => financeStore.subAccounts ?? []);
 
 const filteredAccounts = computed(() => {
     let list = accounts.value;
@@ -183,6 +232,7 @@ function clearFilters() {
             </div>
         </div>
 
+        <!-- Ana Hesaplar Listesi -->
         <div class="card">
             <DataTable
                 v-model:selection="selectedAccounts"
@@ -193,6 +243,7 @@ function clearFilters() {
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 :rowsPerPageOptions="[5, 10, 25]"
                 currentPageReportTemplate="Gösterilen {first} - {last} / {totalRecords} cari hesap"
+                :rowClass="(data: Account) => expandedAccount?.id === data.id && showSubPanel ? 'surface-100' : ''"
             >
                 <Column field="name" header="Ad / Ünvan" sortable></Column>
                 <Column field="authorizedPerson" header="Yetkili Kişi" sortable></Column>
@@ -210,12 +261,20 @@ function clearFilters() {
                         <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                     </template>
                 </Column>
-                <Column header="İşlemler" style="min-width: 100px">
+                <Column header="İşlemler" style="min-width: 130px">
                     <template #body="slotProps">
+                        <Button
+                            :icon="expandedAccount?.id === slotProps.data.id && showSubPanel ? 'pi pi-chevron-up' : 'pi pi-sitemap'"
+                            outlined rounded
+                            class="mr-1"
+                            severity="info"
+                            v-tooltip.top="'Alt Hesaplar'"
+                            @click="toggleSubAccounts(slotProps.data)"
+                        />
                         <Button
                             icon="pi pi-pencil"
                             outlined rounded
-                            class="mr-2"
+                            class="mr-1"
                             v-tooltip.top="'Düzenle'"
                             @click="editAccount(slotProps.data)"
                         />
@@ -231,7 +290,97 @@ function clearFilters() {
             </DataTable>
         </div>
 
-        <!-- Silme Onay Dialogu -->
+        <!-- Alt Hesaplar Paneli -->
+        <Transition name="slide-down">
+            <div v-if="showSubPanel && expandedAccount" class="card mt-3 border-l-4 border-blue-400">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-sitemap text-blue-500 text-lg" />
+                        <span class="font-semibold text-lg">{{ expandedAccount.name }} — Alt Hesaplar</span>
+                        <Tag
+                            :value="`${subAccounts.length} alt hesap`"
+                            severity="info"
+                            class="ml-2"
+                        />
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            label="Yeni Alt Hesap"
+                            icon="pi pi-plus"
+                            size="small"
+                            severity="info"
+                            outlined
+                            @click="openNewSubAccount(expandedAccount.id)"
+                        />
+                        <Button
+                            icon="pi pi-times"
+                            rounded
+                            text
+                            severity="secondary"
+                            v-tooltip.top="'Kapat'"
+                            @click="showSubPanel = false"
+                        />
+                    </div>
+                </div>
+
+                <DataTable
+                    :value="subAccounts"
+                    dataKey="id"
+                    :loading="financeStore.loading"
+                    size="small"
+                >
+                    <template #empty>
+                        <div class="text-center py-6 text-surface-500">
+                            <i class="pi pi-inbox text-3xl mb-2 block" />
+                            <div>Bu ana hesaba bağlı alt hesap bulunamadı.</div>
+                            <Button
+                                label="İlk Alt Hesabı Oluştur"
+                                icon="pi pi-plus"
+                                size="small"
+                                class="mt-3"
+                                @click="openNewSubAccount(expandedAccount!.id)"
+                            />
+                        </div>
+                    </template>
+                    <Column field="name" header="Ad / Ünvan" sortable></Column>
+                    <Column field="authorizedPerson" header="Yetkili Kişi" sortable></Column>
+                    <Column field="phone" header="Telefon"></Column>
+                    <Column field="email" header="E-posta"></Column>
+                    <Column field="accountType" header="Tip">
+                        <template #body="slotProps">
+                            <Tag :severity="slotProps.data.accountType === 'customer' ? 'info' : slotProps.data.accountType === 'supplier' ? 'warn' : 'success'" :value="slotProps.data.accountType === 'customer' ? 'Müşteri' : slotProps.data.accountType === 'supplier' ? 'Tedarikçi' : 'Müşteri + Tedarikçi'" />
+                        </template>
+                    </Column>
+                    <Column field="isActive" header="Durum">
+                        <template #body="slotProps">
+                            <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
+                        </template>
+                    </Column>
+                    <Column header="İşlemler" style="min-width: 100px">
+                        <template #body="slotProps">
+                            <Button
+                                icon="pi pi-pencil"
+                                outlined rounded
+                                size="small"
+                                class="mr-1"
+                                v-tooltip.top="'Düzenle'"
+                                @click="editSubAccount(slotProps.data)"
+                            />
+                            <Button
+                                icon="pi pi-trash"
+                                outlined rounded
+                                size="small"
+                                severity="danger"
+                                v-tooltip.top="'Sil'"
+                                @click="confirmDeleteSubAccount(slotProps.data)"
+                            />
+                        </template>
+                    </Column>
+                </DataTable>
+            </div>
+        </Transition>
+
+        <!-- Ana Hesap Silme Onay Dialogu -->
         <Dialog
             v-model:visible="deleteDialog"
             :style="{ width: '420px' }"
@@ -244,7 +393,7 @@ function clearFilters() {
                     <p class="font-semibold mb-1">Bu cari hesabı silmek istediğinizden emin misiniz?</p>
                     <p class="text-surface-600 dark:text-surface-400 text-sm">
                         <strong>{{ accountToDelete?.name }}</strong> soft-delete ile işaretlenecek.
-                        Bu hesaba ait açık fatura veya teklif varsa silme işlemi başarısız olur.
+                        Bu hesaba ait alt hesap, açık fatura veya teklif varsa silme işlemi başarısız olur.
                     </p>
                 </div>
             </div>
@@ -253,5 +402,40 @@ function clearFilters() {
                 <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteAccount" />
             </template>
         </Dialog>
+
+        <!-- Alt Hesap Silme Onay Dialogu -->
+        <Dialog
+            v-model:visible="subAccountDeleteDialog"
+            :style="{ width: '420px' }"
+            header="Alt Hesap Silme Onayı"
+            :modal="true"
+        >
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500" />
+                <div>
+                    <p class="font-semibold mb-1">Bu alt hesabı silmek istediğinizden emin misiniz?</p>
+                    <p class="text-surface-600 dark:text-surface-400 text-sm">
+                        <strong>{{ subAccountToDelete?.name }}</strong> soft-delete ile işaretlenecek.
+                        Bu hesaba ait açık fatura veya teklif varsa silme işlemi başarısız olur.
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="İptal" icon="pi pi-times" text @click="subAccountDeleteDialog = false" />
+                <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteSubAccount" />
+            </template>
+        </Dialog>
     </div>
 </template>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+    transition: all 0.25s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+</style>

@@ -63,12 +63,14 @@
 - [x] **saveInvoice refaktörü** — Sequence RPC, fallback, hata yayılımı, null-safe satir ekleme
 - [x] **Migration doğrulama** — 21 audit trigger satırı (7×3), 3 sequence, `FT-2026-00001` testı — tümü başarılı ✅
 - [x] **Fatura-Depo Entegrasyonu** — Fatura başlığına ve kalemlerine `warehouse_id` eklendi; 'Kesildi' durumunda otomatik stok hareketi oluşturma altyapısı kuruldu ✅
+- [x] **Alt Hesap Hiyerarşisi (Bölüm 1)** — `accounts.parent_id` FK, 2 seviye trigger, konsolide view, domain/infra/store/UI tam güncellendi ✅
+- [x] **Yapılacaklar & Takvim Modülü (TODO)** — Gelişmiş takvim + To-do list sayfası, dashboard entegrasyonu, veritabanı şeması ve multi-tenant RLS politikaları ✅
 
 ---
 
 ## Son Güncelleme
-**Tarih**: 11 Nisan 2026  
-**Oturum**: #13
+**Tarih**: 18 Nisan 2026
+**Oturum**: #14
 
 ---
 

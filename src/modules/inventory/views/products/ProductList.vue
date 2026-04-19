@@ -110,9 +110,18 @@ onMounted(async () => {
 
 function formatCurrency(value: number | null | undefined, currencyId: string | null | undefined) {
     if (value === null || value === undefined) return '';
-    const currencyCode = getCurrencyCode(currencyId) || 'USD';
-    const locale = currencyCode === 'TRY' ? 'tr-TR' : currencyCode === 'EUR' ? 'de-DE' : 'en-US';
-    return Number(value).toLocaleString(locale, { style: 'currency', currency: currencyCode });
+    const currencyCode = getCurrencyCode(currencyId);
+    
+    if (!currencyCode || currencyCode === '-') {
+        return Number(value).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+    }
+
+    try {
+        const locale = currencyCode === 'TRY' ? 'tr-TR' : currencyCode === 'EUR' ? 'de-DE' : 'en-US';
+        return Number(value).toLocaleString(locale, { style: 'currency', currency: currencyCode });
+    } catch (e) {
+        return `${currencyCode} ${Number(value).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+    }
 }
 
 function openNew() {
@@ -282,8 +291,8 @@ function getTypeName(id: string) {
 }
 
 function getCurrencyCode(id: string | null | undefined) {
-    if (!id) return '-';
-    return lookupStore.currencies.find((item: CurrencyListItem) => item.id === id)?.code || '-';
+    if (!id) return null;
+    return lookupStore.currencies.find((item: CurrencyListItem) => item.id === id)?.code || null;
 }
 
 function getPriceUnitLabel(value: string | null | undefined) {
@@ -351,6 +360,9 @@ function getPriceUnitLabel(value: string | null | undefined) {
             </div>
         </div>
 
+        <!-- Error Message -->
+        <Message v-if="productStore.error" severity="error" class="mb-4">{{ productStore.error }}</Message>
+
         <!-- 3. Card: DataTable -->
         <div class="card">
             <DataTable
@@ -373,6 +385,7 @@ function getPriceUnitLabel(value: string | null | undefined) {
                     </template>
                 </Column>
 
+                <Column field="code" header="Ürün Kodu" sortable style="min-width: 8rem"></Column>
                 <Column field="name" header="Ürün Adı" sortable style="min-width: 12rem"></Column>
                 <Column field="barcode" header="Barcode No" sortable style="min-width: 10rem"></Column>
                 <Column field="status" header="Durum" sortable style="min-width: 8rem">

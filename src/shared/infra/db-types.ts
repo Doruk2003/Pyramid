@@ -27,6 +27,7 @@ export interface DbProduct {
 export interface DbAccount {
     id: string;
     company_id: string;
+    parent_id?: string;       // Alt hesap: üst hesabın ID'si
     account_type: 'customer' | 'supplier' | 'both';
     name: string;
     tax_number?: string;
@@ -60,6 +61,7 @@ export interface DbInvoice {
     invoice_number: string;
     account_id: string;
     warehouse_id?: string;
+    project_id?: string;          // PRJ modülü entegrasyonu
     issue_date: string;
     due_date?: string;
     status: string;
@@ -103,6 +105,7 @@ export interface DbStockMovement {
     company_id: string;
     product_id: string;
     warehouse_id: string;
+    project_id?: string;           // PRJ modülü entegrasyonu
     movement_type: string;
     quantity: number;
     unit_cost?: number;
@@ -204,4 +207,22 @@ export interface DbOrderLine {
     line_total: number;
     sort_order: number;
     created_at: string;
+}
+
+export interface DbTask {
+    id: string;
+    company_id: string;
+    user_id: string;
+    title: string;
+    description?: string;
+    start_date: string;
+    end_date?: string;
+    is_all_day: boolean;
+    status: 'pending' | 'completed' | 'cancelled';
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+    category?: string;
+    color?: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
 }

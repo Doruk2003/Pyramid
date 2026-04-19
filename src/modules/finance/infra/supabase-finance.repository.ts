@@ -18,6 +18,7 @@ function rowToAccount(row: DbAccount): Account {
     return Account.create({
         id: row.id,
         companyId: row.company_id,
+        parentId: row.parent_id ?? undefined,
         accountType: row.account_type,
         name: row.name,
         taxNumber: row.tax_number,
@@ -53,10 +54,41 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             .eq('is_active', true)
             .is('deleted_at', null); // Soft-delete: silinen cari hesaplar gizlenir
         if (filters?.accountType) query = query.eq('account_type', filters.accountType);
+        // parentId filtresi: null ise sadece ana hesaplar, string ise o parent'ın alt hesapları
+        if (filters?.parentId === null) {
+            query = query.is('parent_id', null);
+        } else if (filters?.parentId) {
+            query = query.eq('parent_id', filters.parentId);
+        }
 
-        const { data, error } = await query;
+        const { data, error } = await query.order('name', { ascending: true });
         if (error) return err(new Error(error.message));
 
+        return ok(((data as DbAccount[]) || []).map(rowToAccount));
+    }
+
+    async getSubAccounts(parentId: string): Promise<Result<Account[]>> {
+        // Belirli bir ana hesabın doğrudan alt hesaplarını getirir
+        const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('parent_id', parentId)
+            .is('deleted_at', null)
+            .order('name', { ascending: true });
+        if (error) return err(new Error(error.message));
+        return ok(((data as DbAccount[]) || []).map(rowToAccount));
+    }
+
+    async getRootAccounts(): Promise<Result<Account[]>> {
+        // Sadece parent_id IS NULL olan (ana) hesapları getirir
+        const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .is('parent_id', null)
+            .is('deleted_at', null)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        if (error) return err(new Error(error.message));
         return ok(((data as DbAccount[]) || []).map(rowToAccount));
     }
 
@@ -71,6 +103,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const { error } = await supabase.from('accounts').upsert({
             id: obj.id || undefined,
             company_id: obj.companyId,
+            parent_id: obj.parentId ?? null,   // Alt hesap bağlantısı
             account_type: obj.accountType,
             name: obj.name,
             tax_number: obj.taxNumber,

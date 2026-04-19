@@ -4,17 +4,19 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
 const toast = useToast();
 const router = useRouter();
+const route = useRoute();
 
 interface AccountForm {
     id?: string;
     accountType: AccountType;
+    parentId?: string;        // Alt hesap bağlantısı
     name?: string;
     taxNumber?: string;
     taxOffice?: string;
@@ -41,6 +43,7 @@ interface AccountForm {
 
 const account = ref<AccountForm>({
     accountType: 'customer',
+    parentId: (route.query.parentId as string) || undefined,
     isActive: true,
     creditLimit: 0,
     isDealer: false,
@@ -49,6 +52,13 @@ const account = ref<AccountForm>({
     dealerDiscount3: 0
 });
 const submitted = ref(false);
+
+// Ana hesap seçim dropdown'ı için sadece root hesaplar
+const rootAccounts = computed(() => financeStore.rootAccounts);
+
+onMounted(async () => {
+    await financeStore.fetchRootAccounts();
+});
 
 const accountTypes: Array<{ label: string; value: AccountType }> = [
     { label: 'Müşteri', value: 'customer' },
@@ -88,6 +98,7 @@ async function saveAccount() {
     const acc = Account.create({
         id: crypto.randomUUID(),
         companyId: authStore.user?.companyId || '',
+        parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
         taxNumber: account.value.taxNumber,
@@ -189,6 +200,22 @@ function goBack() {
                         <div>
                             <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
                             <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
+                        </div>
+
+                        <div>
+                            <label for="parentAccount" class="block font-bold mb-3">Bağlı Olduğu Ana Hesap
+                                <span class="text-surface-400 font-normal ml-1">(opsiyonel)</span>
+                            </label>
+                            <Select
+                                id="parentAccount"
+                                v-model="account.parentId"
+                                :options="rootAccounts"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Ana hesap seçin (boş bırakılabilir)"
+                                showClear
+                                fluid
+                            />
                         </div>
 
                         <div>

@@ -6,6 +6,7 @@ export interface AccountProps {
     companyId: string;
     accountType: AccountType;
     name: string;
+    parentId?: string;        // Alt hesap: üst hesabın ID'si (null = ana hesap)
     taxNumber?: string;
     taxOffice?: string;
     email?: string;
@@ -38,6 +39,9 @@ export class Account {
     }
     get companyId(): string {
         return this.props.companyId;
+    }
+    get parentId(): string | undefined {
+        return this.props.parentId;
     }
     get accountType(): AccountType {
         return this.props.accountType;
