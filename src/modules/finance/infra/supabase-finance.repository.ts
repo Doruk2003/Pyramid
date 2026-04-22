@@ -18,6 +18,7 @@ function rowToAccount(row: DbAccount): Account {
     return Account.create({
         id: row.id,
         companyId: row.company_id,
+        code: row.code,
         parentId: row.parent_id ?? undefined,
         accountType: row.account_type,
         name: row.name,
@@ -103,6 +104,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const { error } = await supabase.from('accounts').upsert({
             id: obj.id || undefined,
             company_id: obj.companyId,
+            code: obj.code,
             parent_id: obj.parentId ?? null,   // Alt hesap bağlantısı
             account_type: obj.accountType,
             name: obj.name,

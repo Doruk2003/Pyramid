@@ -4,6 +4,7 @@ export type AddressValue = string | null;
 export interface AccountProps {
     id: string;
     companyId: string;
+    code?: string;           // Cari kodu
     accountType: AccountType;
     name: string;
     parentId?: string;        // Alt hesap: üst hesabın ID'si (null = ana hesap)
@@ -39,6 +40,9 @@ export class Account {
     }
     get companyId(): string {
         return this.props.companyId;
+    }
+    get code(): string | undefined {
+        return this.props.code;
     }
     get parentId(): string | undefined {
         return this.props.parentId;

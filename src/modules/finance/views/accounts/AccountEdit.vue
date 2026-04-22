@@ -16,6 +16,7 @@ const route = useRoute();
 interface AccountForm {
     id?: string;
     companyId?: string;
+    code?: string;
     accountType: AccountType;
     parentId?: string;        // Alt hesap bağlantısı
     name?: string;
@@ -130,6 +131,7 @@ async function saveAccount() {
     const acc = Account.create({
         id: account.value.id || crypto.randomUUID(),
         companyId: account.value.companyId || authStore.user?.companyId || '',
+        code: account.value.code?.trim() || undefined,
         parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
@@ -223,6 +225,11 @@ function goBack() {
             <div class="flex flex-col gap-8 mb-6">
                 <div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label for="code" class="block font-bold mb-3">Cari Kodu</label>
+                            <InputText id="code" v-model.trim="account.code" placeholder="Otomatik (opsiyonel)" fluid />
+                        </div>
+
                         <div>
                             <label for="name" class="block font-bold mb-3">Adı - Ünvanı</label>
                             <InputText id="name" v-model.trim="account.name" required="true" :invalid="submitted && !account.name" fluid />
@@ -332,11 +339,11 @@ function goBack() {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                         <div>
                             <label for="address" class="block font-bold mb-3">Adres</label>
-                            <Textarea id="address" v-model="account.address" rows="3" fluid />
+                            <Textarea id="address" v-model="account.address" rows="2" fluid />
                         </div>
                         <div>
                             <label for="description" class="block font-bold mb-3">Açıklama</label>
-                            <Textarea id="description" v-model="account.description" rows="3" fluid />
+                            <Textarea id="description" v-model="account.description" rows="2" fluid />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">

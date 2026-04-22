@@ -245,6 +245,7 @@ function clearFilters() {
                 currentPageReportTemplate="Gösterilen {first} - {last} / {totalRecords} cari hesap"
                 :rowClass="(data: Account) => expandedAccount?.id === data.id && showSubPanel ? 'surface-100' : ''"
             >
+                <Column field="code" header="Cari Kodu" sortable></Column>
                 <Column field="name" header="Ad / Ünvan" sortable></Column>
                 <Column field="authorizedPerson" header="Yetkili Kişi" sortable></Column>
                 <Column field="authorizedGsm" header="Yetkili GSM" sortable></Column>
@@ -342,6 +343,7 @@ function clearFilters() {
                             />
                         </div>
                     </template>
+                    <Column field="code" header="Cari Kodu" sortable></Column>
                     <Column field="name" header="Ad / Ünvan" sortable></Column>
                     <Column field="authorizedPerson" header="Yetkili Kişi" sortable></Column>
                     <Column field="phone" header="Telefon"></Column>

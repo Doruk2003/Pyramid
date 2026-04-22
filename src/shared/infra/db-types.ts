@@ -27,6 +27,7 @@ export interface DbProduct {
 export interface DbAccount {
     id: string;
     company_id: string;
+    code?: string;            // Cari kodu
     parent_id?: string;       // Alt hesap: üst hesabın ID'si
     account_type: 'customer' | 'supplier' | 'both';
     name: string;
