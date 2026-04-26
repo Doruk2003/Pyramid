@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import type { Account } from '@/modules/finance/domain/account.entity';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { getErrorMessage } from '@/shared/utils/error';
@@ -13,13 +13,44 @@ const toast = useToast();
 const selectedAccounts = ref<Account[]>([]);
 const showFilters = ref(false);
 const deleteDialog = ref(false);
-const accountToDelete = ref<Account | null>(null);
+const accountToDelete = shallowRef<Account | null>(null);
 
 // Alt hesap panel yönetimi
-const expandedAccount = ref<Account | null>(null);
+const expandedAccount = shallowRef<Account | null>(null);
 const showSubPanel = ref(false);
 const subAccountDeleteDialog = ref(false);
-const subAccountToDelete = ref<Account | null>(null);
+const subAccountToDelete = shallowRef<Account | null>(null);
+
+const menu = ref();
+const actionTarget = shallowRef<Account | null>(null);
+const actionType = ref<'main' | 'sub'>('main');
+
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (actionTarget.value) {
+                if (actionType.value === 'main') editAccount(actionTarget.value);
+                else editSubAccount(actionTarget.value);
+            }
+        }
+    },
+    {
+        label: 'Sil',
+        command: () => {
+            if (actionTarget.value) {
+                if (actionType.value === 'main') confirmDeleteAccount(actionTarget.value);
+                else confirmDeleteSubAccount(actionTarget.value);
+            }
+        }
+    }
+]);
+
+const onActionClick = (event: any, acc: Account, type: 'main' | 'sub') => {
+    actionTarget.value = acc;
+    actionType.value = type;
+    menu.value.toggle(event);
+};
 
 interface AccountFilterForm {
     name: string;
@@ -262,7 +293,7 @@ function clearFilters() {
                         <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                     </template>
                 </Column>
-                <Column header="İşlemler" style="min-width: 130px">
+                <Column header="İşlemler" style="min-width: 80px">
                     <template #body="slotProps">
                         <Button
                             :icon="expandedAccount?.id === slotProps.data.id && showSubPanel ? 'pi pi-chevron-up' : 'pi pi-sitemap'"
@@ -272,20 +303,7 @@ function clearFilters() {
                             v-tooltip.top="'Alt Hesaplar'"
                             @click="toggleSubAccounts(slotProps.data)"
                         />
-                        <Button
-                            icon="pi pi-pencil"
-                            outlined rounded
-                            class="mr-1"
-                            v-tooltip.top="'Düzenle'"
-                            @click="editAccount(slotProps.data)"
-                        />
-                        <Button
-                            icon="pi pi-trash"
-                            outlined rounded
-                            severity="danger"
-                            v-tooltip.top="'Sil'"
-                            @click="confirmDeleteAccount(slotProps.data)"
-                        />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data, 'main')" />
                     </template>
                 </Column>
             </DataTable>
@@ -358,24 +376,9 @@ function clearFilters() {
                             <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                         </template>
                     </Column>
-                    <Column header="İşlemler" style="min-width: 100px">
+                    <Column header="İşlemler" style="min-width: 60px">
                         <template #body="slotProps">
-                            <Button
-                                icon="pi pi-pencil"
-                                outlined rounded
-                                size="small"
-                                class="mr-1"
-                                v-tooltip.top="'Düzenle'"
-                                @click="editSubAccount(slotProps.data)"
-                            />
-                            <Button
-                                icon="pi pi-trash"
-                                outlined rounded
-                                size="small"
-                                severity="danger"
-                                v-tooltip.top="'Sil'"
-                                @click="confirmDeleteSubAccount(slotProps.data)"
-                            />
+                            <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data, 'sub')" />
                         </template>
                     </Column>
                 </DataTable>
@@ -427,6 +430,8 @@ function clearFilters() {
                 <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteSubAccount" />
             </template>
         </Dialog>
+
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>
 

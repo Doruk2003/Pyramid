@@ -20,6 +20,7 @@ export interface ProductProps {
     initialStock?: number;
     status: string;
     images?: string[];
+    categoryDiscount?: number;
     createdAt: Date;
 }
 
@@ -88,6 +89,9 @@ export class Product {
     }
     get images(): string[] | undefined {
         return this.props.images;
+    }
+    get categoryDiscount(): number | undefined {
+        return this.props.categoryDiscount;
     }
     get createdAt(): Date {
         return this.props.createdAt;

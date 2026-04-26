@@ -195,6 +195,30 @@ const confirmDeleteUser = (u: User) => {
     deleteUserDialog.value = true;
 };
 
+
+const menu = ref();
+const actionTarget = ref<any>(null);
+
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (actionTarget.value) editUser(actionTarget.value);
+        }
+    },
+    {
+        label: 'Sil',
+        command: () => {
+            if (actionTarget.value) confirmDeleteUser(actionTarget.value);
+        }
+    }
+]);
+
+const onActionClick = (event: any, u: User) => {
+    actionTarget.value = u;
+    menu.value.toggle(event);
+};
+
 const deleteUser = async () => {
     if (!user.value.id) {
         toast.add({ severity: 'error', summary: 'Hata', detail: 'Kullanıcı kimliği bulunamadı', life: 3000 });
@@ -314,10 +338,9 @@ const getBadgeSeverity = (role: UserRole) => {
                         {{ new Date(slotProps.data.createdAt).toLocaleDateString('tr-TR') }}
                     </template>
                 </Column>
-                <Column header="İşlemler">
+                <Column header="İşlemler" style="min-width: 50px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editUser(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDeleteUser(slotProps.data)" />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -409,5 +432,6 @@ const getBadgeSeverity = (role: UserRole) => {
                 <Button label="Evet" icon="pi pi-check" severity="danger" @click="deleteUser" />
             </template>
         </Dialog>
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>

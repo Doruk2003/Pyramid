@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useExchangeRateStore } from '@/modules/finance/application/exchange-rate.store';
-import type { ExchangeRate } from '@/modules/finance/domain/exchange-rate.entity';
+import { ExchangeRate } from '@/modules/finance/domain/exchange-rate.entity';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
@@ -133,6 +133,29 @@ async function openHistory(row: ExchangeRate) {
 const deleteDialogVisible = ref(false);
 const rateToDelete = ref<ExchangeRate | null>(null);
 
+const menu = ref();
+const actionTarget = ref<ExchangeRate | null>(null);
+
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (actionTarget.value) openUpdateDialog(actionTarget.value as ExchangeRate);
+        }
+    },
+    {
+        label: 'Kur Geçmişi',
+        command: () => {
+            if (actionTarget.value) openHistory(actionTarget.value as ExchangeRate);
+        }
+    }
+]);
+
+const onActionClick = (event: any, row: ExchangeRate) => {
+    actionTarget.value = row;
+    menu.value.toggle(event);
+};
+
 function confirmDeleteHistory(row: ExchangeRate) {
     rateToDelete.value = row;
     deleteDialogVisible.value = true;
@@ -262,24 +285,9 @@ onMounted(async () => {
                         {{ formatDate(slotProps.data.effectiveDate) }}
                     </template>
                 </Column>
-                <Column header="İşlemler" style="width: 12rem">
+                <Column header="İşlemler" style="width: 4rem">
                     <template #body="slotProps">
-                        <Button
-                            icon="pi pi-pencil"
-                            outlined
-                            rounded
-                            class="mr-2"
-                            v-tooltip.top="'Kur Güncelle'"
-                            @click="openUpdateDialog(slotProps.data)"
-                        />
-                        <Button
-                            icon="pi pi-history"
-                            outlined
-                            rounded
-                            severity="secondary"
-                            v-tooltip.top="'Kur Geçmişi'"
-                            @click="openHistory(slotProps.data)"
-                        />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -418,5 +426,6 @@ onMounted(async () => {
                 </div>
             </template>
         </Dialog>
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>

@@ -47,7 +47,8 @@ export class SupabaseProductRepository implements IProductRepository {
             barcode: p.barcode,
             initial_stock: p.initialStock,
             status: p.status,
-            images: p.images
+            images: p.images,
+            category_discount: p.categoryDiscount
         });
 
         if (error) return err(new Error(error.message));
@@ -89,6 +90,7 @@ export class SupabaseProductRepository implements IProductRepository {
             initialStock: row.initial_stock,
             status: row.status || 'active',
             images: row.images,
+            categoryDiscount: row.category_discount,
             createdAt: new Date(row.created_at)
         });
     }

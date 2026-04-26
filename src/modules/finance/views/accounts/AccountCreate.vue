@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { getErrorMessage } from '@/shared/utils/error';
@@ -9,6 +10,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 const toast = useToast();
 const router = useRouter();
 const route = useRoute();
@@ -57,8 +59,51 @@ const submitted = ref(false);
 // Ana hesap seçim dropdown'ı için sadece root hesaplar
 const rootAccounts = computed(() => financeStore.rootAccounts);
 
+function sanitizeSerial(serial: string | undefined, fallback: string): string {
+    const cleaned = (serial || fallback).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    return cleaned || fallback;
+}
+
+function escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractSequence(code: string | undefined, serial: string): number | null {
+    if (!code) return null;
+    const normalized = code.toUpperCase().trim();
+    const pattern = new RegExp(`^${escapeRegex(serial)}-?(\\d+)$`);
+    const match = normalized.match(pattern);
+    if (!match) return null;
+
+    const sequence = Number(match[1]);
+    return Number.isFinite(sequence) ? sequence : null;
+}
+
+async function generateNextAccountCode(): Promise<string> {
+    const serial = sanitizeSerial(settingsStore.settings?.accountSerial, 'CAR');
+    const startingNo = settingsStore.settings?.accountStartingNumber || 1;
+
+    if (financeStore.accounts.length === 0) {
+        await financeStore.fetchAccounts();
+    }
+
+    const sequences = financeStore.accounts
+        .map((a) => extractSequence(a.code, serial))
+        .filter((value): value is number => value !== null);
+
+    const maxSequence = sequences.length > 0 ? Math.max(...sequences) : startingNo - 1;
+    const nextSequence = Math.max(startingNo, maxSequence + 1);
+
+    return `${serial}-${String(nextSequence).padStart(4, '0')}`;
+}
+
 onMounted(async () => {
+    await settingsStore.fetchSettings();
     await financeStore.fetchRootAccounts();
+
+    if (!account.value.code?.trim()) {
+        account.value.code = await generateNextAccountCode();
+    }
 });
 
 const accountTypes: Array<{ label: string; value: AccountType }> = [
@@ -96,10 +141,14 @@ async function saveAccount() {
         return;
     }
 
+    if (!account.value.code?.trim()) {
+        account.value.code = await generateNextAccountCode();
+    }
+
     const acc = Account.create({
         id: crypto.randomUUID(),
         companyId: authStore.user?.companyId || '',
-        code: account.value.code?.trim() || `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+        code: account.value.code?.trim() || undefined,
         parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
@@ -286,17 +335,17 @@ function goBack() {
                         </div>
 
                         <div>
-                            <label for="dealerDiscount1" class="block font-bold mb-3">Bayi İskontosu (1)</label>
+                            <label for="dealerDiscount1" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel1 || 'Bayi İskontosu (1)' }}</label>
                             <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount2" class="block font-bold mb-3">Bayi İskontosu (2)</label>
+                            <label for="dealerDiscount2" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel2 || 'Bayi İskontosu (2)' }}</label>
                             <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount3" class="block font-bold mb-3">Bayi İskontosu (3)</label>
+                            <label for="dealerDiscount3" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel3 || 'Bayi İskontosu (3)' }}</label>
                             <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
                     </div>
@@ -345,6 +394,3 @@ function goBack() {
         </div>
     </div>
 </template>
-
-
-

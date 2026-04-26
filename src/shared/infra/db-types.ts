@@ -20,6 +20,7 @@ export interface DbProduct {
     initial_stock?: number;
     status?: string;
     images?: string[];
+    category_discount?: number;
     created_at: string;
     updated_at: string;
 }
@@ -67,11 +68,15 @@ export interface DbInvoice {
     due_date?: string;
     status: string;
     subtotal: number;
+    discount_rate: number;
+    discount_amount: number;
     vat_total: number;
     total: number;
     paid_amount: number;
+    payment_type: string;
     currency: string;
     exchange_rate: number;
+    document_category: string;
     notes?: string;
     created_at: string;
     updated_at: string;
@@ -87,7 +92,9 @@ export interface DbInvoiceLine {
     quantity: number;
     unit_price: number;
     vat_rate: number;
-    discount_rate: number;
+    discount_rate1: number;
+    discount_rate2: number;
+    discount_rate3: number;
     line_total: number;
     created_at: string;
 }
@@ -209,6 +216,30 @@ export interface DbOrderLine {
     sort_order: number;
     created_at: string;
 }
+
+export interface DbProject {
+    id: string;
+    company_id: string;
+    code: string;
+    name: string;
+    location?: string;
+    client_id?: string;
+    status: 'planning' | 'active' | 'completed' | 'suspended';
+    start_date?: string;
+    end_date?: string;
+    budget_material: number;
+    budget_labor: number;
+    budget_equipment: number;
+    budget_general: number;
+    description?: string;
+    is_active: boolean;
+    deleted_at?: string;
+    created_at: string;
+    updated_at: string;
+    // JOIN sonucu (opsiyonel)
+    accounts?: { name: string } | null;
+}
+
 
 export interface DbTask {
     id: string;

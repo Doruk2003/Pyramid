@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { useToast } from 'primevue/usetoast';
-import { onMounted, ref, computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useProductStore } from '@/modules/inventory/application/product.store';
-import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useAuthStore } from '@/core/auth/auth.store';
-import { Product } from '@/modules/inventory/domain/product.entity';
-import type { Currency } from '@/modules/inventory/domain/currency.entity';
 import { supabase } from '@/lib/supabase';
+import { useLookupStore } from '@/modules/inventory/application/lookup.store';
+import { useProductStore } from '@/modules/inventory/application/product.store';
+import { Product } from '@/modules/inventory/domain/product.entity';
 import { getErrorMessage } from '@/shared/utils/error';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const toast = useToast();
 const router = useRouter();
@@ -39,17 +38,35 @@ interface ProductForm {
     images?: string[];
     image?: string;
     code?: string;
+    categoryDiscount?: number | null;
     createdAt?: Date;
 }
 
+const discountTypes = ref([
+    { label: 'Seçim Yok', value: 0 },
+    { label: 'İskonto 1', value: 1 },
+    { label: 'İskonto 2', value: 2 },
+    { label: 'İskonto 3', value: 3 }
+]);
+
 const product = ref<ProductForm>({});
 const submitted = ref(false);
-const imageFiles = ref<File[]>([]);
 const imageUploading = ref(false);
 
+// Cover image state
+const coverImageFile = ref<File | null>(null);
+const coverImagePreview = ref<string | null>(null);
+const isDragOver = ref(false);
+const coverInputRef = ref<HTMLInputElement | null>(null);
+
+// Additional images (6 slots)
+const additionalImageFiles = ref<(File | null)[]>([null, null, null, null, null, null]);
+const additionalImagePreviews = ref<(string | null)[]>([null, null, null, null, null, null]);
+const additionalInputRefs = ref<(HTMLInputElement | null)[]>([null, null, null, null, null, null]);
+
 const statuses = ref([
-    { label: 'Stok Takibi Evet', value: 'TRACKED' },
-    { label: 'Stok Takibi Hayır', value: 'UNTRACKED' }
+    { label: 'Evet', value: 'TRACKED' },
+    { label: 'Hayır', value: 'UNTRACKED' }
 ]);
 
 const productStatuses = ref([
@@ -88,14 +105,17 @@ const selectedCurrencyCode = computed(() => {
 
 const selectedCurrencyLocale = computed(() => {
     switch (selectedCurrencyCode.value) {
-        case 'TRY':
-            return 'tr-TR';
-        case 'EUR':
-            return 'de-DE';
+        case 'TRY': return 'tr-TR';
+        case 'EUR': return 'de-DE';
         case 'USD':
-        default:
-            return 'en-US';
+        default: return 'en-US';
     }
+});
+
+const totalImageCount = computed(() => {
+    let count = coverImagePreview.value && coverImagePreview.value !== 'product-placeholder.svg' ? 1 : 0;
+    count += additionalImagePreviews.value.filter(f => f !== null && f !== 'product-placeholder.svg').length;
+    return count;
 });
 
 async function loadLookups() {
@@ -121,8 +141,22 @@ async function loadProduct() {
                 price_unit: obj.priceUnit,
                 min_stock: obj.minStock,
                 max_stock: obj.maxStock,
-                initial_stock: obj.initialStock
+                initial_stock: obj.initialStock,
+                categoryDiscount: obj.categoryDiscount
             };
+
+            // Görsel önizlemelerini ayarla
+            if (obj.image && obj.image !== 'product-placeholder.svg') {
+                coverImagePreview.value = obj.image;
+            }
+
+            if (obj.images && obj.images.length > 0) {
+                obj.images.forEach((img, idx) => {
+                    if (idx < additionalImagePreviews.value.length && img !== 'product-placeholder.svg') {
+                        additionalImagePreviews.value[idx] = img;
+                    }
+                });
+            }
         } else {
             toast.add({ severity: 'error', summary: 'Hata', detail: 'Ürün bulunamadı', life: 3000 });
             router.push('/inventory/products');
@@ -159,41 +193,100 @@ function buildProductPayload() {
         status: product.value.status || 'ACTIVE',
         images: product.value.images ?? [],
         image: product.value.image || 'product-placeholder.svg',
-        code: product.value.code?.trim() || ''
+        code: product.value.code?.trim() || '',
+        categoryDiscount: product.value.categoryDiscount || 0
     };
 }
 
-function onImageSelected(event: any) {
-    const target = event.target as HTMLInputElement;
-    const files: File[] = event.files || (target && target.files ? Array.from(target.files) : []);
-    imageFiles.value = files.slice(0, 6);
+// Cover image handlers
+function onCoverDragOver(e: DragEvent) {
+    e.preventDefault();
+    isDragOver.value = true;
+}
+function onCoverDragLeave() {
+    isDragOver.value = false;
+}
+function onCoverDrop(e: DragEvent) {
+    e.preventDefault();
+    isDragOver.value = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) setCoverImage(file);
+}
+function onCoverFileSelected(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) setCoverImage(file);
+}
+function setCoverImage(file: File) {
+    coverImageFile.value = file;
+    const reader = new FileReader();
+    reader.onload = (ev) => { coverImagePreview.value = ev.target?.result as string; };
+    reader.readAsDataURL(file);
+}
+function removeCoverImage() {
+    coverImageFile.value = null;
+    coverImagePreview.value = null;
+    product.value.image = 'product-placeholder.svg';
+    if (coverInputRef.value) coverInputRef.value.value = '';
 }
 
-async function uploadImage() {
-    if (!imageFiles.value.length) {
-        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen bir görsel seçin', life: 3000 });
-        return;
-    }
-    imageUploading.value = true;
+// Additional image handlers
+function onAdditionalFileSelected(e: Event, index: number) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) setAdditionalImage(file, index);
+}
+function setAdditionalImage(file: File, index: number) {
+    additionalImageFiles.value[index] = file;
+    const reader = new FileReader();
+    reader.onload = (ev) => { additionalImagePreviews.value[index] = ev.target?.result as string; };
+    reader.readAsDataURL(file);
+}
+function removeAdditionalImage(index: number) {
+    additionalImageFiles.value[index] = null;
+    additionalImagePreviews.value[index] = null;
+    if (additionalInputRefs.value[index]) additionalInputRefs.value[index]!.value = '';
+}
+
+async function uploadAllImages(): Promise<boolean> {
     const safeCode = product.value.code || Math.random().toString(36).substring(7);
-    try {
-        const uploads = await Promise.all(
-            imageFiles.value.map(async (file: File) => {
-                const fileName = `${safeCode}-${Date.now()}-${file.name}`;
-                const { error } = await supabase.storage.from('product-images').upload(fileName, file, { upsert: true });
-                if (error) throw error;
-                const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-                return data.publicUrl;
-            })
-        );
-        product.value.images = uploads;
-        product.value.image = uploads[0] ?? product.value.image ?? 'product-placeholder.svg';
-        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Görseller yüklendi', life: 3000 });
-    } catch (error) {
-        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(error), life: 3000 });
-    } finally {
-        imageUploading.value = false;
+    let changed = false;
+
+    // Cover image update
+    if (coverImageFile.value) {
+        const fileName = `${safeCode}-${Date.now()}-cover-${coverImageFile.value.name}`;
+        const { error } = await supabase.storage.from('product-images').upload(fileName, coverImageFile.value, { upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+        product.value.image = data.publicUrl;
+        changed = true;
     }
+
+    // Additional images update
+    const newImagesList: string[] = [];
+    for (let i = 0; i < additionalImagePreviews.value.length; i++) {
+        const file = additionalImageFiles.value[i];
+        const preview = additionalImagePreviews.value[i];
+        
+        if (file) {
+            // New file uploaded
+            const fileName = `${safeCode}-${Date.now()}-${i}-${file.name}`;
+            const { error } = await supabase.storage.from('product-images').upload(fileName, file, { upsert: true });
+            if (error) throw error;
+            const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+            newImagesList.push(data.publicUrl);
+            changed = true;
+        } else if (preview && preview.startsWith('http')) {
+            // Existing URL
+            newImagesList.push(preview);
+        }
+    }
+    
+    // Check if images array changed
+    if (JSON.stringify(product.value.images) !== JSON.stringify(newImagesList)) {
+        product.value.images = newImagesList;
+        changed = true;
+    }
+
+    return changed;
 }
 
 async function saveProduct() {
@@ -207,6 +300,16 @@ async function saveProduct() {
         toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Kategori, marka ve tip zorunludur', life: 3000 });
         return;
     }
+
+    imageUploading.value = true;
+    try {
+        await uploadAllImages();
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(error), life: 3000 });
+        imageUploading.value = false;
+        return;
+    }
+    imageUploading.value = false;
 
     const payload = buildProductPayload();
     const productEntity = Product.create({
@@ -230,6 +333,7 @@ async function saveProduct() {
         minStock: payload.min_stock,
         maxStock: payload.max_stock,
         initialStock: payload.initial_stock,
+        categoryDiscount: payload.categoryDiscount,
         createdAt: product.value.createdAt || new Date()
     });
 
@@ -242,147 +346,255 @@ async function saveProduct() {
     }
 }
 
-
-
 function goBack() {
     router.push('/inventory/products');
 }
 </script>
 
 <template>
-    <div class="flex flex-col gap-3">
-        <!-- Bilgilendirme Card'ı -->
-        <div class="card p-6 min-h-32 flex flex-col gap-3">
-            <div class="m-0 text-2xl font-medium">Ürün Düzenle: {{ product.name }}</div>
-            <div class="text-surface-600 dark:text-surface-400">
-                <p>Ürün bilgilerini güncellerken stok miktarlarını kontrol etmeyi unutmayın.</p>
-                <p>KDV oranı ve döviz birimi fiyatlandırma hesaplamalarını doğrudan etkiler.</p>
-                <p>Değişiklikleri tamamladıktan sonra "Güncelle" butonu ile kaydedebilirsiniz.</p>
+    <div class="flex flex-col gap-0">
+        <!-- Header Card -->
+        <div class="card p-6 min-h-32 flex flex-col gap-4">
+            <div class="flex flex-col gap-2">
+                <div class="m-0 text-2xl font-medium">Ürün Düzenleme Formu</div>
+                
+                <div class="flex items-center gap-3 mt-2">
+                    <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                        <i class="pi pi-hashtag text-primary text-sm"></i>
+                        <span class="text-base font-mono font-bold text-primary leading-none">{{ product.name || 'Yükleniyor...' }}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Ana Form Card'ı -->
-        <div class="card">
-            <div class="grid grid-cols-12 gap-6 mb-6">
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="code" class="block font-bold mb-3">Ürün Kodu</label>
-                    <InputText id="code" v-model.trim="product.code" placeholder="Otomatik (opsiyonel)" fluid />
-                </div>
+        <!-- Main Content: Form (left) + Image Panel (right) -->
+        <div class="flex gap-6 items-start">
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="name" class="block font-bold mb-3">Ürün Adı</label>
-                    <InputText id="name" v-model.trim="product.name" required="true" :invalid="submitted && !product.name" fluid />
-                    <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
-                </div>
+            <!-- LEFT: Form Card -->
+            <div class="card flex-1 min-w-0">
+                <div class="grid grid-cols-12 gap-6 mb-6">
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="barcode" class="block font-bold mb-3">Barkod / GTIN</label>
-                    <InputText id="barcode" v-model.trim="product.barcode" fluid />
-                </div>
-
-
-                <div class="col-span-12 lg:col-span-4">
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="brand" class="font-bold">Marka</label>
-                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="code" class="block font-semibold mb-3">Ürün Kodu</label>
+                        <InputText id="code" v-model.trim="product.code" placeholder="Otomatik (opsiyonel)" fluid />
                     </div>
-                    <Select id="brand" v-model="product.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka Seç" fluid />
-                    <small v-if="submitted && !product.brand_id" class="text-red-500">Marka zorunludur.</small>
-                </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="category" class="font-bold">Kategori</label>
-                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="name" class="block font-semibold mb-3">Ürün Adı</label>
+                        <InputText id="name" v-model.trim="product.name" required="true" :invalid="submitted && !product.name" fluid />
+                        <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
                     </div>
-                    <Select id="category" v-model="product.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori Seç" fluid />
-                    <small v-if="submitted && !product.category_id" class="text-red-500">Kategori zorunludur.</small>
-                </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="type" class="font-bold">Tip</label>
-                        <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="barcode" class="block font-semibold mb-3">Barkod / GTIN</label>
+                        <InputText id="barcode" v-model.trim="product.barcode" fluid />
                     </div>
-                    <Select id="type" v-model="product.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
-                    <small v-if="submitted && !product.type_id" class="text-red-500">Tip zorunludur.</small>
-                </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="taxRate" class="block font-bold mb-3">KDV Oran</label>
-                    <Select id="taxRate" v-model="product.tax_rate" :options="taxRates" optionLabel="label" optionValue="value" placeholder="KDV Oranı Seç" fluid />
-                    <small v-if="submitted && (product.tax_rate === null || product.tax_rate === undefined)" class="text-red-500">KDV oran zorunludur.</small>
-                </div>
 
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="price" class="block font-bold mb-3">Fiyat (KDV Hariç)</label>
-                    <InputNumber id="price" v-model="product.price" mode="currency" :currency="selectedCurrencyCode" :locale="selectedCurrencyLocale" fluid />
-                    <small v-if="submitted && (product.price === null || product.price === undefined)" class="text-red-500">Fiyat zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="currency" class="block font-bold mb-3">Döviz</label>
-                    <Select id="currency" v-model="product.currency_id" :options="lookupStore.currencies" optionLabel="code" optionValue="id" placeholder="Döviz Seç" fluid />
-                    <small v-if="submitted && !product.currency_id" class="text-red-500">Döviz zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="priceUnit" class="block font-bold mb-3">Birim</label>
-                    <Select id="priceUnit" v-model="product.price_unit" :options="priceUnits" optionLabel="label" optionValue="value" placeholder="Birim Seç" fluid />
-                    <small v-if="submitted && !product.price_unit" class="text-red-500">Birim zorunludur.</small>
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="minStock" class="block font-bold mb-3">Minimum Stok</label>
-                    <InputNumber id="minStock" v-model="product.min_stock" integeronly fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="maxStock" class="block font-bold mb-3">Maksimum Stok</label>
-                    <InputNumber id="maxStock" v-model="product.max_stock" integeronly fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="initialStock" class="block font-bold mb-3">Mevcut Stok (Başlangıç)</label>
-                    <InputNumber id="initialStock" v-model="product.initial_stock" integeronly fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="inventoryStatus" class="block font-bold mb-3">Stok Durumu</label>
-                    <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid></Select>
-                </div>
-
-                <div class="col-span-12 lg:col-span-4">
-                    <label for="status" class="block font-bold mb-3">Durum</label>
-                    <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid></Select>
-                </div>
-
-                <div class="col-span-12 lg:col-span-12">
-                    <label for="description" class="block font-bold mb-3">Açıklama</label>
-                    <Textarea id="description" v-model="product.description" rows="6" cols="20" fluid />
-                </div>
-
-                <div class="col-span-12 lg:col-span-6">
-                    <label for="imageUpload" class="block font-bold mb-3">Ürün Görselleri (0/6)</label>
-                    <div class="flex flex-col gap-3">
-                        <div class="flex flex-wrap gap-3 items-center">
-                            <FileUpload mode="basic" name="productImages" accept="image/*" chooseLabel="Görsel Seç" customUpload :auto="false" multiple :fileLimit="6" @select="onImageSelected" />
-                            <Button label="Yükle" icon="pi pi-upload" severity="secondary" :disabled="imageUploading" @click="uploadImage" />
+                    <div class="col-span-12 lg:col-span-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="brand" class="font-semibold">Marka</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
                         </div>
-                        <small class="text-surface-500">Seçilen: {{ imageFiles.length }}/6</small>
+                        <Select id="brand" v-model="product.brand_id" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Marka Seç" fluid />
+                        <small v-if="submitted && !product.brand_id" class="text-red-500">Marka zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="category" class="font-semibold">Kategori</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                        </div>
+                        <Select id="category" v-model="product.category_id" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Kategori Seç" fluid />
+                        <small v-if="submitted && !product.category_id" class="text-red-500">Kategori zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="type" class="font-semibold">Tip</label>
+                            <Button label="Ekle" text severity="success" size="small" class="p-0 h-4 font-semibold hover:text-green-800" @click="router.push('/admin/inventory-definitions')" />
+                        </div>
+                        <Select id="type" v-model="product.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
+                        <small v-if="submitted && !product.type_id" class="text-red-500">Tip zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="categoryDiscount" class="block font-semibold mb-3">Kategori İskonto Tipi</label>
+                        <Select id="categoryDiscount" v-model="product.categoryDiscount" :options="discountTypes" optionLabel="label" optionValue="value" placeholder="İskonto Tipi Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="taxRate" class="block font-semibold mb-3">KDV Oran</label>
+                        <Select id="taxRate" v-model="product.tax_rate" :options="taxRates" optionLabel="label" optionValue="value" placeholder="KDV Oranı Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="price" class="block font-semibold mb-3">Fiyat ( KDV Hariç )</label>
+                        <InputNumber id="price" v-model="product.price" mode="currency" :currency="selectedCurrencyCode" :locale="selectedCurrencyLocale" fluid />
+                        <small v-if="submitted && (product.price === null || product.price === undefined)" class="text-red-500">Fiyat zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="currency" class="block font-semibold mb-3">Döviz</label>
+                        <Select id="currency" v-model="product.currency_id" :options="lookupStore.currencies" optionLabel="code" optionValue="id" placeholder="Döviz Seç" fluid />
+                        <small v-if="submitted && !product.currency_id" class="text-red-500">Döviz zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="priceUnit" class="block font-semibold mb-3">Birim</label>
+                        <Select id="priceUnit" v-model="product.price_unit" :options="priceUnits" optionLabel="label" optionValue="value" placeholder="Birim Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="minStock" class="block font-semibold mb-3">Minimum Stok</label>
+                        <InputNumber id="minStock" v-model="product.min_stock" integeronly fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="maxStock" class="block font-semibold mb-3">Maksimum Stok</label>
+                        <InputNumber id="maxStock" v-model="product.max_stock" integeronly fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="initialStock" class="block font-semibold mb-3">Mevcut Stok (Başlangıç)</label>
+                        <InputNumber id="initialStock" v-model="product.initial_stock" integeronly fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
+                        <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="status" class="block font-semibold mb-3">Durum</label>
+                        <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-12">
+                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
+                        <Textarea id="description" v-model="product.description" rows="2" cols="20" fluid />
+                    </div>
+
+
+
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-6 mt-12">
+                        <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
+                    </div>
+                    <div class="col-span-6 mt-12">
+                        <Button label="Güncelle" icon="pi pi-check" class="w-full" :loading="imageUploading" @click="saveProduct" />
                     </div>
                 </div>
             </div>
 
-            <!-- İşlem Butonları - Alt Kısım -->
-            <div class="grid grid-cols-12 gap-4">
-                <div class="col-span-6">
-                    <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" @click="goBack" />
+            <!-- RIGHT: Image Upload Panel -->
+            <div class="card flex-shrink-0 flex flex-col gap-4" style="width: 320px;">
+                <h5 class="m-0 font-semibold text-base">Ürün Görseli</h5>
+
+                <!-- Cover Image Drop Zone -->
+                <div
+                    class="relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden"
+                    :class="[
+                        coverImagePreview ? 'border-transparent cursor-default' : 'cursor-pointer',
+                        isDragOver
+                            ? 'border-primary bg-primary/5'
+                            : !coverImagePreview ? 'border-surface-200 dark:border-surface-700 hover:border-surface-400 dark:hover:border-surface-500 bg-surface-50 dark:bg-surface-800' : ''
+                    ]"
+                    style="height: 220px;"
+                    @dragover="onCoverDragOver"
+                    @dragleave="onCoverDragLeave"
+                    @drop="onCoverDrop"
+                    @click="!coverImagePreview && coverInputRef?.click()"
+                >
+                    <!-- Preview -->
+                    <template v-if="coverImagePreview">
+                        <img :src="coverImagePreview" alt="Kapak Görseli" class="w-full h-full object-cover" />
+                        <button
+                            type="button"
+                            class="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
+                            @click.stop="removeCoverImage"
+                        >
+                            <i class="pi pi-times text-xs"></i>
+                        </button>
+                    </template>
+
+                    <!-- Empty State -->
+                    <template v-else>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4">
+                            <div class="w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-700 flex items-center justify-center">
+                                <i class="pi pi-cloud-upload text-xl text-surface-400 dark:text-surface-500"></i>
+                            </div>
+                            <p class="text-sm text-surface-500 dark:text-surface-400 text-center font-medium m-0">
+                                Kapak görselini bırakın veya seçin
+                            </p>
+                            <span class="text-sm text-primary underline font-semibold hover:opacity-80 transition-opacity">
+                                Yükle
+                            </span>
+                        </div>
+                    </template>
+
+                    <input
+                        ref="coverInputRef"
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        @change="onCoverFileSelected"
+                    />
                 </div>
-                <div class="col-span-6">
-                    <Button label="Güncelle" icon="pi pi-check" class="w-full" @click="saveProduct" />
+
+                <!-- Additional Image Slots (6 slots) -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div
+                        v-for="(preview, idx) in additionalImagePreviews"
+                        :key="idx"
+                        class="relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden"
+                        :class="[
+                            preview
+                                ? 'border-transparent cursor-default'
+                                : 'border-surface-200 dark:border-surface-700 hover:border-surface-400 dark:hover:border-surface-500 bg-surface-50 dark:bg-surface-800 cursor-pointer'
+                        ]"
+                        style="height: 88px;"
+                        @click="!preview && additionalInputRefs[idx]?.click()"
+                    >
+                        <!-- Preview -->
+                        <template v-if="preview">
+                            <img :src="preview" alt="Ürün Görseli" class="w-full h-full object-cover rounded-xl" />
+                            <button
+                                type="button"
+                                class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow hover:bg-red-600 transition-colors z-10"
+                                @click.stop="removeAdditionalImage(idx)"
+                            >
+                                <i class="pi pi-times" style="font-size: 0.55rem;"></i>
+                            </button>
+                        </template>
+
+                        <!-- Empty Slot -->
+                        <template v-else>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                                <i class="pi pi-cloud-upload text-surface-300 dark:text-surface-600" style="font-size: 1.1rem;"></i>
+                                <span class="text-xs text-primary underline font-medium">Yükle</span>
+                            </div>
+                        </template>
+
+                        <input
+                            :ref="(el) => { additionalInputRefs[idx] = el as HTMLInputElement | null }"
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="(e) => onAdditionalFileSelected(e, idx)"
+                        />
+                    </div>
                 </div>
+
+                <!-- Image count -->
+                <p class="text-xs text-surface-400 dark:text-surface-500 text-center m-0">
+                    {{ totalImageCount }} / 7 görsel seçildi
+                </p>
             </div>
+
         </div>
     </div>
 </template>

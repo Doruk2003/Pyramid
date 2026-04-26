@@ -14,7 +14,6 @@ const toast = useToast();
 type ExportableTable = { exportCSV: () => void };
 const dt = ref<ExportableTable | null>(null);
 const deleteProductDialog = ref(false);
-const deleteProductsDialog = ref(false);
 const categoryDialog = ref(false);
 const brandDialog = ref(false);
 const typeDialog = ref(false);
@@ -28,6 +27,71 @@ const selectedProducts = ref<ProductListItem[]>([]);
 const newCategoryName = ref('');
 const newBrandName = ref('');
 const newTypeName = ref('');
+const menu = ref();
+const menuItems = ref([
+    {
+        label: 'Detay',
+        command: () => {
+            if (product.value) viewProduct(product.value as ProductListItem);
+        }
+    },
+    {
+        label: 'Kopyala',
+        command: () => {
+            if (product.value) cloneProduct(product.value as ProductListItem);
+        }
+    },
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (product.value) editProduct(product.value as ProductListItem);
+        }
+    },
+    {
+        label: 'Sil',
+        command: () => {
+            if (product.value) confirmDeleteProduct(product.value as ProductListItem);
+        }
+    }
+]);
+
+const columns = ref([
+    { field: 'image', header: 'Görsel' },
+    { field: 'code', header: 'Ürün Kodu' },
+    { field: 'name', header: 'Ürün Adı' },
+    { field: 'barcode', header: 'Barkod No' },
+    { field: 'taxRate', header: 'KDV %' },
+    { field: 'brandId', header: 'Marka' },
+    { field: 'categoryId', header: 'Kategori' },
+    { field: 'typeId', header: 'Tip' },
+    { field: 'minStock', header: 'Min Stok' },
+    { field: 'maxStock', header: 'Max Stok' },
+    { field: 'initialStock', header: 'Mevcut Stok' },
+    { field: 'status', header: 'Durum' },
+    { field: 'inventoryStatus', header: 'Stok Takibi' }
+]);
+
+const selectedColumns = ref(columns.value.filter(c => ['image', 'code', 'name', 'status', 'price'].includes(c.field)));
+
+function onColumnToggle(val: any) {
+    selectedColumns.value = columns.value.filter((col) => val.includes(col));
+    // Seçimleri localStorage'a kaydet (sadece field isimlerini)
+    const fieldNames = selectedColumns.value.map(c => c.field);
+    localStorage.setItem('product_list_columns', JSON.stringify(fieldNames));
+}
+
+function viewProduct(prod: ProductListItem) {
+    router.push(`/inventory/products/details/${prod.id}`);
+}
+
+function cloneProduct(prod: ProductListItem) {
+    router.push(`/inventory/products/create?cloneId=${prod.id}`);
+}
+
+const onProductActionClick = (event: any, prod: ProductListItem) => {
+    product.value = prod;
+    menu.value.toggle(event);
+};
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -56,8 +120,8 @@ const filterForm = ref<ProductFilterForm>({
 const activeFilters = ref<ProductFilterForm>({ ...filterForm.value });
 
 const productStatuses = ref([
-    { label: 'Aktif', value: 'ACTIVE' },
-    { label: 'Pasif', value: 'PASSIVE' }
+    { label: 'AKTİF', value: 'ACTIVE' },
+    { label: 'PASİF', value: 'PASSIVE' }
 ]);
 
 const priceUnits = ref([
@@ -106,6 +170,17 @@ const filteredProducts = computed(() => {
 onMounted(async () => {
     productStore.fetchProducts();
     lookupStore.fetchAll();
+
+    // Kayıtlı sütun seçimlerini yükle
+    const saved = localStorage.getItem('product_list_columns');
+    if (saved) {
+        try {
+            const fieldNames = JSON.parse(saved);
+            selectedColumns.value = columns.value.filter(col => fieldNames.includes(col.field));
+        } catch (e) {
+            console.error('Sütun seçimleri yüklenemedi:', e);
+        }
+    }
 });
 
 function formatCurrency(value: number | null | undefined, currencyId: string | null | undefined) {
@@ -186,17 +261,6 @@ function exportCSV() {
     dt.value?.exportCSV();
 }
 
-function confirmDeleteSelected() {
-    deleteProductsDialog.value = true;
-}
-
-async function deleteSelectedProducts() {
-    const toDelete = selectedProducts.value ?? [];
-    await Promise.all(toDelete.map((item) => productStore.deleteProduct(item.id)));
-    deleteProductsDialog.value = false;
-    selectedProducts.value = [];
-    toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Ürünler silindi', life: 3000 });
-}
 
 function getStatusLabel(status: string | null | undefined): 'success' | 'info' | 'warn' | 'secondary' | 'contrast' | 'danger' | undefined {
     switch (status) {
@@ -232,23 +296,12 @@ function getStatusText(status: string | null | undefined) {
     }
 }
 
-function getProductStatusLabel(status: string | null | undefined) {
-    switch (status) {
-        case 'ACTIVE':
-            return 'success';
-        case 'PASSIVE':
-            return 'secondary';
-        default:
-            return 'secondary';
-    }
-}
-
 function getProductStatusText(status: string | null | undefined) {
     switch (status) {
         case 'ACTIVE':
-            return 'Aktif';
+            return 'AKTİF';
         case 'PASSIVE':
-            return 'Pasif';
+            return 'PASİF';
         default:
             return status || '';
     }
@@ -312,13 +365,22 @@ function getPriceUnitLabel(value: string | null | undefined) {
             <!-- Alt Satır: Toolbar (Yeni, Sil, Dışa Aktar butonları) -->
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Ürün Oluştur" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
+                    <Button label="Yeni Ürün Oluştur" icon="pi pi-plus" severity="primary" class="mr-2" @click="openNew" />
                 </template>
 
                 <template #end>
-                    <Button label="Ürün Sil" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedProducts || !selectedProducts.length" />
-                    <Button label="Ürün Ara" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
-                    <Button label="Dışa Aktar" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+                    <MultiSelect
+                        :modelValue="selectedColumns"
+                        :options="columns"
+                        optionLabel="header"
+                        @update:modelValue="onColumnToggle"
+                        placeholder="Sütun Seç"
+                        :maxSelectedLabels="1"
+                        class="mr-2"
+                        style="min-width: 15rem"
+                    />
+                    <Button  icon="pi pi-filter" severity="secondary"  v-tooltip.bottom="'Ürün Ara'" @click="toggleFilters" />
+                    <Button  icon="pi pi-upload" severity="secondary" v-tooltip.bottom="'Dışa Aktar'" @click="exportCSV" />
                 </template>
             </Toolbar>
         </div>
@@ -379,73 +441,78 @@ function getPriceUnitLabel(value: string | null | undefined) {
             >
                 <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
 
-                <Column field="image" header="Görsel">
+                <Column v-if="selectedColumns.find(c => c.field === 'image')" field="image" header="Görsel">
                     <template #body="slotProps">
                         <img :src="resolveProductImage(slotProps.data)" :alt="slotProps.data.name" class="rounded" style="width: 64px" />
                     </template>
                 </Column>
 
-                <Column field="code" header="Ürün Kodu" sortable style="min-width: 8rem"></Column>
-                <Column field="name" header="Ürün Adı" sortable style="min-width: 12rem"></Column>
-                <Column field="barcode" header="Barcode No" sortable style="min-width: 10rem"></Column>
-                <Column field="status" header="Durum" sortable style="min-width: 8rem">
-                    <template #body="slotProps">
-                        <Tag :value="getProductStatusText(slotProps.data.status)" :severity="getProductStatusLabel(slotProps.data.status)" />
-                    </template>
-                </Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'code')" field="code" header="Ürün Kodu" sortable style="min-width: 8rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'name')" field="name" header="Ürün Adı" sortable style="min-width: 12rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'barcode')" field="barcode" header="Barcode No" sortable style="min-width: 10rem"></Column>
 
-                <Column field="priceUnit" header="Birim" sortable style="min-width: 8rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'priceUnit')" field="priceUnit" header="Birim" sortable style="min-width: 8rem">
                     <template #body="slotProps">
                         {{ getPriceUnitLabel(slotProps.data.priceUnit) }}
                     </template>
                 </Column>
 
-                <Column field="price" header="Fiyat" sortable style="min-width: 8rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'price')" field="price" header="Fiyat" sortable style="min-width: 8rem">
                     <template #body="slotProps">
                         {{ formatCurrency(slotProps.data.price, slotProps.data.currencyId) }}
                     </template>
                 </Column>
 
-                <Column field="currencyId" header="Döviz" sortable style="min-width: 8rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'currencyId')" field="currencyId" header="Döviz" sortable style="min-width: 8rem">
                     <template #body="slotProps">
                         {{ getCurrencyCode(slotProps.data.currencyId) }}
                     </template>
                 </Column>
 
-                <Column field="taxRate" header="KDV %" sortable style="min-width: 8rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'taxRate')" field="taxRate" header="KDV %" sortable style="min-width: 8rem"></Column>
 
-                <Column field="brandId" header="Marka" sortable style="min-width: 10rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'brandId')" field="brandId" header="Marka" sortable style="min-width: 10rem">
                     <template #body="slotProps">
                         {{ getBrandName(slotProps.data.brandId) }}
                     </template>
                 </Column>
 
-                <Column field="categoryId" header="Kategori" sortable style="min-width: 10rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'categoryId')" field="categoryId" header="Kategori" sortable style="min-width: 10rem">
                     <template #body="slotProps">
                         {{ getCategoryName(slotProps.data.categoryId) }}
                     </template>
                 </Column>
 
-                <Column field="typeId" header="Tip" sortable style="min-width: 10rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'typeId')" field="typeId" header="Tip" sortable style="min-width: 10rem">
                     <template #body="slotProps">
                         {{ getTypeName(slotProps.data.typeId) }}
                     </template>
                 </Column>
 
-                <Column field="minStock" header="Min Stok" sortable style="min-width: 10rem"></Column>
-                <Column field="maxStock" header="Max Stok" sortable style="min-width: 10rem"></Column>
-                <Column field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'minStock')" field="minStock" header="Min Stok" sortable style="min-width: 10rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'maxStock')" field="maxStock" header="Max Stok" sortable style="min-width: 10rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem"></Column>
 
-                <Column field="inventoryStatus" header="Stok Takibi" sortable style="min-width: 12rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'status')" field="status" header="Durum" sortable style="min-width: 8rem">
+                    <template #body="slotProps">
+                        <span 
+                            class="font-bold text-sm" 
+                            :class="slotProps.data.status === 'ACTIVE' ? 'text-green-500' : 'text-red-500'"
+                        >
+                            {{ getProductStatusText(slotProps.data.status) }}
+                        </span>
+                    </template>
+                </Column>
+
+                <Column v-if="selectedColumns.find(c => c.field === 'inventoryStatus')" field="inventoryStatus" header="Stok Takibi" sortable style="min-width: 12rem">
                     <template #body="slotProps">
                         <Tag :value="getStatusText(slotProps.data.inventoryStatus)" :severity="getStatusLabel(slotProps.data.inventoryStatus)" />
                     </template>
                 </Column>
 
-                <Column :exportable="false" style="min-width: 12rem">
+                <Column :exportable="false" style="min-width: 4rem">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editProduct(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDeleteProduct(slotProps.data)" />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onProductActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -462,17 +529,6 @@ function getPriceUnitLabel(value: string | null | undefined) {
             <template #footer>
                 <Button label="Hayır" icon="pi pi-times" text @click="deleteProductDialog = false" />
                 <Button label="Evet" icon="pi pi-check" @click="deleteProduct" />
-            </template>
-        </Dialog>
-
-        <Dialog v-model:visible="deleteProductsDialog" :style="{ width: '450px' }" header="Onay" :modal="true">
-            <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle text-3xl!" />
-                <span>Seçili ürünleri silmek istediğinize emin misiniz</span>
-            </div>
-            <template #footer>
-                <Button label="Hayır" icon="pi pi-times" text @click="deleteProductsDialog = false" />
-                <Button label="Evet" icon="pi pi-check" text @click="deleteSelectedProducts" />
             </template>
         </Dialog>
 
@@ -508,6 +564,8 @@ function getPriceUnitLabel(value: string | null | undefined) {
                 <Button label="Kaydet" icon="pi pi-check" @click="saveType" />
             </template>
         </Dialog>
+
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>
 <style scoped>

@@ -64,13 +64,14 @@
 - [x] **Migration doğrulama** — 21 audit trigger satırı (7×3), 3 sequence, `FT-2026-00001` testı — tümü başarılı ✅
 - [x] **Fatura-Depo Entegrasyonu** — Fatura başlığına ve kalemlerine `warehouse_id` eklendi; 'Kesildi' durumunda otomatik stok hareketi oluşturma altyapısı kuruldu ✅
 - [x] **Alt Hesap Hiyerarşisi (Bölüm 1)** — `accounts.parent_id` FK, 2 seviye trigger, konsolide view, domain/infra/store/UI tam güncellendi ✅
+- [x] **PRJ Modülü (Bölüm 2)** — `projects` tablosu + kategorili bütçe (Malzeme/İşçilik/Ekipman/Genel Gider), `invoices.project_id` + `stock_movements.project_id`, domain/infra/store/UI tam tamamlandı ✅
 - [x] **Yapılacaklar & Takvim Modülü (TODO)** — Gelişmiş takvim + To-do list sayfası, dashboard entegrasyonu, veritabanı şeması ve multi-tenant RLS politikaları ✅
 
 ---
 
 ## Son Güncelleme
-**Tarih**: 18 Nisan 2026
-**Oturum**: #14
+**Tarih**: 25 Nisan 2026
+**Oturum**: #15 (Tamamlandı)
 
 ---
 
@@ -82,12 +83,29 @@
 
 ## Şu An Üzerinde Çalışılan
 
-**Görev**: Bir sonraki modül — PUR (Satınalma) veya RPT (Raporlama) modülü
-**Durum**: 🔵 Planlama aşamasında.
+**Görev**: PRJ Modülü (Baskı 2 Uygulamalı) — Migration çalıştırıldıktan sonra RPT veya stok-proje entegrasyonu
+**Durum**: 🟡 Migration bekleniyor.
 
-> **NOT**: Tüm analiz bulguları ve acil/orta/uzun vadeli düzeltmeler tamamlandı.
-> Proje üretim kalitesine (.production-ready) ulaştı.
-> Kalan tek ertelenen madde: Rol Yönetimi DB RBAC altyapısı (Faz 2 kapsamı).
+> **BLOCKER**: `20260418110000_project_module.sql` migration'ının Supabase Dashboard SQL Editor'da çalıştırılması gerekiyor.
+
+### Oturum #15 Tamamlanan İşler:
+- ✅ `DbProject` interface → `db-types.ts`
+- ✅ `projectId` getter → `invoice.entity.ts`
+- ✅ `supabase-finance.repository.ts` → getInvoices/getInvoiceById/saveInvoice'e `project_id` eklendi
+- ✅ `supabase-project.repository.ts` → Tam CRUD + cost summary + JOIN implementasyonu
+- ✅ `project.store.ts` → Pinia store (fetchProjects, costSummary, activeProjects getter)
+- ✅ `ProjectList.vue` → Kart tabanlı liste, kategorili bütçe, dialog form, silme onayı
+- ✅ `ProjectDetail.vue` → Dashboard, bütçe kartları, ilerleme çubuğu, kategorili dağılım, fatura tablosu
+- ✅ `InvoiceForm.vue` → Proje seçim dropdown'ı eklendi
+- ✅ `router/index.ts` → `/finance/projects` + `/finance/projects/:id` rotaları
+- ✅ `AppMenu.vue` → Finans altında **Projeler** menüsü
+- ✅ Migration SQL → Tamamen idempotent hale getirildi
+
+### Sıradaki Oturum İçin Önerilen Görevler:
+1. **RPT — Raporlama Modülü**: Proje maliyet raporu, fatura bazlı finansal özet ekranları
+2. **Stok-Proje Entegrasyonu**: `MovementList.vue`'ya proje filtresi, proje bazlı stok gideri özeti
+3. **Dashboard PRJ Widget**: Ana ekrana aktif proje özet kartları
+4. **PUR — Satınalma Modülü**: Onay akışlı satın alma siparişi
 
 ---
 

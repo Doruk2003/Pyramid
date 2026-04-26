@@ -61,6 +61,11 @@ const model = computed(() => {
                             label: 'Cari Hesaplar',
                             icon: 'pi pi-fw pi-address-book',
                             to: '/finance/accounts'
+                        },
+                        {
+                            label: 'Projeler',
+                            icon: 'pi pi-fw pi-sitemap',
+                            to: '/finance/projects'
                         }
                     ]
                 }

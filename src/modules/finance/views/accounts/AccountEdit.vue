@@ -6,9 +6,11 @@ import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useSettingsStore } from '@/modules/admin/application/settings.store';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 const toast = useToast();
 const router = useRouter();
 const route = useRoute();
@@ -98,6 +100,7 @@ async function loadAccount() {
 }
 
 onMounted(async () => {
+    await settingsStore.fetchSettings();
     await loadAccount();
     await financeStore.fetchRootAccounts();
 });
@@ -319,17 +322,17 @@ function goBack() {
                         </div>
 
                         <div>
-                            <label for="dealerDiscount1" class="block font-bold mb-3">Bayi İskontosu (1)</label>
+                            <label for="dealerDiscount1" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel1 || 'Bayi İskontosu (1)' }}</label>
                             <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount2" class="block font-bold mb-3">Bayi İskontosu (2)</label>
+                            <label for="dealerDiscount2" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel2 || 'Bayi İskontosu (2)' }}</label>
                             <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount3" class="block font-bold mb-3">Bayi İskontosu (3)</label>
+                            <label for="dealerDiscount3" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel3 || 'Bayi İskontosu (3)' }}</label>
                             <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
                     </div>
