@@ -11,6 +11,8 @@ export interface InvoiceLineProps {
     description?: string;
     quantity: number;
     unitPrice: number;
+    originalPrice?: number;    // Ürün kartındaki orijinal fiyat
+    originalCurrency?: string; // Ürün kartındaki orijinal döviz
     vatRate: number;
     discountRate1: number;
     discountRate2: number;
@@ -126,6 +128,7 @@ export class Invoice {
     calculateTotals(): Invoice {
         let linesSubtotal = 0;
         let linesVat = 0;
+        const isExport = this.props.documentCategory === 'export' || this.props.documentCategory === 'export_registered';
 
         const updatedLines = this.props.lines.map((line) => {
             // Bileşik İndirim Uygula (Compound Discount)
@@ -134,7 +137,8 @@ export class Invoice {
             const d3 = 1 - (line.discountRate3 || 0) / 100;
             
             const lineSubtotal = line.quantity * line.unitPrice * d1 * d2 * d3;
-            const lineVat = lineSubtotal * (line.vatRate / 100);
+            // İhracat/İhraç Kayıtlı ise KDV 0 olur
+            const lineVat = isExport ? 0 : lineSubtotal * (line.vatRate / 100);
             const lineTotal = lineSubtotal + lineVat;
 
             linesSubtotal += lineSubtotal;
@@ -145,21 +149,22 @@ export class Invoice {
 
         // Fatura Geneli İndirim Hesaplama (Net Ara Toplam üzerinden)
         const discountRate = this.props.discountRate || 0;
-        const discountAmount = linesSubtotal * (discountRate / 100);
-        const netSubtotal = linesSubtotal - discountAmount;
+        const discountAmount = Math.round((linesSubtotal * (discountRate / 100)) * 100) / 100;
+        const netSubtotal = Math.round((linesSubtotal - discountAmount) * 100) / 100;
         
         // KDV, indirim sonrası tutar üzerinden tekrar hesaplanır (veya orantılı düşülür)
-        // Profesyonel yaklaşımda KDV her satırda hesaplanır, bu yüzden global indirimi satırlara orantılı yedirmek en temizidir.
-        // Ancak burada basitlik için KDV'yi de net tutar üzerinden oranlıyoruz:
-        const vatTotal = netSubtotal > 0 ? (linesVat * (netSubtotal / linesSubtotal)) : 0;
+        // İhracat durumunda linesVat zaten 0 olduğu için vatTotal da 0 olacaktır.
+        const vatTotal = netSubtotal > 0 && linesSubtotal > 0 
+            ? Math.round((linesVat * (netSubtotal / linesSubtotal)) * 100) / 100 
+            : 0;
 
         return new Invoice({
             ...this.props,
             lines: updatedLines,
-            subtotal: linesSubtotal,
+            subtotal: Math.round(linesSubtotal * 100) / 100,
             discountAmount: discountAmount,
             vatTotal: vatTotal,
-            total: netSubtotal + vatTotal,
+            total: Math.round((netSubtotal + vatTotal) * 100) / 100,
             updatedAt: new Date()
         });
     }

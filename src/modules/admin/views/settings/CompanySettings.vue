@@ -45,6 +45,31 @@ const saveSettings = async () => {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 };
+
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const onLogoSelect = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.files && target.files[0]) {
+        const file = target.files[0];
+        
+        // Boyut kontrolü (örn: max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            toast.add({ severity: 'warn', summary: 'Dosya Boyutu', detail: 'Logo boyutu 2MB\'dan küçük olmalıdır.', life: 3000 });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            settingsData.value.logoUrl = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+const triggerFileInput = () => {
+    fileInput.value?.click();
+};
 </script>
 
 <template>
@@ -65,38 +90,73 @@ const saveSettings = async () => {
 
             <TabPanels class="px-6 pb-6 pt-6">
                 <TabPanel value="general">
-                    <div class="grid grid-cols-12 gap-4">
-                        <div class="col-span-12 md:col-span-6">
-                            <label for="companyName" class="block font-bold mb-2">Şirket Adı</label>
-                            <InputText id="companyName" v-model="settingsData.companyName" fluid />
+                    <div class="grid grid-cols-12 gap-6">
+                        <!-- Şirket Bilgileri (SOL) -->
+                        <div class="col-span-12 md:col-span-8 grid grid-cols-12 gap-4">
+                            <div class="col-span-12 md:col-span-8">
+                                <label for="companyName" class="block font-bold mb-2">Şirket Adı</label>
+                                <InputText id="companyName" v-model="settingsData.companyName" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-4">
+                                <label for="currency" class="block font-bold mb-2">Varsayılan Para Birimi</label>
+                                <Select id="currency" v-model="settingsData.currency" :options="['TRY', 'USD', 'EUR']" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-6">
+                                <label for="taxNumber" class="block font-bold mb-2">Vergi Numarası</label>
+                                <InputText id="taxNumber" v-model="settingsData.taxNumber" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-6">
+                                <label for="taxOffice" class="block font-bold mb-2">Vergi Dairesi</label>
+                                <InputText id="taxOffice" v-model="settingsData.taxOffice" fluid />
+                            </div>
+                            <div class="col-span-12">
+                                <label for="address" class="block font-bold mb-2">Adres</label>
+                                <Textarea id="address" v-model="settingsData.address" rows="3" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-4">
+                                <label for="phone" class="block font-bold mb-2">Telefon</label>
+                                <InputText id="phone" v-model="settingsData.phone" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-4">
+                                <label for="email" class="block font-bold mb-2">E-posta</label>
+                                <InputText id="email" v-model="settingsData.email" fluid />
+                            </div>
+                            <div class="col-span-12 md:col-span-4">
+                                <label for="website" class="block font-bold mb-2">Web Sitesi</label>
+                                <InputText id="website" v-model="settingsData.website" fluid />
+                            </div>
                         </div>
-                        <div class="col-span-12 md:col-span-6">
-                            <label for="currency" class="block font-bold mb-2">Varsayılan Para Birimi</label>
-                            <Select id="currency" v-model="settingsData.currency" :options="['TRY', 'USD', 'EUR']" fluid />
-                        </div>
-                        <div class="col-span-12 md:col-span-6">
-                            <label for="taxNumber" class="block font-bold mb-2">Vergi Numarası</label>
-                            <InputText id="taxNumber" v-model="settingsData.taxNumber" fluid />
-                        </div>
-                        <div class="col-span-12 md:col-span-6">
-                            <label for="taxOffice" class="block font-bold mb-2">Vergi Dairesi</label>
-                            <InputText id="taxOffice" v-model="settingsData.taxOffice" fluid />
-                        </div>
-                        <div class="col-span-12">
-                            <label for="address" class="block font-bold mb-2">Adres</label>
-                            <Textarea id="address" v-model="settingsData.address" rows="3" fluid />
-                        </div>
+
+                        <!-- Şirket Logosu (SAĞ) -->
                         <div class="col-span-12 md:col-span-4">
-                            <label for="phone" class="block font-bold mb-2">Telefon</label>
-                            <InputText id="phone" v-model="settingsData.phone" fluid />
-                        </div>
-                        <div class="col-span-12 md:col-span-4">
-                            <label for="email" class="block font-bold mb-2">E-posta</label>
-                            <InputText id="email" v-model="settingsData.email" fluid />
-                        </div>
-                        <div class="col-span-12 md:col-span-4">
-                            <label for="website" class="block font-bold mb-2">Web Sitesi</label>
-                            <InputText id="website" v-model="settingsData.website" fluid />
+                            <div class="flex flex-col items-center justify-center p-6 bg-surface-50 dark:bg-surface-900 rounded-xl border border-dashed border-surface-300 dark:border-surface-700 sticky top-4">
+                                <div class="text-lg font-bold mb-4 w-full text-center border-b pb-2">Şirket Logosu</div>
+                                
+                                <div class="relative group w-48 h-48 mb-6 overflow-hidden rounded-xl bg-white flex items-center justify-center border-2 border-surface-200 shadow-sm">
+                                    <img v-if="settingsData.logoUrl" :src="settingsData.logoUrl" alt="Logo Preview" class="max-w-full max-h-full object-contain p-2" />
+                                    <div v-else class="flex flex-col items-center gap-2 text-surface-400">
+                                        <i class="pi pi-image text-5xl"></i>
+                                        <span class="text-sm">Logo Seçilmedi</span>
+                                    </div>
+                                    
+                                    <!-- Hover Overlay -->
+                                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" @click="triggerFileInput">
+                                        <i class="pi pi-camera text-3xl text-white"></i>
+                                    </div>
+                                </div>
+
+                                <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onLogoSelect" />
+                                
+                                <div class="flex flex-col gap-3 w-full">
+                                    <Button label="Logo Seç" icon="pi pi-upload" severity="primary" class="w-full" @click="triggerFileInput" />
+                                    <Button v-if="settingsData.logoUrl" label="Logoyu Kaldır" icon="pi pi-trash" severity="danger" text class="w-full" @click="settingsData.logoUrl = ''" />
+                                </div>
+
+                                <div class="mt-4 text-xs text-surface-500 text-center leading-relaxed">
+                                    Fatura ve raporlarınızda görünecek resmi şirket logonuzu buradan yükleyebilirsiniz.<br>
+                                    <span class="font-bold">(PNG, JPG veya SVG)</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </TabPanel>

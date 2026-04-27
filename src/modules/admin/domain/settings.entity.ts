@@ -53,6 +53,27 @@ export class CompanySettings {
     get discountLabel3(): string | undefined {
         return this.props.discountLabel3;
     }
+    get taxOffice(): string | undefined {
+        return this.props.taxOffice;
+    }
+    get taxNumber(): string | undefined {
+        return this.props.taxNumber;
+    }
+    get address(): string | undefined {
+        return this.props.address;
+    }
+    get phone(): string | undefined {
+        return this.props.phone;
+    }
+    get email(): string | undefined {
+        return this.props.email;
+    }
+    get website(): string | undefined {
+        return this.props.website;
+    }
+    get logoUrl(): string | undefined {
+        return this.props.logoUrl;
+    }
     get productSerial(): string | undefined {
         return this.props.productSerial;
     }

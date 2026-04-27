@@ -91,6 +91,8 @@ export interface DbInvoiceLine {
     description?: string;
     quantity: number;
     unit_price: number;
+    original_price?: number;
+    original_currency?: string;
     vat_rate: number;
     discount_rate1: number;
     discount_rate2: number;
