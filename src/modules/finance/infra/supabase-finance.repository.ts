@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Account, type AddressValue } from '@/modules/finance/domain/account.entity';
-import { Invoice, type InvoiceStatus, type InvoiceType } from '@/modules/finance/domain/invoice.entity';
+import { Invoice, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
 import type { AccountFilters, IFinanceRepository, InvoiceFilters } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
@@ -18,6 +18,8 @@ function rowToAccount(row: DbAccount): Account {
     return Account.create({
         id: row.id,
         companyId: row.company_id,
+        code: row.code,
+        parentId: row.parent_id ?? undefined,
         accountType: row.account_type,
         name: row.name,
         taxNumber: row.tax_number,
@@ -53,10 +55,41 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             .eq('is_active', true)
             .is('deleted_at', null); // Soft-delete: silinen cari hesaplar gizlenir
         if (filters?.accountType) query = query.eq('account_type', filters.accountType);
+        // parentId filtresi: null ise sadece ana hesaplar, string ise o parent'ın alt hesapları
+        if (filters?.parentId === null) {
+            query = query.is('parent_id', null);
+        } else if (filters?.parentId) {
+            query = query.eq('parent_id', filters.parentId);
+        }
 
-        const { data, error } = await query;
+        const { data, error } = await query.order('name', { ascending: true });
         if (error) return err(new Error(error.message));
 
+        return ok(((data as DbAccount[]) || []).map(rowToAccount));
+    }
+
+    async getSubAccounts(parentId: string): Promise<Result<Account[]>> {
+        // Belirli bir ana hesabın doğrudan alt hesaplarını getirir
+        const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('parent_id', parentId)
+            .is('deleted_at', null)
+            .order('name', { ascending: true });
+        if (error) return err(new Error(error.message));
+        return ok(((data as DbAccount[]) || []).map(rowToAccount));
+    }
+
+    async getRootAccounts(): Promise<Result<Account[]>> {
+        // Sadece parent_id IS NULL olan (ana) hesapları getirir
+        const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .is('parent_id', null)
+            .is('deleted_at', null)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        if (error) return err(new Error(error.message));
         return ok(((data as DbAccount[]) || []).map(rowToAccount));
     }
 
@@ -71,6 +104,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const { error } = await supabase.from('accounts').upsert({
             id: obj.id || undefined,
             company_id: obj.companyId,
+            code: obj.code,
+            parent_id: obj.parentId ?? null,   // Alt hesap bağlantısı
             account_type: obj.accountType,
             name: obj.name,
             tax_number: obj.taxNumber,
@@ -129,25 +164,36 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                     invoiceType: row.invoice_type as InvoiceType,
                     invoiceNumber: row.invoice_number,
                     accountId: row.account_id,
+                    warehouseId: row.warehouse_id,
+                    projectId: row.project_id ?? undefined,
                     issueDate: new Date(row.issue_date),
                     dueDate: row.due_date ? new Date(row.due_date) : undefined,
                     status: row.status as InvoiceStatus,
+                    paymentType: (row.payment_type as PaymentType) || 'cash',
                     subtotal: Number(row.subtotal),
+                    discountRate: Number(row.discount_rate || 0),
+                    discountAmount: Number(row.discount_amount || 0),
                     vatTotal: Number(row.vat_total),
                     total: Number(row.total),
                     paidAmount: Number(row.paid_amount),
                     currency: row.currency,
                     exchangeRate: Number(row.exchange_rate),
                     notes: row.notes,
+                    documentCategory: (row.document_category as DocumentCategory) || 'domestic',
                     lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
                         id: l.id,
                         invoiceId: l.invoice_id,
                         productId: l.product_id,
+                        warehouseId: l.warehouse_id,
                         description: l.description,
                         quantity: Number(l.quantity),
                         unitPrice: Number(l.unit_price),
+                        originalPrice: l.original_price ? Number(l.original_price) : undefined,
+                        originalCurrency: l.original_currency,
                         vatRate: Number(l.vat_rate),
-                        discountRate: Number(l.discount_rate),
+                        discountRate1: Number(l.discount_rate1),
+                        discountRate2: Number(l.discount_rate2),
+                        discountRate3: Number(l.discount_rate3),
                         lineTotal: Number(l.line_total)
                     })),
                     createdAt: new Date(row.created_at),
@@ -168,25 +214,36 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 invoiceType: row.invoice_type as InvoiceType,
                 invoiceNumber: row.invoice_number,
                 accountId: row.account_id,
+                warehouseId: row.warehouse_id,
+                projectId: row.project_id ?? undefined,
                 issueDate: new Date(row.issue_date),
                 dueDate: row.due_date ? new Date(row.due_date) : undefined,
                 status: row.status as InvoiceStatus,
+                paymentType: (row.payment_type as PaymentType) || 'cash',
                 subtotal: Number(row.subtotal),
+                discountRate: Number(row.discount_rate || 0),
+                discountAmount: Number(row.discount_amount || 0),
                 vatTotal: Number(row.vat_total),
                 total: Number(row.total),
                 paidAmount: Number(row.paid_amount),
                 currency: row.currency,
                 exchangeRate: Number(row.exchange_rate),
                 notes: row.notes,
+                documentCategory: (row.document_category as DocumentCategory) || 'domestic',
                 lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
                     id: l.id,
                     invoiceId: l.invoice_id,
                     productId: l.product_id,
+                    warehouseId: l.warehouse_id,
                     description: l.description,
                     quantity: Number(l.quantity),
                     unitPrice: Number(l.unit_price),
+                    originalPrice: l.original_price ? Number(l.original_price) : undefined,
+                    originalCurrency: l.original_currency,
                     vatRate: Number(l.vat_rate),
-                    discountRate: Number(l.discount_rate),
+                    discountRate1: Number(l.discount_rate1),
+                    discountRate2: Number(l.discount_rate2),
+                    discountRate3: Number(l.discount_rate3),
                     lineTotal: Number(l.line_total)
                 })),
                 createdAt: new Date(row.created_at),
@@ -225,10 +282,16 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 invoice_type: obj.invoiceType,
                 invoice_number: invoiceNumber, // sequence veya kullanıcının girdiği değer
                 account_id: obj.accountId,
+                warehouse_id: obj.warehouseId || null,
+                project_id: obj.projectId || null,   // PRJ entegrasyonu
                 issue_date: obj.issueDate.toISOString().split('T')[0],
                 due_date: obj.dueDate?.toISOString().split('T')[0] ?? null,
                 status: obj.status,
+                payment_type: obj.paymentType,
+                document_category: obj.documentCategory,
                 subtotal: obj.subtotal,   // trigger tarafından ezilecek
+                discount_rate: obj.discountRate,
+                discount_amount: obj.discountAmount,
                 vat_total: obj.vatTotal,  // trigger tarafından ezilecek
                 total: obj.total,         // trigger tarafından ezilecek
                 paid_amount: obj.paidAmount,
@@ -259,11 +322,16 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             const linePayloads = obj.lines.map((l) => ({
                 invoice_id: savedId,
                 product_id: l.productId || null,
+                warehouse_id: l.warehouseId || null,
                 description: l.description ?? null,
                 quantity: l.quantity,
                 unit_price: l.unitPrice,
+                original_price: l.originalPrice,
+                original_currency: l.originalCurrency,
                 vat_rate: l.vatRate,
-                discount_rate: l.discountRate,
+                discount_rate1: l.discountRate1,
+                discount_rate2: l.discountRate2,
+                discount_rate3: l.discountRate3,
                 line_total: l.lineTotal // = net + KDV (görüntüleme için; toplamlar trigger'dan gelir)
             }));
 

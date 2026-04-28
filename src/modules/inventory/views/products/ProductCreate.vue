@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { supabase } from '@/lib/supabase';
+import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { Product } from '@/modules/inventory/domain/product.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const toast = useToast();
 const router = useRouter();
+const route = useRoute();
 
 const productStore = useProductStore();
 const lookupStore = useLookupStore();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 
 interface ProductForm {
     name?: string;
@@ -35,13 +38,22 @@ interface ProductForm {
     images?: string[];
     image?: string;
     code?: string;
+    categoryDiscount?: number | null;
 }
+
+const discountTypes = ref([
+    { label: 'Seçim Yok', value: 0 },
+    { label: 'İskonto 1', value: 1 },
+    { label: 'İskonto 2', value: 2 },
+    { label: 'İskonto 3', value: 3 }
+]);
 
 const product = ref<ProductForm>({
     tax_rate: 20,
     price_unit: 'pcs',
     status: 'ACTIVE',
-    inventoryStatus: 'TRACKED'
+    inventoryStatus: 'TRACKED',
+    categoryDiscount: 0
 });
 const submitted = ref(false);
 const imageUploading = ref(false);
@@ -111,12 +123,109 @@ const totalImageCount = computed(() => {
     return count;
 });
 
+function sanitizeSerial(serial: string | undefined, fallback: string): string {
+    const cleaned = (serial || fallback).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    return cleaned || fallback;
+}
+
+function escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractSequence(code: string | undefined, serial: string): number | null {
+    if (!code) return null;
+    const normalized = code.toUpperCase().trim();
+    const pattern = new RegExp(`^${escapeRegex(serial)}-?(\\d+)$`);
+    const match = normalized.match(pattern);
+    if (!match) return null;
+
+    const sequence = Number(match[1]);
+    return Number.isFinite(sequence) ? sequence : null;
+}
+
+async function generateNextProductCode(): Promise<string> {
+    const serial = sanitizeSerial(settingsStore.settings?.productSerial, 'PRD');
+    const startingNo = settingsStore.settings?.productStartingNumber || 1;
+
+    if (productStore.products.length === 0) {
+        await productStore.fetchProducts();
+    }
+
+    const sequences = productStore.products
+        .map((p) => extractSequence(p.code, serial))
+        .filter((value): value is number => value !== null);
+
+    const maxSequence = sequences.length > 0 ? Math.max(...sequences) : startingNo - 1;
+    const nextSequence = Math.max(startingNo, maxSequence + 1);
+
+    return `${serial}-${String(nextSequence).padStart(5, '0')}`;
+}
+
 async function loadLookups() {
     await lookupStore.fetchAll();
 }
 
-onMounted(() => {
-    loadLookups();
+onMounted(async () => {
+    await loadLookups();
+    await settingsStore.fetchSettings();
+
+    const cloneId = route.query.cloneId as string;
+    if (cloneId) {
+        // Eğer ürünler henüz yüklenmemişse yükle
+        if (productStore.products.length === 0) {
+            await productStore.fetchProducts();
+        }
+
+        const source = productStore.products.find((p) => p.id === cloneId);
+        if (source) {
+            product.value = {
+                name: `${source.name} (Kopya)`,
+                description: source.description,
+                price: source.price,
+                currency_id: source.currencyId,
+                tax_rate: source.taxRate,
+                price_unit: source.priceUnit,
+                category_id: source.categoryId,
+                brand_id: source.brandId,
+                type_id: source.typeId,
+                inventoryStatus: source.inventoryStatus,
+                initial_stock: source.initialStock,
+                min_stock: source.minStock,
+                max_stock: source.maxStock,
+                categoryDiscount: source.categoryDiscount || 0,
+                barcode: '', // Barkod genellikle benzersizdir, kopyalamıyoruz
+                status: source.status,
+                image: source.image,
+                images: source.images ? [...source.images] : []
+            };
+
+            // Görsel önizlemelerini ayarla
+            if (source.image) {
+                coverImagePreview.value = source.image;
+            }
+
+            if (source.images && source.images.length > 0) {
+                source.images.forEach((img, idx) => {
+                    if (idx < additionalImagePreviews.value.length) {
+                        additionalImagePreviews.value[idx] = img;
+                    }
+                });
+            }
+
+            toast.add({
+                severity: 'info',
+                summary: 'Bilgi',
+                detail: 'Ürün bilgileri kopyalandı. Gerekli alanları güncelleyip kaydedebilirsiniz.',
+                life: 5000
+            });
+        }
+    } else {
+        // Otomatik Ürün Kodu Oluştur
+        product.value.code = await generateNextProductCode();
+    }
+    if (!product.value.code?.trim()) {
+        product.value.code = await generateNextProductCode();
+    }
 });
 
 function normalizeInventoryStatus(value: unknown): string | null {
@@ -153,7 +262,8 @@ function buildProductPayload() {
         status: product.value.status || 'ACTIVE',
         images: product.value.images ?? [],
         image: product.value.image || 'product-placeholder.svg',
-        code: product.value.code?.trim() || createId()
+        code: product.value.code?.trim() || undefined,
+        categoryDiscount: product.value.categoryDiscount || 0
     };
 }
 
@@ -235,6 +345,10 @@ async function saveProduct() {
         return;
     }
 
+    if (!product.value.code?.trim()) {
+        product.value.code = await generateNextProductCode();
+    }
+
     imageUploading.value = true;
     try {
         const uploadedUrls = await uploadAllImages();
@@ -271,6 +385,7 @@ async function saveProduct() {
         minStock: payload.min_stock,
         maxStock: payload.max_stock,
         initialStock: payload.initial_stock,
+        categoryDiscount: payload.categoryDiscount,
         createdAt: new Date()
     });
 
@@ -308,8 +423,13 @@ function goBack() {
                 <div class="grid grid-cols-12 gap-6 mb-6">
 
                     <div class="col-span-12 lg:col-span-4">
+                        <label for="code" class="block font-semibold mb-3">Ürün Kodu</label>
+                        <InputText id="code" v-model.trim="product.code" placeholder="Otomatik (opsiyonel)" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
                         <label for="name" class="block font-semibold mb-3">Ürün Adı</label>
-                        <InputText id="name" v-model.trim="product.name" required="true" autofocus :invalid="submitted && !product.name" fluid />
+                        <InputText id="name" v-model.trim="product.name" required="true" :invalid="submitted && !product.name" fluid />
                         <small v-if="submitted && !product.name" class="text-red-500">Ürün adı zorunludur.</small>
                     </div>
 
@@ -318,10 +438,6 @@ function goBack() {
                         <InputText id="barcode" v-model.trim="product.barcode" fluid />
                     </div>
 
-                    <div class="col-span-12 lg:col-span-4">
-                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
-                        <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
-                    </div>
 
                     <div class="col-span-12 lg:col-span-4">
                         <div class="flex justify-between items-center mb-1">
@@ -348,6 +464,11 @@ function goBack() {
                         </div>
                         <Select id="type" v-model="product.type_id" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Tip Seç" fluid />
                         <small v-if="submitted && !product.type_id" class="text-red-500">Tip zorunludur.</small>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="categoryDiscount" class="block font-semibold mb-3">Kategori İskonto Tipi</label>
+                        <Select id="categoryDiscount" v-model="product.categoryDiscount" :options="discountTypes" optionLabel="label" optionValue="value" placeholder="İskonto Tipi Seç" fluid />
                     </div>
 
                     <div class="col-span-12 lg:col-span-4">
@@ -387,14 +508,19 @@ function goBack() {
                         <InputNumber id="initialStock" v-model="product.initial_stock" integeronly fluid />
                     </div>
 
-                    <div class="col-span-12 lg:col-span-8">
-                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
-                        <Textarea id="description" v-model="product.description" rows="1" cols="20" fluid />
-                    </div>    
+                    <div class="col-span-12 lg:col-span-4">
+                        <label for="inventoryStatus" class="block font-semibold mb-3">Stok Takibi</label>
+                        <Select id="inventoryStatus" v-model="product.inventoryStatus" :options="statuses" optionLabel="label" optionValue="value" placeholder="Seçim Yap" fluid />
+                    </div>
 
-                    <div class="col-span-12 lg:col-span-12">
+                    <div class="col-span-12 lg:col-span-4">
                         <label for="status" class="block font-semibold mb-3">Durum</label>
                         <Select id="status" v-model="product.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum Seç" fluid />
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-12">
+                        <label for="description" class="block font-semibold mb-3">Açıklama</label>
+                        <Textarea id="description" v-model="product.description" rows="2" cols="20" fluid />
                     </div>
 
 

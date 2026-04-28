@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import type { MovementType } from '@/modules/inventory/domain/stock-movement.entity';
+import { computed, onMounted, ref } from 'vue';
 
 import { useRouter } from 'vue-router';
 
@@ -137,10 +137,10 @@ function clearFilters() {
             </div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Hareket" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <Button label="Yeni Hareket" icon="pi pi-plus" severity="primary" @click="openNew" />
                 </template>
                 <template #end>
-                    <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
+                    <Button icon="pi pi-filter" severity="secondary" v-tooltip.bottom="'Filtreleri Aç/Kapa'" @click="toggleFilters" />
                 </template>
             </Toolbar>
         </div>

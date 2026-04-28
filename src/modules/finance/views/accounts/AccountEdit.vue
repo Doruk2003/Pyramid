@@ -4,11 +4,13 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useSettingsStore } from '@/modules/admin/application/settings.store';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 const toast = useToast();
 const router = useRouter();
 const route = useRoute();
@@ -16,7 +18,9 @@ const route = useRoute();
 interface AccountForm {
     id?: string;
     companyId?: string;
+    code?: string;
     accountType: AccountType;
+    parentId?: string;        // Alt hesap bağlantısı
     name?: string;
     taxNumber?: string;
     taxOffice?: string;
@@ -70,15 +74,18 @@ async function loadAccount() {
     const id = route.params.id as string;
     if (!id) return;
 
-    if (financeStore.accounts.length === 0) {
-        await financeStore.fetchAccounts();
-    }
+    // Önce root accounts listesinde ara
+    let found = financeStore.accounts.find((item) => item.id === id);
 
-    const found = financeStore.accounts.find((item) => item.id === id);
+    // Bulunamazsa (alt hesap olabilir) DB'den direkt çek
     if (!found) {
-        toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamadı', life: 3000 });
-        router.push('/finance/accounts');
-        return;
+        const result = await financeStore.getAccountById(id);
+        if (!result.success) {
+            toast.add({ severity: 'error', summary: 'Hata', detail: 'Cari hesap bulunamadı', life: 3000 });
+            router.push('/finance/accounts');
+            return;
+        }
+        found = result.data;
     }
 
     const obj = found.toObject();
@@ -93,8 +100,15 @@ async function loadAccount() {
 }
 
 onMounted(async () => {
+    await settingsStore.fetchSettings();
     await loadAccount();
+    await financeStore.fetchRootAccounts();
 });
+
+// Ana hesap seçim dropdown’ı için root hesaplar (kendisi hariç)
+const rootAccounts = computed(() =>
+    financeStore.rootAccounts.filter((a) => a.id !== account.value.id)
+);
 
 async function saveAccount() {
     submitted.value = true;
@@ -120,6 +134,8 @@ async function saveAccount() {
     const acc = Account.create({
         id: account.value.id || crypto.randomUUID(),
         companyId: account.value.companyId || authStore.user?.companyId || '',
+        code: account.value.code?.trim() || undefined,
+        parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
         taxNumber: account.value.taxNumber,
@@ -213,6 +229,11 @@ function goBack() {
                 <div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
+                            <label for="code" class="block font-bold mb-3">Cari Kodu</label>
+                            <InputText id="code" v-model.trim="account.code" placeholder="Otomatik (opsiyonel)" fluid />
+                        </div>
+
+                        <div>
                             <label for="name" class="block font-bold mb-3">Adı - Ünvanı</label>
                             <InputText id="name" v-model.trim="account.name" required="true" :invalid="submitted && !account.name" fluid />
                             <small v-if="submitted && !account.name" class="text-red-500">Ad zorunludur.</small>
@@ -222,6 +243,23 @@ function goBack() {
                             <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
                             <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
                         </div>
+
+                        <div>
+                            <label for="parentAccountEdit" class="block font-bold mb-3">Bağlı Olduğu Ana Hesap
+                                <span class="text-surface-400 font-normal ml-1">(opsiyonel)</span>
+                            </label>
+                            <Select
+                                id="parentAccountEdit"
+                                v-model="account.parentId"
+                                :options="rootAccounts"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Ana hesap seçin (boş bırakılabilir)"
+                                showClear
+                                fluid
+                            />
+                        </div>
+
 
                         <div>
                             <label for="taxNumber" class="block font-bold mb-3">Vergi No - TC</label>
@@ -284,17 +322,17 @@ function goBack() {
                         </div>
 
                         <div>
-                            <label for="dealerDiscount1" class="block font-bold mb-3">Bayi İskontosu (1)</label>
+                            <label for="dealerDiscount1" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel1 || 'Bayi İskontosu (1)' }}</label>
                             <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount2" class="block font-bold mb-3">Bayi İskontosu (2)</label>
+                            <label for="dealerDiscount2" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel2 || 'Bayi İskontosu (2)' }}</label>
                             <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount3" class="block font-bold mb-3">Bayi İskontosu (3)</label>
+                            <label for="dealerDiscount3" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel3 || 'Bayi İskontosu (3)' }}</label>
                             <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
                     </div>
@@ -304,11 +342,11 @@ function goBack() {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                         <div>
                             <label for="address" class="block font-bold mb-3">Adres</label>
-                            <Textarea id="address" v-model="account.address" rows="3" fluid />
+                            <Textarea id="address" v-model="account.address" rows="2" fluid />
                         </div>
                         <div>
                             <label for="description" class="block font-bold mb-3">Açıklama</label>
-                            <Textarea id="description" v-model="account.description" rows="3" fluid />
+                            <Textarea id="description" v-model="account.description" rows="2" fluid />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">

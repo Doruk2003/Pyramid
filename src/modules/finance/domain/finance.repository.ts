@@ -4,6 +4,7 @@ import type { Result } from '@/shared/types/result';
 
 export interface AccountFilters {
     accountType?: AccountType;
+    parentId?: string | null;  // null: sadece ana hesaplar, string: belirli ebeveynin altları
 }
 
 export interface InvoiceFilters {
@@ -15,6 +16,8 @@ export interface IFinanceRepository {
     // Account
     getAccounts(filters?: AccountFilters): Promise<Result<Account[]>>;
     getAccountById(id: string): Promise<Result<Account>>;
+    getSubAccounts(parentId: string): Promise<Result<Account[]>>;      // Belirli ana hesabın alt hesapları
+    getRootAccounts(): Promise<Result<Account[]>>;                      // Sadece ana hesaplar (parent_id IS NULL)
     saveAccount(account: Account): Promise<Result<void>>;
     deleteAccount(id: string): Promise<Result<void>>;
 

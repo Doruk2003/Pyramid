@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
-import type { Currency } from '@/modules/inventory/domain/currency.entity';
+import { Currency } from '@/modules/inventory/domain/currency.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
@@ -104,6 +104,27 @@ async function saveCurrency() {
 const deleteDialogVisible = ref(false);
 const currencyToDelete = ref<Currency | null>(null);
 
+const menu = ref();
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (currencyToDelete.value) editCurrency(currencyToDelete.value as Currency);
+        }
+    },
+    {
+        label: 'Sil',
+        command: () => {
+            if (currencyToDelete.value) confirmDelete(currencyToDelete.value as Currency);
+        }
+    }
+]);
+
+const onActionClick = (event: any, currency: Currency) => {
+    currencyToDelete.value = currency;
+    menu.value.toggle(event);
+};
+
 function confirmDelete(currency: Currency) {
     currencyToDelete.value = currency;
     deleteDialogVisible.value = true;
@@ -176,10 +197,9 @@ onMounted(() => {
                     </template>
                 </Column>
                 <Column field="name" header="Ad" sortable></Column>
-                <Column header="İşlemler">
+                <Column header="İşlemler" style="min-width: 50px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editCurrency(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDelete(slotProps.data)" />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -243,5 +263,7 @@ onMounted(() => {
                 </div>
             </template>
         </Dialog>
+
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>

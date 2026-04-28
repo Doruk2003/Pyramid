@@ -1,0 +1,26 @@
+/* PDF Template Styles - Overriding oklch and global styles for PDF export */
+#invoice-pdf-template * {
+    color-scheme: light !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color: #000000 !important;
+    border-color: #333333 !important;
+}
+
+#invoice-pdf-template .text-primary { color: #3b82f6 !important; }
+#invoice-pdf-template .bg-surface-50 { background-color: #f8fafc !important; }
+#invoice-pdf-template .border-surface-200 { border-color: #e2e8f0 !important; }
+
+/* Ensure fonts are solid for canvas */
+#invoice-pdf-template {
+    font-variant-numeric: tabular-nums;
+    font-family: 'Arial', sans-serif !important;
+}
+
+#invoice-pdf-template table {
+    background-color: #ffffff !important;
+}
+
+#invoice-pdf-template tr {
+    background-color: transparent !important;
+}

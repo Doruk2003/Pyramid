@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Account, type AccountType, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 const toast = useToast();
 const router = useRouter();
+const route = useRoute();
 
 interface AccountForm {
     id?: string;
+    code?: string;
     accountType: AccountType;
+    parentId?: string;        // Alt hesap bağlantısı
     name?: string;
     taxNumber?: string;
     taxOffice?: string;
@@ -41,6 +46,7 @@ interface AccountForm {
 
 const account = ref<AccountForm>({
     accountType: 'customer',
+    parentId: (route.query.parentId as string) || undefined,
     isActive: true,
     creditLimit: 0,
     isDealer: false,
@@ -49,6 +55,56 @@ const account = ref<AccountForm>({
     dealerDiscount3: 0
 });
 const submitted = ref(false);
+
+// Ana hesap seçim dropdown'ı için sadece root hesaplar
+const rootAccounts = computed(() => financeStore.rootAccounts);
+
+function sanitizeSerial(serial: string | undefined, fallback: string): string {
+    const cleaned = (serial || fallback).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    return cleaned || fallback;
+}
+
+function escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractSequence(code: string | undefined, serial: string): number | null {
+    if (!code) return null;
+    const normalized = code.toUpperCase().trim();
+    const pattern = new RegExp(`^${escapeRegex(serial)}-?(\\d+)$`);
+    const match = normalized.match(pattern);
+    if (!match) return null;
+
+    const sequence = Number(match[1]);
+    return Number.isFinite(sequence) ? sequence : null;
+}
+
+async function generateNextAccountCode(): Promise<string> {
+    const serial = sanitizeSerial(settingsStore.settings?.accountSerial, 'CAR');
+    const startingNo = settingsStore.settings?.accountStartingNumber || 1;
+
+    if (financeStore.accounts.length === 0) {
+        await financeStore.fetchAccounts();
+    }
+
+    const sequences = financeStore.accounts
+        .map((a) => extractSequence(a.code, serial))
+        .filter((value): value is number => value !== null);
+
+    const maxSequence = sequences.length > 0 ? Math.max(...sequences) : startingNo - 1;
+    const nextSequence = Math.max(startingNo, maxSequence + 1);
+
+    return `${serial}-${String(nextSequence).padStart(4, '0')}`;
+}
+
+onMounted(async () => {
+    await settingsStore.fetchSettings();
+    await financeStore.fetchRootAccounts();
+
+    if (!account.value.code?.trim()) {
+        account.value.code = await generateNextAccountCode();
+    }
+});
 
 const accountTypes: Array<{ label: string; value: AccountType }> = [
     { label: 'Müşteri', value: 'customer' },
@@ -85,9 +141,15 @@ async function saveAccount() {
         return;
     }
 
+    if (!account.value.code?.trim()) {
+        account.value.code = await generateNextAccountCode();
+    }
+
     const acc = Account.create({
         id: crypto.randomUUID(),
         companyId: authStore.user?.companyId || '',
+        code: account.value.code?.trim() || undefined,
+        parentId: account.value.parentId || undefined,
         accountType: account.value.accountType,
         name: account.value.name.trim(),
         taxNumber: account.value.taxNumber,
@@ -181,6 +243,11 @@ function goBack() {
                 <div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
+                            <label for="code" class="block font-bold mb-3">Cari Kodu</label>
+                            <InputText id="code" v-model.trim="account.code" placeholder="Otomatik (opsiyonel)" fluid />
+                        </div>
+
+                        <div>
                             <label for="name" class="block font-bold mb-3">Adı - Ünvanı</label>
                             <InputText id="name" v-model.trim="account.name" required="true" autofocus :invalid="submitted && !account.name" fluid />
                             <small v-if="submitted && !account.name" class="text-red-500">Ad zorunludur.</small>
@@ -189,6 +256,22 @@ function goBack() {
                         <div>
                             <label for="type" class="block font-bold mb-3">Hesap Tipi</label>
                             <Select id="type" v-model="account.accountType" :options="accountTypes" optionLabel="label" optionValue="value" fluid />
+                        </div>
+
+                        <div>
+                            <label for="parentAccount" class="block font-bold mb-3">Bağlı Olduğu Ana Hesap
+                                <span class="text-surface-400 font-normal ml-1">(opsiyonel)</span>
+                            </label>
+                            <Select
+                                id="parentAccount"
+                                v-model="account.parentId"
+                                :options="rootAccounts"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Ana hesap seçin (boş bırakılabilir)"
+                                showClear
+                                fluid
+                            />
                         </div>
 
                         <div>
@@ -252,17 +335,17 @@ function goBack() {
                         </div>
 
                         <div>
-                            <label for="dealerDiscount1" class="block font-bold mb-3">Bayi İskontosu (1)</label>
+                            <label for="dealerDiscount1" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel1 || 'Bayi İskontosu (1)' }}</label>
                             <InputNumber id="dealerDiscount1" v-model="account.dealerDiscount1" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount2" class="block font-bold mb-3">Bayi İskontosu (2)</label>
+                            <label for="dealerDiscount2" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel2 || 'Bayi İskontosu (2)' }}</label>
                             <InputNumber id="dealerDiscount2" v-model="account.dealerDiscount2" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
 
                         <div>
-                            <label for="dealerDiscount3" class="block font-bold mb-3">Bayi İskontosu (3)</label>
+                            <label for="dealerDiscount3" class="block font-bold mb-3">{{ settingsStore.settings?.discountLabel3 || 'Bayi İskontosu (3)' }}</label>
                             <InputNumber id="dealerDiscount3" v-model="account.dealerDiscount3" :min="0" :max="100" :minFractionDigits="2" suffix="%" fluid />
                         </div>
                     </div>
@@ -272,11 +355,11 @@ function goBack() {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                         <div>
                             <label for="address" class="block font-bold mb-3">Adres</label>
-                            <Textarea id="address" v-model="account.address" rows="3" fluid />
+                            <Textarea id="address" v-model="account.address" rows="2" fluid />
                         </div>
                         <div>
                             <label for="description" class="block font-bold mb-3">Açıklama</label>
-                            <Textarea id="description" v-model="account.description" rows="3" fluid />
+                            <Textarea id="description" v-model="account.description" rows="2" fluid />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
@@ -311,6 +394,3 @@ function goBack() {
         </div>
     </div>
 </template>
-
-
-

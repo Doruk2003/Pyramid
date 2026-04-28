@@ -30,6 +30,11 @@ const router = createRouter({
                     component: () => import('@/modules/inventory/views/products/ProductEdit.vue')
                 },
                 {
+                    path: '/inventory/products/details/:id',
+                    name: 'product-details',
+                    component: () => import('@/modules/inventory/views/products/ProductDetail.vue')
+                },
+                {
                     path: '/admin/users',
                     name: 'admin-users',
                     component: () => import('@/modules/admin/views/users/UserList.vue')
@@ -138,6 +143,21 @@ const router = createRouter({
                     path: '/sales/orders/edit/:id',
                     name: 'sales-order-edit',
                     component: () => import('@/modules/sales/views/orders/OrderForm.vue')
+                },
+                {
+                    path: '/finance/projects',
+                    name: 'finance-projects',
+                    component: () => import('@/modules/finance/views/projects/ProjectList.vue')
+                },
+                {
+                    path: '/finance/projects/:id',
+                    name: 'finance-project-detail',
+                    component: () => import('@/modules/finance/views/projects/ProjectDetail.vue')
+                },
+                {
+                    path: '/todo/calendar',
+                    name: 'todo-calendar',
+                    component: () => import('@/modules/todo/views/CalendarPage.vue')
                 }
             ]
         },

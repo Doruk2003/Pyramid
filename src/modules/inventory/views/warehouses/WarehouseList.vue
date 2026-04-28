@@ -13,6 +13,29 @@ const toast = useToast();
 const warehouseDialog = ref(false);
 const deleteDialog = ref(false);
 const warehouseToDelete = ref<Warehouse | null>(null);
+
+const menu = ref();
+const actionTarget = ref<Warehouse | null>(null);
+
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (actionTarget.value) editWarehouse(actionTarget.value as Warehouse);
+        }
+    },
+    {
+        label: 'Sil',
+        command: () => {
+            if (actionTarget.value) confirmDelete(actionTarget.value as Warehouse);
+        }
+    }
+]);
+
+const onActionClick = (event: any, w: Warehouse) => {
+    actionTarget.value = w;
+    menu.value.toggle(event);
+};
 type WarehouseForm = Partial<WarehouseProps>;
 const warehouse = ref<WarehouseForm>({});
 const submitted = ref(false);
@@ -141,10 +164,10 @@ function clearFilters() {
             </div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Depo" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <Button label="Yeni Depo" icon="pi pi-plus" severity="primary" @click="openNew" />
                 </template>
                 <template #end>
-                    <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
+                    <Button  icon="pi pi-filter" severity="secondary"  v-tooltip.bottom="'Filtreleri Aç/Kapa'" @click="toggleFilters" />
                 </template>
             </Toolbar>
         </div>
@@ -182,22 +205,9 @@ function clearFilters() {
                         <Tag :severity="slotProps.data.isActive ? 'success' : 'secondary'" :value="slotProps.data.isActive ? 'Aktif' : 'Pasif'" />
                     </template>
                 </Column>
-                <Column header="İşlemler" style="min-width: 100px">
+                <Column header="İşlemler" style="min-width: 50px">
                     <template #body="slotProps">
-                        <Button
-                            icon="pi pi-pencil"
-                            outlined rounded
-                            class="mr-2"
-                            v-tooltip.top="'Düzenle'"
-                            @click="editWarehouse(slotProps.data)"
-                        />
-                        <Button
-                            icon="pi pi-trash"
-                            outlined rounded
-                            severity="danger"
-                            v-tooltip.top="'Sil'"
-                            @click="confirmDelete(slotProps.data)"
-                        />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -257,5 +267,6 @@ function clearFilters() {
                 <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteWarehouse" />
             </template>
         </Dialog>
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>

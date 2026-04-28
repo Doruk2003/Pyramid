@@ -1,17 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
-import { useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
-import { getErrorMessage } from '@/shared/utils/error';
 import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
+import { getErrorMessage } from '@/shared/utils/error';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const financeStore = useFinanceStore();
 const router = useRouter();
 const toast = useToast();
 const showFilters = ref(false);
 const deleteDialog = ref(false);
-const invoiceToDelete = ref<Invoice | null>(null);
+const invoiceToDelete = ref<any>(null);
+
+const menu = ref();
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (invoiceToDelete.value) viewInvoice(invoiceToDelete.value.id);
+        }
+    },
+    {
+        label: 'Sil',
+        disabled: invoiceToDelete.value?.status !== 'draft',
+        command: () => {
+            if (invoiceToDelete.value) confirmDeleteInvoice(invoiceToDelete.value);
+        }
+    }
+]);
+
+const onActionClick = (event: any, inv: Invoice) => {
+    invoiceToDelete.value = inv;
+    menu.value.toggle(event);
+};
 
 interface InvoiceFilterForm {
     invoiceNumber: string;
@@ -183,10 +205,10 @@ function clearFilters() {
             </div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Fatura" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <Button label="Yeni Fatura Girişi" icon="pi pi-plus" severity="primary" @click="openNew" />
                 </template>
                 <template #end>
-                    <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
+                    <Button icon="pi pi-filter" severity="secondary" v-tooltip.bottom="'Filtreleri Aç/Kapa'" @click="toggleFilters" />
                 </template>
             </Toolbar>
         </div>
@@ -251,23 +273,9 @@ function clearFilters() {
                         <span class="font-semibold">{{ formatCurrency(slotProps.data.total, slotProps.data.currency) }}</span>
                     </template>
                 </Column>
-                <Column header="İşlemler" style="min-width: 110px">
+                <Column header="İşlemler" style="min-width: 50px">
                     <template #body="slotProps">
-                        <Button
-                            icon="pi pi-pencil"
-                            outlined rounded
-                            class="mr-2"
-                            v-tooltip.top="'Düzenle'"
-                            @click="viewInvoice(slotProps.data.id)"
-                        />
-                        <Button
-                            icon="pi pi-trash"
-                            outlined rounded
-                            severity="danger"
-                            v-tooltip.top="slotProps.data.status === 'draft' ? 'Sil' : 'Sadece taslak faturalar silinebilir'"
-                            :disabled="slotProps.data.status !== 'draft'"
-                            @click="confirmDeleteInvoice(slotProps.data)"
-                        />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
@@ -295,5 +303,7 @@ function clearFilters() {
                 <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteInvoice" />
             </template>
         </Dialog>
+
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>

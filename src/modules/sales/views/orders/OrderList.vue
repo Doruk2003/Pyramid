@@ -10,6 +10,23 @@ const financeStore = useFinanceStore();
 const router = useRouter();
 const showFilters = ref(false);
 
+const menu = ref();
+const actionTarget = ref<any | null>(null);
+
+const menuItems = computed(() => [
+    {
+        label: 'Düzenle',
+        command: () => {
+            if (actionTarget.value) viewOrder(actionTarget.value.id);
+        }
+    }
+]);
+
+const onActionClick = (event: any, row: any) => {
+    actionTarget.value = row;
+    menu.value.toggle(event);
+};
+
 interface OrderFilterForm {
     orderNumber: string;
     status: OrderStatus | null;
@@ -207,12 +224,13 @@ function clearFilters() {
                         <span class="font-semibold">{{ formatCurrency(slotProps.data.total, slotProps.data.currency) }}</span>
                     </template>
                 </Column>
-                <Column header="İşlemler" style="min-width: 80px; text-align: center">
+                <Column header="İşlemler" style="min-width: 50px; text-align: center">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded @click="viewOrder(slotProps.data.id)" />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
         </div>
+        <Menu ref="menu" :model="menuItems" :popup="true" />
     </div>
 </template>
