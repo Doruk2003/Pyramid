@@ -18,6 +18,7 @@ export interface InvoiceLineProps {
     discountRate2: number;
     discountRate3: number;
     lineTotal: number;
+    sourceLineId?: string;     // Yeni eklenen: Hangi sipariş/teklif satırından geldi?
 }
 
 export interface InvoiceProps {
@@ -42,6 +43,8 @@ export interface InvoiceProps {
     currency: string;
     exchangeRate: number;
     notes?: string;
+    sourceType?: 'quote' | 'order'; // Yeni eklenen
+    sourceIds?: string[];           // Yeni eklenen (Toplu faturalandırma için)
     lines: InvoiceLineProps[];
     createdAt: Date;
     updatedAt: Date;
@@ -109,6 +112,12 @@ export class Invoice {
     }
     get notes(): string | undefined {
         return this.props.notes;
+    }
+    get sourceType(): string | undefined {
+        return this.props.sourceType;
+    }
+    get sourceIds(): string[] | undefined {
+        return this.props.sourceIds;
     }
     get paidAmount(): number {
         return this.props.paidAmount;

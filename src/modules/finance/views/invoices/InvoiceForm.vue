@@ -10,6 +10,7 @@ import { Invoice, type DocumentCategory, type InvoiceStatus, type InvoiceType, t
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { useSalesStore } from '@/modules/sales/application/sales.store'; // Yeni eklendi
 import { getErrorMessage } from '@/shared/utils/error';
 import { numberToWords } from '@/shared/utils/number-to-words';
 import html2canvas from 'html2canvas';
@@ -21,8 +22,9 @@ import { useRoute, useRouter } from 'vue-router';
 const financeStore = useFinanceStore();
 const projectStore = useProjectStore();
 const productStore = useProductStore();
-const inventoryStore = useInventoryStore(); // Yeni eklendi
+const inventoryStore = useInventoryStore();
 const lookupStore = useLookupStore();
+const salesStore = useSalesStore(); // Yeni eklendi
 const exchangeRateStore = useExchangeRateStore();
 const authStore = useAuthStore();
 const router = useRouter();
@@ -47,6 +49,7 @@ interface InvoiceLineForm {
     discountRate2: number;
     discountRate3: number;
     lineTotal: number;
+    sourceLineId?: string; // Yeni eklendi
 }
 
 interface InvoiceFormModel {
@@ -66,6 +69,8 @@ interface InvoiceFormModel {
     notes: string;
     lines: InvoiceLineForm[];
     paidAmount?: number;
+    sourceType?: 'quote' | 'order'; // Yeni eklendi
+    sourceIds?: string[];           // Yeni eklendi
     createdAt?: Date;
 }
 
@@ -84,6 +89,8 @@ const invoice = ref<InvoiceFormModel>({
     exchangeRate: 1,
     discountRate: 0,
     notes: '',
+    sourceType: undefined,
+    sourceIds: [],
     lines: []
 });
 
@@ -124,6 +131,7 @@ onMounted(async () => {
     await exchangeRateStore.fetchCurrentRates();
     await projectStore.fetchProjects();   // Proje dropdown için
     await settingsStore.fetchSettings();
+    await inventoryStore.fetchBalances();
 
     if (isEdit) {
         await financeStore.fetchInvoices();
@@ -151,6 +159,92 @@ onMounted(async () => {
             const count = financeStore.invoices.filter(i => i.invoiceNumber.startsWith(serial)).length;
             const nextNo = startingNo + count;
             invoice.value.invoiceNumber = `${serial}-${new Date().getFullYear()}-${String(nextNo).padStart(6, '0')}`;
+        }
+
+        // --- Kaynak Belgeden (Sipariş/Teklif) Aktarım Mantığı ---
+        const sourceIdsQuery = route.query.sourceIds as string;
+        const sourceTypeQuery = route.query.sourceType as 'quote' | 'order';
+
+        if (sourceIdsQuery && sourceTypeQuery) {
+            invoice.value.sourceType = sourceTypeQuery;
+            invoice.value.sourceIds = sourceIdsQuery.split(',');
+            invoice.value.lines = []; // Varsayılan boş satırı temizle
+
+            if (sourceTypeQuery === 'order') {
+                await salesStore.fetchOrders();
+                const selectedOrders = salesStore.orders.filter(o => invoice.value.sourceIds?.includes(o.id));
+                
+                if (selectedOrders.length > 0) {
+                    // İlk siparişten genel bilgileri al
+                    const first = selectedOrders[0];
+                    invoice.value.accountId = first.accountId;
+                    invoice.value.currency = first.currency;
+                    invoice.value.exchangeRate = first.exchangeRate;
+                    invoice.value.projectId = first.projectId || '';
+                    invoice.value.warehouseId = first.lines[0]?.warehouseId || ''; // Varsa ilk satırdaki depoyu al
+                    
+                    // Notlara sipariş numaralarını ekle
+                    const orderNumbers = selectedOrders.map(o => o.orderNumber).join(', ');
+                    invoice.value.notes = `${orderNumbers} nolu siparişlere istinaden düzenlenmiştir. \n` + (first.notes || '');
+
+                    // Tüm sipariş satırlarını (bekleyen miktar kadar) ekle
+                    selectedOrders.forEach(order => {
+                        order.lines.forEach(line => {
+                            const pendingQty = line.quantity - (line.invoicedQuantity || 0);
+                            if (pendingQty > 0) {
+                                invoice.value.lines.push({
+                                    id: crypto.randomUUID(),
+                                    productId: line.productId,
+                                    warehouseId: line.warehouseId || invoice.value.warehouseId,
+                                    description: line.description,
+                                    quantity: pendingQty,
+                                    unitPrice: line.unitPrice,
+                                    vatRate: line.vatRate,
+                                    discountRate1: line.discountRate1 || 0,
+                                    discountRate2: line.discountRate2 || 0,
+                                    discountRate3: line.discountRate3 || 0,
+                                    lineTotal: 0, // Computed tarafından hesaplanacak
+                                    sourceLineId: line.id
+                                });
+                            }
+                        });
+                    });
+                }
+            } else if (sourceTypeQuery === 'quote') {
+                await salesStore.fetchQuotes();
+                const selectedQuotes = salesStore.quotes.filter(q => invoice.value.sourceIds?.includes(q.id));
+                
+                if (selectedQuotes.length > 0) {
+                    const first = selectedQuotes[0];
+                    invoice.value.accountId = first.accountId;
+                    invoice.value.currency = first.currency;
+                    invoice.value.exchangeRate = first.exchangeRate;
+                    
+                    const quoteNumbers = selectedQuotes.map(q => q.quoteNumber).join(', ');
+                    invoice.value.notes = `${quoteNumbers} nolu tekliflere istinaden düzenlenmiştir. \n` + (first.notes || '');
+
+                    selectedQuotes.forEach(quote => {
+                        quote.lines.forEach(line => {
+                            const pendingQty = line.quantity - (line.orderedQuantity || 0); // Teklif için orderQty kontrolü
+                            if (pendingQty > 0) {
+                                invoice.value.lines.push({
+                                    id: crypto.randomUUID(),
+                                    productId: line.productId,
+                                    description: line.description,
+                                    quantity: pendingQty,
+                                    unitPrice: line.unitPrice,
+                                    vatRate: line.vatRate,
+                                    discountRate1: line.discountRate1 || 0,
+                                    discountRate2: line.discountRate2 || 0,
+                                    discountRate3: line.discountRate3 || 0,
+                                    lineTotal: 0,
+                                    sourceLineId: line.id
+                                });
+                            }
+                        });
+                    });
+                }
+            }
         }
     }
 });
@@ -207,6 +301,17 @@ function focusAddLineButton() {
     if (btn) {
         btn.focus();
     }
+}
+
+function getStock(productId: string, warehouseId?: string) {
+    if (!productId) return 0;
+    const targetWarehouse = warehouseId || invoice.value.warehouseId;
+    if (!targetWarehouse) return 0;
+    
+    const balance = inventoryStore.balances.find(
+        (b) => b.productId === productId && b.warehouseId === targetWarehouse
+    );
+    return balance ? balance.balance : 0;
 }
 
 function addLine(autoOpenSelect = false) {
@@ -497,6 +602,11 @@ async function saveInvoice() {
 
     const result = await financeStore.saveInvoice(inv);
     if (result.success) {
+        // --- Kaynak Belge Miktarlarını Güncelle ---
+        if (invoice.value.sourceType && invoice.value.sourceIds && invoice.value.sourceIds.length > 0) {
+            await salesStore.updateSourceQuantities(invoice.value.sourceType, invoice.value.sourceIds);
+        }
+        
         toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Fatura kaydedildi', life: 3000 });
         router.push('/finance/invoices');
     } else {
@@ -531,6 +641,14 @@ function goBack() {
                             </span>
                         </div>
 
+                        <!-- Kaynak Belge Badge -->
+                        <div v-if="invoice.sourceType" class="flex items-center gap-2 px-3 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <i class="pi pi-link text-blue-500 text-sm"></i>
+                            <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                Kaynak {{ invoice.sourceType === 'order' ? 'Sipariş' : 'Teklif' }} Bağlı
+                            </span>
+                        </div>
+
                         <!-- Döviz Kuru (Yabancı döviz ise) -->
                         <div v-if="isForeignCurrency" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-money-bill text-surface-500 text-sm"></i>
@@ -555,7 +673,7 @@ function goBack() {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div>
                             <label for="date" class="block font-bold mb-3">Tarih</label>
-                            <DatePicker id="date" v-model="invoice.issueDate" fluid />
+                            <DatePicker id="date" v-model="invoice.issueDate" dateFormat="dd.mm.yy" fluid />
                         </div>
                         <div>
                             <label for="type" class="block font-bold mb-3">Fatura Tipi</label>
@@ -567,7 +685,7 @@ function goBack() {
                         </div>
                         <div>
                             <label for="dueDate" class="block font-bold mb-3">Vade Tarihi</label>
-                            <DatePicker id="dueDate" v-model="invoice.dueDate" fluid />
+                            <DatePicker id="dueDate" v-model="invoice.dueDate" dateFormat="dd.mm.yy" fluid />
                         </div>
                         <div>
                             <label for="warehouse" class="block font-bold mb-3">Depo (Varsayılan)</label>
@@ -638,7 +756,15 @@ function goBack() {
                     <DataTable :value="invoice.lines" class="p-datatable-sm">
                         <Column header="Ürün" style="width: 25%">
                             <template #body="slotProps">
-                                <Select :ref="(el) => setProductSelectRef(el, slotProps.index)" v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                                <div class="flex flex-col gap-1">
+                                    <Select :ref="(el) => setProductSelectRef(el, slotProps.index)" v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                                    <div v-if="slotProps.data.productId" class="flex items-center gap-1.5 px-1">
+                                        <i class="pi pi-box text-[10px]" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-500' : 'text-red-500'"></i>
+                                        <span class="text-[10px] font-medium" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-600' : 'text-red-600'">
+                                            Mevcut Stok: {{ getStock(slotProps.data.productId, slotProps.data.warehouseId) }} Adet
+                                        </span>
+                                    </div>
+                                </div>
                             </template>
                         </Column>
                         <Column header="Depo" style="width: 8%">
@@ -793,7 +919,7 @@ function goBack() {
         <!-- Table -->
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 11px;">
             <thead>
-                <tr style="border-bottom: 2px solid #ddd;">
+                <tr style="border-bottom: 2px solid #999;">
                     <th style="text-align: left; padding: 10px 5px; color: #111; width: 30px; font-weight: 400;">#</th>
                     <th style="text-align: left; padding: 10px 5px; color: #111; font-weight: 400;">Ürün</th>
                     <th style="text-align: center; padding: 10px 5px; color: #111; width: 50px; font-weight: 400;">Miktar</th>

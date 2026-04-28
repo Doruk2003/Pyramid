@@ -3,8 +3,10 @@ import type { Account } from '@/modules/finance/domain/account.entity';
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
 import type { AccountFilters, InvoiceFilters } from '@/modules/finance/domain/finance.repository';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
+import { SupabaseProjectRepository } from '@/modules/finance/infra/supabase-project.repository';
 
 const financeRepo = new SupabaseFinanceRepository();
+const projectRepo = new SupabaseProjectRepository();
 
 export const useFinanceStore = defineStore('finance', {
     state: () => ({
@@ -12,6 +14,7 @@ export const useFinanceStore = defineStore('finance', {
         rootAccounts: [] as Account[],          // Sadece ana hesaplar (parent_id IS NULL)
         subAccounts: [] as Account[],           // Aktif ana hesabın alt hesapları
         invoices: [] as Invoice[],
+        projects: [] as any[],                  // Projeler listesi
         loading: false,
         error: null as string | null
     }),
@@ -90,6 +93,14 @@ export const useFinanceStore = defineStore('finance', {
                 this.invoices = this.invoices.filter((inv) => inv.id !== id);
             }
             return result;
+        },
+        
+        // Projects
+        async fetchProjects() {
+            this.loading = true;
+            const result = await projectRepo.getProjects();
+            if (result.success) this.projects = result.data;
+            this.loading = false;
         }
     }
 });

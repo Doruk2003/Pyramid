@@ -12,6 +12,7 @@ const showFilters = ref(false);
 
 const menu = ref();
 const actionTarget = ref<any | null>(null);
+const selectedQuotes = ref<any[]>([]); // Çoklu seçim için
 
 const menuItems = computed(() => [
     {
@@ -52,6 +53,7 @@ const statusOptions: Array<{ label: string; value: QuoteStatus }> = [
     { label: 'Gönderildi', value: 'sent' },
     { label: 'Kabul Edildi', value: 'accepted' },
     { label: 'Reddedildi', value: 'rejected' },
+    { label: 'Kısmi Sipariş', value: 'partially_converted' },
     { label: 'Süresi Doldu', value: 'expired' },
     { label: 'Dönüştürüldü', value: 'converted' }
 ];
@@ -65,6 +67,28 @@ function openNew() {
     router.push('/sales/quotes/create');
 }
 
+function bulkInvoice() {
+    if (selectedQuotes.value.length === 0) return;
+
+    const accountIds = new Set(selectedQuotes.value.map(q => q.accountId));
+    if (accountIds.size > 1) {
+        alert('Farklı cari hesaplara ait teklifler toplu faturalandırılamaz.');
+        return;
+    }
+
+    const currencies = new Set(selectedQuotes.value.map(q => q.currency));
+    if (currencies.size > 1) {
+        alert('Farklı döviz cinsinden teklifler toplu faturalandırılamaz.');
+        return;
+    }
+
+    const ids = selectedQuotes.value.map(q => q.id).join(',');
+    router.push({
+        path: '/finance/invoices/create',
+        query: { sourceIds: ids, sourceType: 'quote' }
+    });
+}
+
 function viewQuote(id: string) {
     router.push(`/sales/quotes/edit/${id}`);
 }
@@ -74,9 +98,11 @@ function getStatusLabel(status: QuoteStatus) {
         draft: 'Taslak',
         sent: 'Gönderildi',
         accepted: 'Kabul Edildi',
+        partially_converted: 'Kısmi Sipariş',
         rejected: 'Reddedildi',
         expired: 'Süresi Doldu',
-        converted: 'Dönüştürüldü'
+        converted: 'Dönüştürüldü',
+        cancelled: 'İptal'
     };
     return map[status] || status;
 }
@@ -86,9 +112,11 @@ function getStatusSeverity(status: QuoteStatus) {
         draft: 'secondary',
         sent: 'info',
         accepted: 'success',
+        partially_converted: 'warn',
         rejected: 'danger',
         expired: 'warn',
-        converted: 'contrast'
+        converted: 'contrast',
+        cancelled: 'danger'
     };
     return map[status] || 'secondary';
 }
@@ -159,7 +187,16 @@ function clearFilters() {
             </div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Teklif" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <div class="flex gap-2">
+                        <Button label="Yeni Teklif" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                        <Button 
+                            v-if="selectedQuotes.length > 0" 
+                            label="Faturalandır" 
+                            icon="pi pi-file-export" 
+                            severity="success" 
+                            @click="bulkInvoice" 
+                        />
+                    </div>
                 </template>
                 <template #end>
                     <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
@@ -179,10 +216,10 @@ function clearFilters() {
                     <Select v-model="filterForm.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Cari Hesap" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" fluid />
+                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" fluid />
+                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1 flex gap-2">
                     <Button label="Filtrele" icon="pi pi-search" class="w-full" @click="applyFilters" />
@@ -194,12 +231,14 @@ function clearFilters() {
         <div class="card">
             <DataTable
                 :value="filteredQuotes"
+                v-model:selection="selectedQuotes"
                 dataKey="id"
                 :paginator="true"
                 :rows="10"
                 :rowsPerPageOptions="[10, 25, 50]"
                 emptyMessage="Kayıtlı teklif bulunamadı."
             >
+                <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
                 <Column field="quoteNumber" header="Teklif No" sortable style="min-width: 130px" />
                 <Column header="Müşteri (Cari)" sortable style="min-width: 180px">
                     <template #body="slotProps">
@@ -214,6 +253,21 @@ function clearFilters() {
                 <Column field="status" header="Durum" sortable style="min-width: 130px">
                     <template #body="slotProps">
                         <Tag :severity="getStatusSeverity(slotProps.data.status)" :value="getStatusLabel(slotProps.data.status)" />
+                    </template>
+                </Column>
+                <Column header="Dönüşüm" style="min-width: 120px">
+                    <template #body="slotProps">
+                        <div class="flex flex-col gap-1 w-full">
+                            <ProgressBar 
+                                :value="Math.round((slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) / slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0)) * 100) || 0" 
+                                :showValue="false" 
+                                style="height: 4px"
+                                :severity="slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) >= slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0) ? 'success' : (slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) > 0 ? 'warn' : 'secondary')"
+                            />
+                            <span class="text-[10px] text-surface-500 font-medium">
+                                {{ slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) }} / {{ slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0) }}
+                            </span>
+                        </div>
                     </template>
                 </Column>
                 <Column field="total" header="Toplam" sortable style="min-width: 130px">

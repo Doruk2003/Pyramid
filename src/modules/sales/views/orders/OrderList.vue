@@ -12,6 +12,7 @@ const showFilters = ref(false);
 
 const menu = ref();
 const actionTarget = ref<any | null>(null);
+const selectedOrders = ref<any[]>([]); // Çoklu seçim için
 
 const menuItems = computed(() => [
     {
@@ -53,6 +54,7 @@ const statusOptions: Array<{ label: string; value: OrderStatus }> = [
     { label: 'Hazırlanıyor', value: 'processing' },
     { label: 'Sevk Edildi', value: 'shipped' },
     { label: 'Teslim Edildi', value: 'delivered' },
+    { label: 'Kısmi Faturalandı', value: 'partially_invoiced' },
     { label: 'İptal', value: 'cancelled' },
     { label: 'Tamamlandı', value: 'completed' }
 ];
@@ -66,6 +68,31 @@ function openNew() {
     router.push('/sales/orders/create');
 }
 
+function bulkInvoice() {
+    if (selectedOrders.value.length === 0) return;
+
+    // 1. Kontrol: Tüm siparişler aynı cari hesaba mı ait?
+    const accountIds = new Set(selectedOrders.value.map(o => o.accountId));
+    if (accountIds.size > 1) {
+        // Burada bir toast mesajı iyi olurdu ama şimdilik konsol/basit uyarı
+        alert('Farklı cari hesaplara ait siparişler toplu faturalandırılamaz.');
+        return;
+    }
+
+    // 2. Kontrol: Tüm siparişler aynı döviz cinsinden mi?
+    const currencies = new Set(selectedOrders.value.map(o => o.currency));
+    if (currencies.size > 1) {
+        alert('Farklı döviz cinsinden siparişler toplu faturalandırılamaz.');
+        return;
+    }
+
+    const ids = selectedOrders.value.map(o => o.id).join(',');
+    router.push({
+        path: '/finance/invoices/create',
+        query: { sourceIds: ids, sourceType: 'order' }
+    });
+}
+
 function viewOrder(id: string) {
     router.push(`/sales/orders/edit/${id}`);
 }
@@ -77,6 +104,7 @@ function getStatusLabel(status: OrderStatus) {
         processing: 'Hazırlanıyor',
         shipped: 'Sevk Edildi',
         delivered: 'Teslim Edildi',
+        partially_invoiced: 'Kısmi Faturalandı',
         cancelled: 'İptal',
         completed: 'Tamamlandı'
     };
@@ -90,6 +118,7 @@ function getStatusSeverity(status: OrderStatus) {
         processing: 'warn',
         shipped: 'info',
         delivered: 'success',
+        partially_invoiced: 'warn',
         cancelled: 'danger',
         completed: 'success'
     };
@@ -162,7 +191,16 @@ function clearFilters() {
             </div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Sipariş" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <div class="flex gap-2">
+                        <Button label="Yeni Sipariş" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                        <Button 
+                            v-if="selectedOrders.length > 0" 
+                            label="Faturalandır" 
+                            icon="pi pi-file-export" 
+                            severity="success" 
+                            @click="bulkInvoice" 
+                        />
+                    </div>
                 </template>
                 <template #end>
                     <Button label="Filtreler" icon="pi pi-filter" severity="secondary" @click="toggleFilters" />
@@ -182,10 +220,10 @@ function clearFilters() {
                     <Select v-model="filterForm.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Cari Hesap" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" fluid />
+                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" fluid />
+                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1 flex gap-2">
                     <Button label="Filtrele" icon="pi pi-search" class="w-full" @click="applyFilters" />
@@ -197,12 +235,14 @@ function clearFilters() {
         <div class="card">
             <DataTable
                 :value="filteredOrders"
+                v-model:selection="selectedOrders"
                 dataKey="id"
                 :paginator="true"
                 :rows="10"
                 :rowsPerPageOptions="[10, 25, 50]"
                 emptyMessage="Kayıtlı sipariş bulunamadı."
             >
+                <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
                 <Column field="orderNumber" header="Sipariş No" sortable style="min-width: 130px" />
                 <Column header="Müşteri (Cari)" sortable style="min-width: 180px">
                     <template #body="slotProps">
@@ -217,6 +257,20 @@ function clearFilters() {
                 <Column field="status" header="Durum" sortable style="min-width: 140px">
                     <template #body="slotProps">
                         <Tag :severity="getStatusSeverity(slotProps.data.status)" :value="getStatusLabel(slotProps.data.status)" />
+                    </template>
+                </Column>
+                <Column header="Sevk/Fatura" style="min-width: 120px">
+                    <template #body="slotProps">
+                        <div class="flex flex-col gap-1 w-full">
+                            <ProgressBar 
+                                :value="Math.round((slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.invoicedQuantity || 0), 0) / slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0)) * 100) || 0" 
+                                :showValue="false" 
+                                style="height: 4px"
+                            />
+                            <span class="text-[10px] text-surface-500">
+                                {{ slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.invoicedQuantity || 0), 0) }} / {{ slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0) }}
+                            </span>
+                        </div>
                     </template>
                 </Column>
                 <Column field="total" header="Toplam" sortable style="min-width: 130px">

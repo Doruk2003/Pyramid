@@ -1,14 +1,18 @@
-export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'partially_converted' | 'rejected' | 'expired' | 'converted' | 'cancelled';
 
 export interface QuoteLineProps {
     id: string;
     quoteId: string;
     productId: string;
+    warehouseId?: string; // Yeni eklendi
     description?: string;
     quantity: number;
+    orderedQuantity: number; // Yeni eklenen: Siparişe dönüştürülen miktar
     unitPrice: number;
     vatRate: number;
-    discountRate: number;
+    discountRate1: number;
+    discountRate2: number;
+    discountRate3: number;
     lineTotal: number;
     sortOrder: number;
 }
@@ -27,6 +31,8 @@ export interface QuoteProps {
     total: number;
     currency: string;
     exchangeRate: number;
+    projectId?: string;
+    type: 'sale' | 'purchase'; // Yeni eklendi
     notes?: string;
     lines: QuoteLineProps[];
     createdAt: Date;
@@ -47,6 +53,8 @@ export class Quote {
     get vatTotal(): number { return this.props.vatTotal; }
     get currency(): string { return this.props.currency; }
     get exchangeRate(): number { return this.props.exchangeRate; }
+    get projectId(): string | undefined { return this.props.projectId; }
+    get type(): 'sale' | 'purchase' { return this.props.type; }
     get issueDate(): Date { return this.props.issueDate; }
     get validUntil(): Date | undefined { return this.props.validUntil; }
     get notes(): string | undefined { return this.props.notes; }
@@ -61,7 +69,11 @@ export class Quote {
         let vatTotal = 0;
 
         const updatedLines = this.props.lines.map((line) => {
-            const lineSubtotal = line.quantity * line.unitPrice * (1 - (line.discountRate || 0) / 100);
+            const d1 = 1 - (line.discountRate1 || 0) / 100;
+            const d2 = 1 - (line.discountRate2 || 0) / 100;
+            const d3 = 1 - (line.discountRate3 || 0) / 100;
+            
+            const lineSubtotal = line.quantity * line.unitPrice * d1 * d2 * d3;
             const lineVat = lineSubtotal * ((line.vatRate || 0) / 100);
             const lineTotal = lineSubtotal + lineVat;
 

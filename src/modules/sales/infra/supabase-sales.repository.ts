@@ -31,16 +31,21 @@ export class SupabaseSalesRepository implements ISalesRepository {
             total: Number(row.total),
             currency: row.currency,
             exchangeRate: Number(row.exchange_rate),
+            projectId: row.project_id,
             notes: row.notes,
             lines: (row.quote_lines || []).map(l => ({
                 id: l.id,
                 quoteId: l.quote_id,
                 productId: l.product_id,
+                warehouseId: l.warehouse_id,
                 description: l.description,
                 quantity: Number(l.quantity),
+                orderedQuantity: Number(l.ordered_quantity || 0),
                 unitPrice: Number(l.unit_price),
                 vatRate: Number(l.vat_rate),
-                discountRate: Number(l.discount_rate),
+                discountRate1: Number(l.discount_rate1 || 0),
+                discountRate2: Number(l.discount_rate2 || 0),
+                discountRate3: Number(l.discount_rate3 || 0),
                 lineTotal: Number(l.line_total),
                 sortOrder: l.sort_order
             })),
@@ -74,16 +79,21 @@ export class SupabaseSalesRepository implements ISalesRepository {
             total: Number(row.total),
             currency: row.currency,
             exchangeRate: Number(row.exchange_rate),
+            projectId: row.project_id,
             notes: row.notes,
             lines: (row.quote_lines || []).map(l => ({
                 id: l.id,
                 quoteId: l.quote_id,
                 productId: l.product_id,
+                warehouseId: l.warehouse_id,
                 description: l.description,
                 quantity: Number(l.quantity),
+                orderedQuantity: Number(l.ordered_quantity || 0),
                 unitPrice: Number(l.unit_price),
                 vatRate: Number(l.vat_rate),
-                discountRate: Number(l.discount_rate),
+                discountRate1: Number(l.discount_rate1 || 0),
+                discountRate2: Number(l.discount_rate2 || 0),
+                discountRate3: Number(l.discount_rate3 || 0),
                 lineTotal: Number(l.line_total),
                 sortOrder: l.sort_order
             })),
@@ -109,6 +119,8 @@ export class SupabaseSalesRepository implements ISalesRepository {
                 total: obj.total,
                 currency: obj.currency,
                 exchange_rate: obj.exchangeRate,
+                project_id: obj.projectId || null,
+                type: obj.type,
                 notes: obj.notes,
                 updated_at: new Date().toISOString()
             })
@@ -124,11 +136,15 @@ export class SupabaseSalesRepository implements ISalesRepository {
         const linePayloads = obj.lines.map((l) => ({
             quote_id: data.id,
             product_id: l.productId,
+            warehouse_id: l.warehouseId || null,
             description: l.description,
             quantity: l.quantity,
             unit_price: l.unitPrice,
+            ordered_quantity: l.orderedQuantity,
             vat_rate: l.vatRate,
-            discount_rate: l.discountRate,
+            discount_rate1: l.discountRate1,
+            discount_rate2: l.discountRate2,
+            discount_rate3: l.discountRate3,
             line_total: l.lineTotal,
             sort_order: l.sortOrder
         }));
@@ -188,18 +204,26 @@ export class SupabaseSalesRepository implements ISalesRepository {
             total: Number(row.total),
             currency: row.currency,
             exchangeRate: Number(row.exchange_rate),
+            projectId: row.project_id,
+            type: row.type as 'sale' | 'purchase',
             notes: row.notes,
             lines: (row.order_lines || []).map(l => ({
                 id: l.id,
                 orderId: l.order_id,
                 productId: l.product_id,
+                warehouseId: l.warehouse_id,
                 description: l.description,
                 quantity: Number(l.quantity),
+                invoicedQuantity: Number(l.invoiced_quantity || 0),
+                shippedQuantity: Number(l.shipped_quantity || 0),
                 unitPrice: Number(l.unit_price),
                 vatRate: Number(l.vat_rate),
-                discountRate: Number(l.discount_rate),
+                discountRate1: Number(l.discount_rate1 || 0),
+                discountRate2: Number(l.discount_rate2 || 0),
+                discountRate3: Number(l.discount_rate3 || 0),
                 lineTotal: Number(l.line_total),
-                sortOrder: l.sort_order
+                sortOrder: l.sort_order,
+                sourceLineId: l.source_line_id
             })),
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at)
@@ -232,18 +256,26 @@ export class SupabaseSalesRepository implements ISalesRepository {
             total: Number(row.total),
             currency: row.currency,
             exchangeRate: Number(row.exchange_rate),
+            projectId: row.project_id,
+            type: row.type as 'sale' | 'purchase',
             notes: row.notes,
             lines: (row.order_lines || []).map(l => ({
                 id: l.id,
                 orderId: l.order_id,
                 productId: l.product_id,
+                warehouseId: l.warehouse_id,
                 description: l.description,
                 quantity: Number(l.quantity),
+                invoicedQuantity: Number(l.invoiced_quantity || 0),
+                shippedQuantity: Number(l.shipped_quantity || 0),
                 unitPrice: Number(l.unit_price),
                 vatRate: Number(l.vat_rate),
-                discountRate: Number(l.discount_rate),
+                discountRate1: Number(l.discount_rate1 || 0),
+                discountRate2: Number(l.discount_rate2 || 0),
+                discountRate3: Number(l.discount_rate3 || 0),
                 lineTotal: Number(l.line_total),
-                sortOrder: l.sort_order
+                sortOrder: l.sort_order,
+                sourceLineId: l.source_line_id
             })),
             createdAt: new Date(row.created_at),
             updatedAt: new Date(row.updated_at)
@@ -268,6 +300,7 @@ export class SupabaseSalesRepository implements ISalesRepository {
                 total: obj.total,
                 currency: obj.currency,
                 exchange_rate: obj.exchangeRate,
+                project_id: obj.projectId || null,
                 notes: obj.notes,
                 updated_at: new Date().toISOString()
             })
@@ -283,11 +316,17 @@ export class SupabaseSalesRepository implements ISalesRepository {
         const linePayloads = obj.lines.map((l) => ({
             order_id: data.id,
             product_id: l.productId,
+            warehouse_id: l.warehouseId || null,
             description: l.description,
             quantity: l.quantity,
             unit_price: l.unitPrice,
+            invoiced_quantity: l.invoicedQuantity,
+            shipped_quantity: l.shippedQuantity,
+            source_line_id: l.sourceLineId,
             vat_rate: l.vatRate,
-            discount_rate: l.discountRate,
+            discount_rate1: l.discountRate1,
+            discount_rate2: l.discountRate2,
+            discount_rate3: l.discountRate3,
             line_total: l.lineTotal,
             sort_order: l.sortOrder
         }));
@@ -319,5 +358,69 @@ export class SupabaseSalesRepository implements ISalesRepository {
             return `SP-${year}-${String((count ?? 0) + 1).padStart(5, '0')}`;
         }
         return data as string;
+    }
+
+    // --- QUANTITY TRACKING HELPERS ---
+    
+    async updateSourceQuantities(sourceType: 'quote' | 'order', sourceIds: string[]): Promise<Result<void>> {
+        try {
+            if (sourceType === 'order') {
+                // Her sipariş için durumu ve satırları kontrol et
+                for (const orderId of sourceIds) {
+                    const { data: lines } = await supabase.from('order_lines').select('*').eq('order_id', orderId);
+                    if (!lines) continue;
+
+                    let allInvoiced = true;
+                    let someInvoiced = false;
+
+                    for (const line of lines) {
+                        const { data: invLines } = await supabase
+                            .from('invoice_lines')
+                            .select('quantity')
+                            .eq('source_line_id', line.id);
+                        
+                        const totalInvoiced = (invLines || []).reduce((sum, l) => sum + Number(l.quantity), 0);
+                        
+                        // Güncelle
+                        await supabase.from('order_lines').update({ invoiced_quantity: totalInvoiced }).eq('id', line.id);
+
+                        if (totalInvoiced > 0) someInvoiced = true;
+                        if (totalInvoiced < Number(line.quantity)) allInvoiced = false;
+                    }
+
+                    // Durumu güncelle
+                    const status = allInvoiced ? 'completed' : (someInvoiced ? 'partially_invoiced' : 'confirmed');
+                    await supabase.from('orders').update({ status }).eq('id', orderId);
+                }
+            } else if (sourceType === 'quote') {
+                for (const quoteId of sourceIds) {
+                    const { data: lines } = await supabase.from('quote_lines').select('*').eq('quote_id', quoteId);
+                    if (!lines) continue;
+
+                    let allConverted = true;
+                    let someConverted = false;
+
+                    for (const line of lines) {
+                        // Quotes can go to Orders OR Invoices (depending on flow)
+                        // Here we check both if needed, but the user is doing direct Invoice
+                        const { data: orderLines } = await supabase.from('order_lines').select('quantity').eq('source_line_id', line.id);
+                        const { data: invLines } = await supabase.from('invoice_lines').select('quantity').eq('source_line_id', line.id);
+                        
+                        const totalConverted = [(orderLines || []), (invLines || [])].flat().reduce((sum, l) => sum + Number(l.quantity), 0);
+                        
+                        await supabase.from('quote_lines').update({ ordered_quantity: totalConverted }).eq('id', line.id);
+
+                        if (totalConverted > 0) someConverted = true;
+                        if (totalConverted < Number(line.quantity)) allConverted = false;
+                    }
+
+                    const status = allConverted ? 'converted' : (someConverted ? 'partially_converted' : 'accepted');
+                    await supabase.from('quotes').update({ status }).eq('id', quoteId);
+                }
+            }
+            return ok(undefined);
+        } catch (e: any) {
+            return err(new Error(e.message));
+        }
     }
 }

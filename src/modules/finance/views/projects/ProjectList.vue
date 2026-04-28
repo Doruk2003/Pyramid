@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useProjectStore } from '@/modules/finance/application/project.store';
-import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useAuthStore } from '@/core/auth/auth.store';
+import { useFinanceStore } from '@/modules/finance/application/finance.store';
+import { useProjectStore } from '@/modules/finance/application/project.store';
 import { Project, PROJECT_STATUS_LABELS, PROJECT_STATUS_SEVERITIES, type ProjectStatus } from '@/modules/finance/domain/project.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
@@ -14,11 +14,52 @@ const financeStore = useFinanceStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
+type ExportableTable = { exportCSV: () => void };
+const dt = ref<ExportableTable | null>(null);
+
 const showForm = ref(false);
 const editingProject = ref<Project | null>(null);
 const deleteDialog = ref(false);
 const projectToDelete = ref<Project | null>(null);
 const submitted = ref(false);
+
+// Filtreler
+const showFilters = ref(false);
+interface ProjectFilterForm {
+    code: string;
+    name: string;
+    status: ProjectStatus | null;
+    clientId: string | null;
+}
+const filterForm = ref<ProjectFilterForm>({
+    code: '',
+    name: '',
+    status: null,
+    clientId: null
+});
+const activeFilters = ref<ProjectFilterForm>({ ...filterForm.value });
+
+function toggleFilters() {
+    showFilters.value = !showFilters.value;
+}
+
+function applyFilters() {
+    activeFilters.value = { ...filterForm.value };
+}
+
+function clearFilters() {
+    filterForm.value = {
+        code: '',
+        name: '',
+        status: null,
+        clientId: null
+    };
+    activeFilters.value = { ...filterForm.value };
+}
+
+function exportCSV() {
+    dt.value?.exportCSV();
+}
 
 // Form alanları
 interface ProjectForm {
@@ -64,9 +105,29 @@ onMounted(async () => {
 });
 
 // toRaw: Pinia proxy'sini söküp gerçek Project instance'larına dönüştür
-// "as Project" gerekli: toRaw TypeScript'te T→T döndürür, UnwrapRef<Project>→Project dönüşümü için cast lazım
-const projects = computed((): Project[] => projectStore.projects.map((p) => toRaw(p) as unknown as Project));
+const allProjects = computed((): Project[] => projectStore.projects.map((p) => toRaw(p) as unknown as Project));
 const rootAccounts = computed(() => financeStore.rootAccounts);
+
+const filteredProjects = computed(() => {
+    let list = allProjects.value;
+    const f = activeFilters.value;
+
+    if (f.code) {
+        const query = f.code.toLowerCase();
+        list = list.filter(p => p.code.toLowerCase().includes(query));
+    }
+    if (f.name) {
+        const query = f.name.toLowerCase();
+        list = list.filter(p => p.name.toLowerCase().includes(query));
+    }
+    if (f.status) {
+        list = list.filter(p => p.status === f.status);
+    }
+    if (f.clientId) {
+        list = list.filter(p => p.clientId === f.clientId);
+    }
+    return list;
+});
 
 // Toplam bütçe hesabı
 function totalBudget(p: Project): number {
@@ -171,9 +232,51 @@ async function deleteProject() {
             <div class="m-0 text-2xl font-medium mb-3">Proje Yönetimi</div>
             <Toolbar>
                 <template #start>
-                    <Button label="Yeni Proje" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                    <Button label="Yeni Proje Ekle" icon="pi pi-plus" severity="primary" @click="openNew" />
+                </template>
+                <template #end>
+                    <Button icon="pi pi-filter" severity="secondary" v-tooltip.bottom="'Filtrele'" @click="toggleFilters" class="mr-2" />
+                    <Button icon="pi pi-upload" severity="secondary" v-tooltip.bottom="'Dışa Aktar'" @click="exportCSV" />
                 </template>
             </Toolbar>
+        </div>
+
+        <!-- Filtre Paneli -->
+        <div v-if="showFilters" class="card mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                    <InputText v-model="filterForm.code" placeholder="Proje Kodu" fluid />
+                </div>
+                <div>
+                    <InputText v-model="filterForm.name" placeholder="Proje Adı" fluid />
+                </div>
+                <div>
+                    <Select
+                        v-model="filterForm.status"
+                        :options="statusOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Durum Seç"
+                        showClear
+                        fluid
+                    />
+                </div>
+                <div>
+                    <Select
+                        v-model="filterForm.clientId"
+                        :options="rootAccounts"
+                        optionLabel="name"
+                        optionValue="id"
+                        placeholder="İşveren Seç"
+                        showClear
+                        fluid
+                    />
+                </div>
+                <div class="flex gap-2">
+                    <Button label="Uygula" class="flex-1" @click="applyFilters" />
+                    <Button label="Temizle" severity="secondary" outlined @click="clearFilters" />
+                </div>
+            </div>
         </div>
 
         <!-- Proje Kartları -->
@@ -181,78 +284,85 @@ async function deleteProject() {
             <ProgressSpinner />
         </div>
 
-        <div v-else-if="projects.length === 0" class="card text-center py-12">
+        <div v-else-if="filteredProjects.length === 0" class="card text-center py-12">
             <i class="pi pi-folder-open text-5xl text-surface-400 mb-3 block" />
-            <p class="text-surface-500 text-lg">Henüz proje bulunmuyor.</p>
-            <Button label="İlk Projeyi Oluştur" icon="pi pi-plus" class="mt-4" @click="openNew" />
+            <p class="text-surface-500 text-lg">Arama kriterlerine uygun proje bulunamadı.</p>
+            <Button v-if="allProjects.length === 0" label="İlk Projeyi Oluştur" icon="pi pi-plus" class="mt-4" @click="openNew" />
+            <Button v-else label="Filtreleri Temizle" icon="pi pi-filter-slash" class="mt-4" severity="secondary" @click="clearFilters" />
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div v-else class="flex flex-col gap-4">
             <div
-                v-for="p in projects"
+                v-for="p in filteredProjects"
                 :key="p.id"
-                class="card cursor-pointer hover:shadow-lg transition-shadow duration-200"
+                class="card cursor-pointer hover:shadow-lg transition-shadow duration-200 p-5"
                 @click="openDetail(p)"
             >
-                <!-- Kart Başlığı -->
-                <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <div class="text-xs text-surface-400 font-mono mb-1">{{ p.code }}</div>
-                        <div class="font-semibold text-lg leading-tight">{{ p.name }}</div>
-                        <div v-if="p.location" class="text-sm text-surface-500 mt-1">
-                            <i class="pi pi-map-marker mr-1" />{{ p.location }}
+                <div class="flex flex-wrap items-center gap-6">
+                    <!-- Sol: Temel Bilgiler -->
+                    <div class="flex-1 min-w-[320px]">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-base text-primary font-bold font-mono">{{ p.code }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="font-bold text-2xl leading-tight">{{ p.name }}</div>
+                            <Tag
+                                :value="PROJECT_STATUS_LABELS[p.status]"
+                                :severity="PROJECT_STATUS_SEVERITIES[p.status]"
+                                size="small"
+                                class="whitespace-nowrap"
+                            />
+                        </div>
+                        <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-surface-500">
+                            <span v-if="p.location" class="flex items-center">
+                                <i class="pi pi-map-marker mr-2" />{{ p.location }}
+                            </span>
+                            <span v-if="p.clientName" class="flex items-center">
+                                <i class="pi pi-building mr-2" />{{ p.clientName }}
+                            </span>
+                            <span v-if="p.startDate || p.endDate" class="flex items-center">
+                                <i class="pi pi-calendar mr-2" />
+                                {{ p.startDate?.toLocaleDateString('tr-TR') }}
+                                <i class="pi pi-arrow-right mx-3 text-[10px]" />
+                                {{ p.endDate?.toLocaleDateString('tr-TR') }}
+                            </span>
                         </div>
                     </div>
-                    <Tag
-                        :value="PROJECT_STATUS_LABELS[p.status]"
-                        :severity="PROJECT_STATUS_SEVERITIES[p.status]"
-                    />
-                </div>
 
-                <!-- İşveren -->
-                <div v-if="p.clientName" class="flex items-center gap-2 text-sm text-surface-600 mb-3">
-                    <i class="pi pi-building" />
-                    <span>{{ p.clientName }}</span>
-                </div>
-
-                <!-- Kategorili Bütçe Özeti -->
-                <div class="border-t border-surface-200 dark:border-surface-700 pt-3 mt-2">
-                    <div class="text-xs text-surface-400 mb-2 font-semibold uppercase tracking-wide">Bütçe Dağılımı</div>
-                    <div class="grid grid-cols-2 gap-1 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-surface-500">Malzeme</span>
-                            <span class="font-medium">{{ formatCurrency(p.budget.material) }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-surface-500">İşçilik</span>
-                            <span class="font-medium">{{ formatCurrency(p.budget.labor) }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-surface-500">Ekipman</span>
-                            <span class="font-medium">{{ formatCurrency(p.budget.equipment) }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-surface-500">Genel Gider</span>
-                            <span class="font-medium">{{ formatCurrency(p.budget.general) }}</span>
+                    <!-- Orta: Bütçe Detayları -->
+                    <div class="hidden xl:flex items-center gap-10 px-8 border-l border-surface-200 dark:border-surface-700">
+                        <div class="grid grid-cols-2 gap-x-12 gap-y-2 text-base">
+                            <div class="flex justify-between gap-6">
+                                <span class="text-surface-500 font-medium">Malzeme:</span>
+                                <span class="font-bold text-surface-700 dark:text-surface-200">{{ formatCurrency(p.budget.material) }}</span>
+                            </div>
+                            <div class="flex justify-between gap-6">
+                                <span class="text-surface-500 font-medium">İşçilik:</span>
+                                <span class="font-bold text-surface-700 dark:text-surface-200">{{ formatCurrency(p.budget.labor) }}</span>
+                            </div>
+                            <div class="flex justify-between gap-6">
+                                <span class="text-surface-500 font-medium">Ekipman:</span>
+                                <span class="font-bold text-surface-700 dark:text-surface-200">{{ formatCurrency(p.budget.equipment) }}</span>
+                            </div>
+                            <div class="flex justify-between gap-6">
+                                <span class="text-surface-500 font-medium">Genel Gider:</span>
+                                <span class="font-bold text-surface-700 dark:text-surface-200">{{ formatCurrency(p.budget.general) }}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex justify-between mt-2 pt-2 border-t border-surface-100 dark:border-surface-800">
-                        <span class="font-semibold">Toplam Bütçe</span>
-                        <span class="font-bold text-primary">{{ formatCurrency(totalBudget(p)) }}</span>
+
+                    <!-- Sağ: Toplam Bütçe -->
+                    <div class="flex flex-col items-end min-w-[180px] px-8 border-l border-surface-200 dark:border-surface-700">
+                        <div class="text-[11px] text-surface-400 uppercase font-black tracking-widest mb-1">TOPLAM BÜTÇE</div>
+                        <div class="text-3xl font-black text-primary">{{ formatCurrency(totalBudget(p)) }}</div>
                     </div>
-                </div>
 
-                <!-- Tarih aralığı -->
-                <div v-if="p.startDate || p.endDate" class="flex gap-3 text-xs text-surface-500 mt-3">
-                    <span v-if="p.startDate"><i class="pi pi-calendar mr-1" />{{ p.startDate.toLocaleDateString('tr-TR') }}</span>
-                    <span v-if="p.endDate"><i class="pi pi-calendar-times mr-1" />{{ p.endDate.toLocaleDateString('tr-TR') }}</span>
-                </div>
-
-                <!-- Aksiyon Butonları -->
-                <div class="flex gap-2 mt-4 pt-3 border-t border-surface-100 dark:border-surface-800" @click.stop>
-                    <Button icon="pi pi-eye" label="Detay" size="small" outlined class="flex-1" @click="openDetail(p)" />
-                    <Button icon="pi pi-pencil" size="small" outlined @click="openEdit(p)" v-tooltip.top="'Düzenle'" />
-                    <Button icon="pi pi-trash" size="small" outlined severity="danger" @click="confirmDelete(p)" v-tooltip.top="'Sil'" />
+                    <!-- Aksiyonlar -->
+                    <div class="flex gap-2 ml-auto" @click.stop>
+                        <Button icon="pi pi-eye" label="Detay" size="small" outlined @click="openDetail(p)" class="hidden md:flex" />
+                        <Button icon="pi pi-pencil" size="small" outlined @click="openEdit(p)" v-tooltip.top="'Düzenle'" />
+                        <Button icon="pi pi-trash" size="small" outlined severity="danger" @click="confirmDelete(p)" v-tooltip.top="'Sil'" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -377,5 +487,39 @@ async function deleteProject() {
                 <Button label="Evet, Sil" icon="pi pi-trash" severity="danger" @click="deleteProject" />
             </template>
         </Dialog>
+
+        <!-- Hidden DataTable for Export -->
+        <div style="display: none">
+            <DataTable ref="dt" :value="filteredProjects">
+                <Column field="code" header="Proje Kodu" />
+                <Column field="name" header="Proje Adı" />
+                <Column field="status" header="Durum">
+                    <template #body="{ data }">{{ PROJECT_STATUS_LABELS[data.status as ProjectStatus] }}</template>
+                </Column>
+                <Column field="clientName" header="İşveren" />
+                <Column field="location" header="Lokasyon" />
+                <Column field="startDate" header="Başlangıç">
+                    <template #body="{ data }">{{ data.startDate?.toLocaleDateString('tr-TR') }}</template>
+                </Column>
+                <Column field="endDate" header="Bitiş">
+                    <template #body="{ data }">{{ data.endDate?.toLocaleDateString('tr-TR') }}</template>
+                </Column>
+                <Column field="budget.material" header="Bütçe: Malzeme">
+                    <template #body="{ data }">{{ data.budget.material }}</template>
+                </Column>
+                <Column field="budget.labor" header="Bütçe: İşçilik">
+                    <template #body="{ data }">{{ data.budget.labor }}</template>
+                </Column>
+                <Column field="budget.equipment" header="Bütçe: Ekipman">
+                    <template #body="{ data }">{{ data.budget.equipment }}</template>
+                </Column>
+                <Column field="budget.general" header="Bütçe: Genel Gider">
+                    <template #body="{ data }">{{ data.budget.general }}</template>
+                </Column>
+                <Column header="Toplam Bütçe">
+                    <template #body="{ data }">{{ totalBudget(data) }}</template>
+                </Column>
+            </DataTable>
+        </div>
     </div>
 </template>

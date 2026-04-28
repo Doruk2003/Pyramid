@@ -231,10 +231,10 @@ function clearFilters() {
                     <InputText v-model="filterForm.currency" placeholder="Döviz" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" fluid />
+                    <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1">
-                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" fluid />
+                    <DatePicker v-model="filterForm.endDate" placeholder="Bitiş" dateFormat="dd.mm.yy" fluid />
                 </div>
                 <div class="col-span-1 flex items-end gap-1">
                     <Button label="Filtrele" class="w-full" @click="applyFilters" />
