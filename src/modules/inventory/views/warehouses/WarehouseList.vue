@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
+import { useProductStore } from '@/modules/inventory/application/product.store';
 import { Warehouse, type WarehouseProps } from '@/modules/inventory/domain/warehouse.entity';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
@@ -19,13 +20,22 @@ const actionTarget = ref<Warehouse | null>(null);
 
 const menuItems = computed(() => [
     {
+        label: 'Stok Görüntüle',
+        icon: 'pi pi-search',
+        command: () => {
+            if (actionTarget.value) viewStock(actionTarget.value as Warehouse);
+        }
+    },
+    {
         label: 'Düzenle',
+        icon: 'pi pi-pencil',
         command: () => {
             if (actionTarget.value) editWarehouse(actionTarget.value as Warehouse);
         }
     },
     {
         label: 'Sil',
+        icon: 'pi pi-trash',
         command: () => {
             if (actionTarget.value) confirmDelete(actionTarget.value as Warehouse);
         }
@@ -36,6 +46,35 @@ const onActionClick = (event: any, w: Warehouse) => {
     actionTarget.value = w;
     menu.value.toggle(event);
 };
+
+// Stock View
+const productStore = useProductStore();
+const stockViewVisible = ref(false);
+const warehouseForStock = ref<Warehouse | null>(null);
+
+async function viewStock(w: Warehouse) {
+    warehouseForStock.value = w;
+    stockViewVisible.value = true;
+    if (productStore.products.length === 0) await productStore.fetchProducts();
+    await invStore.fetchBalances();
+}
+
+const currentWarehouseStock = computed(() => {
+    if (!warehouseForStock.value) return [];
+    return (invStore.balances || [])
+        .filter((b: any) => b.warehouseId === warehouseForStock.value?.id && b.balance !== 0)
+        .map((b: any) => {
+            const product = productStore.products.find((p: any) => p.id === b.productId);
+            return {
+                ...b,
+                productName: product?.name || 'Bilinmeyen Ürün',
+                productSku: product?.code || '---',
+                minStock: product?.minStock || 0,
+                isCritical: b.balance < (product?.minStock || 0)
+            };
+        });
+});
+
 type WarehouseForm = Partial<WarehouseProps>;
 const warehouse = ref<WarehouseForm>({});
 const submitted = ref(false);
@@ -125,14 +164,14 @@ const filteredWarehouses = computed(() => {
 
     if (filters.name) {
         const query = filters.name.toLowerCase();
-        list = list.filter((item) => (item.name || '').toLowerCase().includes(query));
+        list = list.filter((item: any) => (item.name || '').toLowerCase().includes(query));
     }
     if (filters.location) {
         const query = filters.location.toLowerCase();
-        list = list.filter((item) => (item.location || '').toLowerCase().includes(query));
+        list = list.filter((item: any) => (item.location || '').toLowerCase().includes(query));
     }
     if (filters.isActive !== null) {
-        list = list.filter((item) => item.isActive === filters.isActive);
+        list = list.filter((item: any) => item.isActive === filters.isActive);
     }
 
     return list;
@@ -197,6 +236,8 @@ function clearFilters() {
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 :rowsPerPageOptions="[5, 10, 25]"
                 currentPageReportTemplate="Gösterilen {first} - {last} / {totalRecords} depo"
+                @row-click="(e) => viewStock(e.data)"
+                class="cursor-pointer"
             >
                 <Column field="name" header="Depo Adı" sortable></Column>
                 <Column field="location" header="Konum" sortable></Column>
@@ -207,11 +248,53 @@ function clearFilters() {
                 </Column>
                 <Column header="İşlemler" style="min-width: 50px">
                     <template #body="slotProps">
-                        <Button icon="pi pi-ellipsis-v" text rounded @click="onActionClick($event, slotProps.data)" />
+                        <Button icon="pi pi-ellipsis-v" text rounded @click.stop="onActionClick($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
         </div>
+
+        <!-- Stock View Drawer -->
+        <Drawer v-model:visible="stockViewVisible" position="right" style="width: 35rem" :header="warehouseForStock?.name + ' - Envanter Durumu'">
+            <div class="flex flex-col gap-6 h-full mt-4">
+                <DataTable :value="currentWarehouseStock" scrollable scrollHeight="flex" class="p-datatable-sm">
+                    <Column field="productName" header="Ürün" sortable>
+                        <template #body="slotProps">
+                            <div class="flex flex-col">
+                                <span class="font-medium text-surface-900 dark:text-surface-0">{{ slotProps.data.productName }}</span>
+                                <span class="text-xs text-surface-500">{{ slotProps.data.productSku }}</span>
+                            </div>
+                        </template>
+                    </Column>
+                    <Column field="balance" header="Miktar" sortable class="text-right">
+                        <template #body="slotProps">
+                            <div class="flex flex-col items-end">
+                                <span :class="[
+                                    slotProps.data.balance < 0 ? 'text-red-500' : 
+                                    slotProps.data.isCritical ? 'text-orange-500' : 'text-surface-900',
+                                    'font-bold text-lg'
+                                ]">
+                                    {{ slotProps.data.balance }}
+                                </span>
+                                <div v-if="slotProps.data.isCritical" class="flex items-center gap-1 mt-0.5">
+                                    <i class="pi pi-exclamation-triangle text-[10px] text-orange-500"></i>
+                                    <span class="text-[10px] text-orange-600 font-medium whitespace-nowrap">
+                                        Kritik: {{ slotProps.data.minStock }} altı
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                    </Column>
+                    <Column header="Durum" style="width: 80px">
+                        <template #body="slotProps">
+                            <Tag v-if="slotProps.data.balance < 0" severity="danger" value="Eksi Stok" />
+                            <Tag v-else-if="slotProps.data.isCritical" severity="warn" value="Kritik" />
+                            <Tag v-else severity="success" value="Yeterli" />
+                        </template>
+                    </Column>
+                </DataTable>
+            </div>
+        </Drawer>
 
         <Dialog v-model:visible="warehouseDialog" :style="{ width: '450px' }" header="Depo Detayları" :modal="true">
             <div class="flex flex-col gap-6">

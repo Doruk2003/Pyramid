@@ -1,0 +1,46 @@
+====================================================================
+               PYRAMID ERP - SOHBET VE GELİŞTİRME ÖZETİ
+====================================================================
+Tarih: 5 Mayıs 2026
+
+Bu oturumda kullanıcının talepleri doğrultusunda Pyramid ERP sisteminin 
+"Stok/Depo" ve "Satış/Fatura" modüllerinde operasyonel verimliliği 
+artıracak kritik geliştirmeler yapılmıştır. 
+
+GERÇEKLEŞTİRİLEN ANA GELİŞTİRMELER:
+
+1. Depolar Arası Sevkiyat ve Transfer Fişi
+   - Depolar arası ürün transferleri için altyapı güçlendirildi.
+   - Transfer işlemlerinin ardından "PDF Transfer Fişi" (Sevk İrsaliyesi 
+     formatında) yazdırılabilmesi özelliği eklendi.
+
+2. Stok Sayım ve Denkleştirme Modülü
+   - Depodaki fiziksel sayım ile sistemdeki bakiyeleri karşılaştıran 
+     "Stok Sayım" (Inventory Count) arayüzü geliştirildi.
+   - Fark tespit edildiğinde sistemi otomatik güncelleyen denkleştirme 
+     hareketleri (adjustment) eklendi.
+
+3. Fatura Ekranında Hızlı Barkod Entegrasyonu
+   - Fatura/Satış ekranına market kasası mantığıyla çalışan, barkod 
+     okuyuculara uyumlu "Hızlı Ürün Ekleme" alanı eklendi.
+   - Okutulan ürün faturada varsa miktarı artırıldı, yoksa yeni eklendi.
+   - Döviz dönüşümleri ve cari/kategori tabanlı iskontoların anında 
+     satıra yansıması sağlandı.
+
+4. Ürün Kartından Profesyonel Etiket (Barkod) Yazdırma
+   - 'jsbarcode' kütüphanesi entegre edildi.
+   - Ürün detay sayfasına (Kardeks ekranı) "Barkod Yazdır" butonu eklendi.
+   - 40x25mm standart termal rulo boyutlarında, şirket logolu, fiyat 
+     ve ürün isimli toplu etiket yazdırma şablonu oluşturuldu.
+
+5. Otomatik Barkod Üretme Algoritması (EAN-13)
+   - Orijinal barkodu olmayan ürünler için "Barkod Üret" butonu eklendi.
+   - Sistem içi kullanıma uygun "27" ön ekiyle başlayan, zaman damgalı 
+     ve geçerli bir Check Digit (Kontrol Basamağı) hesaplayan EAN-13 
+     barkod algoritması kodlandı.
+
+6. Canlı Sistem Testleri
+   - Geliştirilen özellikler (Dashboard kritik stok uyarıları, giriş 
+     ekranı, barkod üretimi vb.) yapay zeka tarayıcı asistanı kullanılarak 
+     canlı sistem (localhost) üzerinde test edildi.
+====================================================================

@@ -1,8 +1,8 @@
-import { defineStore } from 'pinia';
-import type { Warehouse } from '@/modules/inventory/domain/warehouse.entity';
-import type { StockMovement } from '@/modules/inventory/domain/stock-movement.entity';
-import type { StockBalance } from '@/modules/inventory/domain/stock-balance.entity';
+import { StockBalance } from '@/modules/inventory/domain/stock-balance.entity';
+import { StockMovement } from '@/modules/inventory/domain/stock-movement.entity';
+import { Warehouse } from '@/modules/inventory/domain/warehouse.entity';
 import { SupabaseInventoryRepository } from '@/modules/inventory/infra/supabase-inventory.repository';
+import { defineStore } from 'pinia';
 import { ListWarehousesUseCase } from './list-warehouses.usecase';
 import { SaveMovementUseCase } from './save-movement.usecase';
 
@@ -17,6 +17,14 @@ export const useInventoryStore = defineStore('inventory', {
         balances: [] as StockBalance[],
         loading: false
     }),
+
+    getters: {
+        getTotalBalance: (state) => (productId: string): number => {
+            return state.balances
+                .filter(b => b.productId === productId)
+                .reduce((sum, b) => sum + b.balance, 0);
+        }
+    },
 
     actions: {
         async fetchWarehouses() {
@@ -33,10 +41,8 @@ export const useInventoryStore = defineStore('inventory', {
         },
 
         async deleteWarehouse(id: string) {
-            // Soft delete: depo is_active=false + deleted_at damgalanır
             const result = await invRepo.deleteWarehouse(id);
             if (result.success) {
-                // Store'dan anında kaldır (UI güncelle)
                 this.warehouses = this.warehouses.filter((w) => w.id !== id);
             }
             return result;
@@ -44,14 +50,14 @@ export const useInventoryStore = defineStore('inventory', {
 
         async fetchMovements(productId?: string) {
             this.loading = true;
-            const result = await invRepo.getStockMovements(productId); // Movement listesi için bir UseCase eklenebilir
+            const result = await invRepo.getStockMovements(productId);
             if (result.success) this.movements = result.data;
             this.loading = false;
         },
 
         async fetchBalances() {
             this.loading = true;
-            const result = await invRepo.getStockBalances(); // Balance için bir UseCase eklenebilir
+            const result = await invRepo.getStockBalances();
             if (result.success) this.balances = result.data;
             this.loading = false;
         },

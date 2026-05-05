@@ -36,6 +36,11 @@ const model = computed(() => {
                             label: 'Stok Hareketleri',
                             icon: 'pi pi-fw pi-sync',
                             to: '/inventory/movements'
+                        },
+                        {
+                            label: 'Stok Sayımı',
+                            icon: 'pi pi-fw pi-list-check',
+                            to: '/inventory/count'
                         }
                     ]
                 }

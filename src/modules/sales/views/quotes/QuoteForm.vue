@@ -4,16 +4,17 @@ import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { useExchangeRateStore } from '@/modules/finance/application/exchange-rate.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProjectStore } from '@/modules/finance/application/project.store';
-import { CurrencyConversionService } from '@/modules/finance/domain/currency-conversion.service';
-import { Quote, type QuoteStatus } from '@/modules/sales/domain/quote.entity';
-import { useSalesStore } from '@/modules/sales/application/sales.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { useSalesStore } from '@/modules/sales/application/sales.store';
+import { Quote, type QuoteStatus } from '@/modules/sales/domain/quote.entity';
+import DocumentItemsTable from '@/shared/components/DocumentItemsTable.vue';
+import DocumentSummary from '@/shared/components/DocumentSummary.vue';
+import { DocumentCalculator } from '@/shared/utils/document-calculator';
 import { getErrorMessage } from '@/shared/utils/error';
-import { numberToWords } from '@/shared/utils/number-to-words';
 import { useToast } from 'primevue/usetoast';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const salesStore = useSalesStore();
@@ -32,43 +33,7 @@ const toast = useToast();
 const quoteId = route.params.id as string;
 const isEdit = !!quoteId;
 
-interface QuoteLineForm {
-    id: string;
-    quoteId: string;
-    productId: string;
-    warehouseId?: string;
-    description?: string;
-    quantity: number;
-    orderedQuantity: number;
-    unitPrice: number;
-    originalPrice?: number;
-    originalCurrency?: string;
-    vatRate: number;
-    discountRate1: number;
-    discountRate2: number;
-    discountRate3: number;
-    lineTotal: number;
-    sortOrder: number;
-}
-
-interface QuoteFormModel {
-    quoteNumber: string;
-    accountId: string;
-    warehouseId: string;
-    projectId: string | null;
-    issueDate: Date;
-    validUntil: Date | null;
-    status: QuoteStatus;
-    type: 'sale' | 'purchase';
-    currency: string;
-    exchangeRate: number;
-    discountRate: number;
-    notes: string;
-    lines: QuoteLineForm[];
-    createdAt?: Date;
-}
-
-const quote = ref<QuoteFormModel>({
+const quote = ref<any>({
     quoteNumber: '',
     accountId: '',
     warehouseId: '',
@@ -94,23 +59,17 @@ const statusOptions: Array<{ label: string; value: QuoteStatus }> = [
     { label: 'Kısmi Sipariş', value: 'partially_converted' }
 ];
 
-const taxRates = [
-    { label: '%0', value: 0 },
-    { label: '%1', value: 1 },
-    { label: '%8', value: 8 },
-    { label: '%10', value: 10 },
-    { label: '%20', value: 20 }
-];
-
 onMounted(async () => {
-    await financeStore.fetchAccounts();
-    if (productStore.products.length === 0) await productStore.fetchProducts();
-    if (inventoryStore.warehouses.length === 0) await inventoryStore.fetchWarehouses();
-    if (lookupStore.currencies.length === 0) await lookupStore.fetchAll();
-    await exchangeRateStore.fetchCurrentRates();
-    await projectStore.fetchProjects();
-    await settingsStore.fetchSettings();
-    await inventoryStore.fetchBalances();
+    await Promise.all([
+        financeStore.fetchAccounts(),
+        productStore.fetchProducts(),
+        inventoryStore.fetchWarehouses(),
+        lookupStore.fetchAll(),
+        exchangeRateStore.fetchCurrentRates(),
+        projectStore.fetchProjects(),
+        settingsStore.fetchSettings(),
+        inventoryStore.fetchBalances()
+    ]);
 
     if (isEdit) {
         await salesStore.fetchQuotes();
@@ -129,154 +88,23 @@ onMounted(async () => {
         }
     } else {
         quote.value.quoteNumber = await salesStore.getNextQuoteNumber();
-        addLine(false);
+        if (quote.value.lines.length === 0) {
+            // Initial line will be added by the component if we don't have any
+        }
     }
 });
 
-watch(
-    () => quote.value.currency,
-    (newCode) => {
-        if (!newCode || newCode === 'TRY') {
-            quote.value.exchangeRate = 1;
-        } else {
-            const rate = exchangeRateStore.getRateByCode(newCode);
-            if (rate > 0) quote.value.exchangeRate = rate;
-        }
-        quote.value.lines.forEach(line => convertLinePrice(line));
-    }
-);
-
-watch(
-    () => quote.value.exchangeRate,
-    () => {
-        quote.value.lines.forEach(line => convertLinePrice(line));
-    }
-);
-
-const isForeignCurrency = computed(() => quote.value.currency && quote.value.currency !== 'TRY');
-
-const productSelectRefs = ref<any[]>([]);
-function setProductSelectRef(el: any, index: number) {
-    if (el) productSelectRefs.value[index] = el;
-}
-
-function focusAddLineButton() {
-    const btn = document.getElementById('btnAddLine');
-    if (btn) btn.focus();
-}
-
-function addLine(autoOpenSelect = false) {
-    const shouldOpen = autoOpenSelect === true;
-    quote.value.lines.push({
-        id: crypto.randomUUID(),
-        quoteId: quoteId || '',
-        productId: '',
-        warehouseId: quote.value.warehouseId,
-        description: '',
-        quantity: 1,
-        orderedQuantity: 0,
-        unitPrice: 0,
-        originalPrice: 0,
-        originalCurrency: '',
-        vatRate: 20,
-        discountRate1: 0,
-        discountRate2: 0,
-        discountRate3: 0,
-        lineTotal: 0,
-        sortOrder: quote.value.lines.length
-    });
-
-    if (shouldOpen) {
-        nextTick(() => {
-            const lastIndex = quote.value.lines.length - 1;
-            const lastSelect = productSelectRefs.value[lastIndex];
-            if (lastSelect) {
-                if (lastSelect.show) lastSelect.show();
-                else if (lastSelect.$el) lastSelect.$el.click();
-            }
-        });
-    }
-}
-
-function removeLine(index: number) {
-    quote.value.lines.splice(index, 1);
-}
-
-function getStock(productId: string, warehouseId?: string) {
-    if (!productId) return 0;
-    const targetWarehouse = warehouseId || quote.value.warehouseId;
-    if (!targetWarehouse) return 0;
-    
-    const balance = inventoryStore.balances.find(
-        (b) => b.productId === productId && b.warehouseId === targetWarehouse
-    );
-    return balance ? balance.balance : 0;
-}
-
-function convertLinePrice(line: QuoteLineForm) {
-    if (!line.originalPrice || !line.originalCurrency) return;
-    const quoteCurrency = quote.value.currency || 'TRY';
-    const quoteRate = quote.value.exchangeRate || 1;
-    const productRate = exchangeRateStore.getRateByCode(line.originalCurrency);
-    
-    if (line.originalCurrency === quoteCurrency) {
-        line.unitPrice = line.originalPrice;
+watch(() => quote.value.currency, (newCode) => {
+    if (!newCode || newCode === 'TRY') {
+        quote.value.exchangeRate = 1;
     } else {
-        line.unitPrice = CurrencyConversionService.crossConvert(line.originalPrice, productRate, quoteRate);
+        const rate = exchangeRateStore.getRateByCode(newCode || '');
+        if (rate > 0) quote.value.exchangeRate = rate;
     }
-}
-
-function onProductChange(line: QuoteLineForm) {
-    const product = productStore.products.find((p) => p.id === line.productId);
-    if (product) {
-        line.originalPrice = product.price || 0;
-        line.originalCurrency = lookupStore.currencies.find(c => c.id === product.currencyId)?.code || 'TRY';
-        convertLinePrice(line);
-        line.vatRate = product.taxRate || 20;
-        line.description = product.name;
-    }
-}
+});
 
 const totals = computed(() => {
-    let grossTotal = 0;
-    let discountTotal = 0;
-    let vatTotal = 0;
-
-    quote.value.lines.forEach((line) => {
-        const lineGross = line.quantity * (line.unitPrice || 0);
-        const d1 = 1 - (line.discountRate1 || 0) / 100;
-        const d2 = 1 - (line.discountRate2 || 0) / 100;
-        const d3 = 1 - (line.discountRate3 || 0) / 100;
-        
-        const lineSubtotal = lineGross * d1 * d2 * d3;
-        const lineDiscount = lineGross - lineSubtotal;
-        const lineVat = lineSubtotal * ((line.vatRate || 0) / 100);
-        
-        line.lineTotal = Math.round((lineSubtotal + lineVat) * 100) / 100;
-
-        grossTotal += lineGross;
-        discountTotal += lineDiscount;
-        vatTotal += lineVat;
-    });
-
-    const linesSubtotal = Math.round((grossTotal - discountTotal) * 100) / 100;
-    const globalDiscountRate = quote.value.discountRate || 0;
-    const globalDiscountAmount = Math.round((linesSubtotal * (globalDiscountRate / 100)) * 100) / 100;
-    const netSubtotal = Math.round((linesSubtotal - globalDiscountAmount) * 100) / 100;
-    const finalVatTotal = linesSubtotal > 0 ? Math.round((vatTotal * (netSubtotal / linesSubtotal)) * 100) / 100 : 0;
-
-    return {
-        grossTotal: Math.round(grossTotal * 100) / 100,
-        discountTotal: Math.round((discountTotal + globalDiscountAmount) * 100) / 100,
-        subtotal: linesSubtotal,
-        netSubtotal: netSubtotal,
-        vatTotal: finalVatTotal,
-        total: Math.round((netSubtotal + finalVatTotal) * 100) / 100
-    };
-});
-
-const totalAsWords = computed(() => {
-    return numberToWords(totals.value.total, quote.value.currency);
+    return DocumentCalculator.calculateTotals(quote.value.lines, quote.value.discountRate, quote.value.currency);
 });
 
 async function saveQuote() {
@@ -298,21 +126,9 @@ async function saveQuote() {
         projectId: quote.value.projectId || undefined,
         createdAt: quote.value.createdAt || new Date(),
         updatedAt: new Date(),
-        lines: quote.value.lines.map((l) => ({
-            id: l.id,
-            quoteId: quoteId || '',
-            productId: l.productId,
-            warehouseId: (l as any).warehouseId || undefined,
-            description: l.description,
-            quantity: l.quantity,
-            orderedQuantity: l.orderedQuantity || 0,
-            unitPrice: l.unitPrice,
-            vatRate: l.vatRate,
-            discountRate1: l.discountRate1,
-            discountRate2: l.discountRate2,
-            discountRate3: l.discountRate3,
-            lineTotal: l.lineTotal,
-            sortOrder: l.sortOrder
+        lines: quote.value.lines.map((l: any) => ({
+            ...l,
+            quoteId: quoteId || ''
         }))
     });
 
@@ -332,19 +148,18 @@ function goBack() {
 
 <template>
     <div class="flex flex-col gap-0">
+        <!-- Header -->
         <div class="card p-6 min-h-32 flex flex-col gap-4">
             <div class="flex flex-col gap-2">
                 <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Teklifi Düzenle' : 'Yeni Teklif' }}</div>
                 
                 <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-3">
-                        <!-- Teklif Numarası -->
                         <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-hashtag text-primary text-sm"></i>
                             <span class="text-xl font-mono font-bold text-primary leading-none">{{ quote.quoteNumber || '---' }}</span>
                         </div>
 
-                        <!-- Tip Badge -->
                         <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-file text-surface-500 text-sm"></i>
                             <span class="text-base font-bold text-surface-700 dark:text-surface-300">
@@ -352,8 +167,7 @@ function goBack() {
                             </span>
                         </div>
 
-                        <!-- Döviz Kuru -->
-                        <div v-if="isForeignCurrency" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                        <div v-if="quote.currency !== 'TRY'" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-money-bill text-surface-500 text-sm"></i>
                             <div class="text-base font-medium leading-none">
                                 1 {{ quote.currency }} = <span class="font-bold text-primary">{{ quote.exchangeRate.toFixed(4) }}</span> ₺
@@ -369,74 +183,61 @@ function goBack() {
             </div>
         </div>
 
+        <!-- Form Content -->
         <div class="card">
             <div class="flex flex-col gap-8 mb-6">
-                <div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div>
-                            <label for="date" class="block font-bold mb-3">Tarih</label>
-                            <DatePicker id="date" v-model="quote.issueDate" dateFormat="dd.mm.yy" fluid />
-                        </div>
-                        <div>
-                            <label for="validUntil" class="block font-bold mb-3">Geçerlilik Tarihi</label>
-                            <DatePicker id="validUntil" v-model="quote.validUntil" dateFormat="dd.mm.yy" fluid />
-                        </div>
-                        <div>
-                            <label for="warehouse" class="block font-bold mb-3">Depo (Varsayılan)</label>
-                            <Select id="warehouse" v-model="quote.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
-                        </div>
-                        <div class="lg:col-span-2">
-                            <label for="account" class="block font-bold mb-3">Cari Hesap</label>
-                            <Select id="account" v-model="quote.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
-                        </div>
+                <!-- Top Fields -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block font-bold mb-3">Tarih</label>
+                        <DatePicker v-model="quote.issueDate" dateFormat="dd.mm.yy" fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Geçerlilik Tarihi</label>
+                        <DatePicker v-model="quote.validUntil" dateFormat="dd.mm.yy" fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Depo (Varsayılan)</label>
+                        <Select v-model="quote.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
+                    </div>
+                    <div class="lg:col-span-2">
+                        <label class="block font-bold mb-3">Cari Hesap</label>
+                        <Select v-model="quote.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
+                    </div>
 
-                        <div>
-                            <label for="project" class="block font-bold mb-3">Proje</label>
-                            <Select id="project" v-model="quote.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid />
-                        </div>
-                        <div>
-                            <label for="currency" class="block font-bold mb-3">Döviz</label>
-                            <Select id="currency" v-model="quote.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid />
-                        </div>
-                        <div>
-                            <label for="rate" class="block font-bold mb-3">Kur</label>
-                            <InputNumber v-model="quote.exchangeRate" :minFractionDigits="4" :disabled="!isForeignCurrency" fluid />
-                        </div>
-                        <div>
-                            <label for="status" class="block font-bold mb-3">Durum</label>
-                            <Select id="status" v-model="quote.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid />
-                        </div>
-                        <div>
-                            <label for="discountRate" class="block font-bold mb-3">Genel İndirim %</label>
-                            <InputNumber id="discountRate" v-model="quote.discountRate" :min="0" :max="100" fluid />
-                        </div>
+                    <div>
+                        <label class="block font-bold mb-3">Proje</label>
+                        <Select v-model="quote.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Döviz</label>
+                        <Select v-model="quote.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Kur</label>
+                        <InputNumber v-model="quote.exchangeRate" :minFractionDigits="4" :disabled="quote.currency === 'TRY'" fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Durum</label>
+                        <Select v-model="quote.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid />
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-3">Genel İndirim %</label>
+                        <InputNumber v-model="quote.discountRate" :min="0" :max="100" fluid />
                     </div>
                 </div>
 
-                <div>
-                    <div class="flex justify-between items-center mb-4">
-                        <h6 class="font-normal m-0">Teklif Kalemleri</h6>
-                        <Button id="btnAddLine" label="Kalem Ekle" icon="pi pi-plus" text size="small" @click="() => addLine(true)" />
-                    </div>
-                    <DataTable :value="quote.lines" class="p-datatable-sm">
-                        <Column header="Ürün" style="width: 25%">
-                            <template #body="slotProps">
-                                <div class="flex flex-col gap-1">
-                                    <Select :ref="(el) => setProductSelectRef(el, slotProps.index)" v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
-                                    <div v-if="slotProps.data.productId" class="flex items-center gap-1.5 px-1">
-                                        <i class="pi pi-box text-[10px]" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-500' : 'text-red-500'"></i>
-                                        <span class="text-[10px] font-medium" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-600' : 'text-red-600'">
-                                            Mevcut Stok: {{ getStock(slotProps.data.productId, slotProps.data.warehouseId) }} Adet
-                                        </span>
-                                    </div>
-                                </div>
-                            </template>
-                        </Column>
-                        <Column header="Miktar" style="width: 7%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.quantity" :min="1" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
+                <!-- Lines Table -->
+                <DocumentItemsTable 
+                    :lines="quote.lines" 
+                    :currency="quote.currency" 
+                    :exchangeRate="quote.exchangeRate" 
+                    :accountId="quote.accountId"
+                    :warehouseId="quote.warehouseId"
+                    documentType="quote"
+                    @change="() => {}"
+                >
+                    <template #extra-columns>
                         <Column v-if="isEdit" header="Siparişleşme" style="width: 10%">
                             <template #body="slotProps">
                                 <div class="flex flex-col gap-1">
@@ -452,79 +253,18 @@ function goBack() {
                                 </div>
                             </template>
                         </Column>
-                        <Column header="Birim Fiyat" style="width: 10%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.unitPrice" :minFractionDigits="2" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column header="KDV %" style="width: 7%">
-                            <template #body="slotProps">
-                                <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel1 || 'İnd.1'" style="width: 5%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate1" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel2 || 'İnd.2'" style="width: 5%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate2" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel3 || 'İnd.3'" style="width: 5%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate3" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column header="Toplam" style="width: 12%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputText :value="slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })" readonly fluid class="font-bold text-right" @keydown.tab.exact.prevent="focusAddLineButton" />
-                            </template>
-                        </Column>
-                        <Column style="width: 3%">
-                            <template #body="slotProps">
-                                <Button icon="pi pi-trash" severity="danger" text rounded @click="removeLine(slotProps.index)" />
-                            </template>
-                        </Column>
-                    </DataTable>
-                </div>
+                    </template>
+                </DocumentItemsTable>
 
-                <div class="flex flex-col lg:flex-row justify-between gap-6">
-                    <div class="w-full lg:w-7/12">
-                        <label for="notes" class="block font-bold mb-3">Notlar</label>
-                        <Textarea id="notes" v-model="quote.notes" rows="6" placeholder="Teklif notu ekleyin..." fluid />
-                        <div class="mt-4 p-4 bg-surface-50 dark:bg-surface-900 rounded border border-surface-200 dark:border-surface-700 italic text-surface-600 dark:text-surface-400">
-                            {{ totalAsWords }}
-                        </div>
-                    </div>
-                    <div class="w-full lg:w-4/12">
-                        <div class="flex flex-col gap-3 p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <div class="flex justify-between items-center">
-                                <span class="text-surface-600 dark:text-surface-400">Brüt Toplam</span>
-                                <span class="font-medium">{{ totals.grossTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ quote.currency }}</span>
-                            </div>
-                            <div class="flex justify-between items-center text-red-500">
-                                <span>Toplam İndirim</span>
-                                <span>-{{ totals.discountTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ quote.currency }}</span>
-                            </div>
-                            <div class="flex justify-between items-center font-bold border-t border-surface-200 dark:border-surface-700 pt-3">
-                                <span>Ara Toplam</span>
-                                <span>{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ quote.currency }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span>KDV Toplam</span>
-                                <span>{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ quote.currency }}</span>
-                            </div>
-                            <div class="flex justify-between items-center text-2xl font-bold text-primary border-t-2 border-primary pt-3 mt-2">
-                                <span>Genel Toplam</span>
-                                <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }} {{ quote.currency }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Summary -->
+                <DocumentSummary 
+                    :totals="totals" 
+                    :currency="quote.currency" 
+                    v-model:notes="quote.notes" 
+                />
             </div>
 
+            <!-- Actions -->
             <div class="grid grid-cols-12 gap-4 mt-8">
                 <div class="col-span-6">
                     <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" outlined @click="goBack" />

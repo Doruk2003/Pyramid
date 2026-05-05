@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { FilterMatchMode } from '@primevue/core/api';
@@ -10,6 +11,7 @@ const router = useRouter();
 const productStore = useProductStore();
 const lookupStore = useLookupStore();
 const toast = useToast();
+const invStore = useInventoryStore();
 
 type ExportableTable = { exportCSV: () => void };
 const dt = ref<ExportableTable | null>(null);
@@ -67,11 +69,12 @@ const columns = ref([
     { field: 'minStock', header: 'Min Stok' },
     { field: 'maxStock', header: 'Max Stok' },
     { field: 'initialStock', header: 'Mevcut Stok' },
+    { field: 'categoryDiscount', header: 'İskonto Tipi' },
     { field: 'status', header: 'Durum' },
     { field: 'inventoryStatus', header: 'Stok Takibi' }
 ]);
 
-const selectedColumns = ref(columns.value.filter(c => ['image', 'code', 'name', 'status', 'price'].includes(c.field)));
+const selectedColumns = ref(columns.value.filter(c => ['image', 'code', 'name', 'status', 'price', 'initialStock', 'categoryDiscount'].includes(c.field)));
 
 function onColumnToggle(val: any) {
     selectedColumns.value = columns.value.filter((col) => val.includes(col));
@@ -106,6 +109,7 @@ interface ProductFilterForm {
     type_id: string | null;
     brand_id: string | null;
     status: string | null;
+    categoryDiscount: number | null;
 }
 
 const filterForm = ref<ProductFilterForm>({
@@ -114,7 +118,8 @@ const filterForm = ref<ProductFilterForm>({
     category_id: null,
     type_id: null,
     brand_id: null,
-    status: null
+    status: null,
+    categoryDiscount: null
 });
 
 const activeFilters = ref<ProductFilterForm>({ ...filterForm.value });
@@ -122,6 +127,12 @@ const activeFilters = ref<ProductFilterForm>({ ...filterForm.value });
 const productStatuses = ref([
     { label: 'AKTİF', value: 'ACTIVE' },
     { label: 'PASİF', value: 'PASSIVE' }
+]);
+
+const discountTypes = ref([
+    { label: 'İskonto 1', value: 1 },
+    { label: 'İskonto 2', value: 2 },
+    { label: 'İskonto 3', value: 3 }
 ]);
 
 const priceUnits = ref([
@@ -163,12 +174,25 @@ const filteredProducts = computed(() => {
     if (filtersValue.status) {
         list = list.filter((item) => item.status === filtersValue.status);
     }
+    if (filtersValue.categoryDiscount !== null) {
+        list = list.filter((item) => item.categoryDiscount === filtersValue.categoryDiscount);
+    }
 
     return list;
 });
 
+const getDiscountTypeLabel = (value: number | null | undefined) => {
+    switch (value) {
+        case 1: return 'İskonto 1';
+        case 2: return 'İskonto 2';
+        case 3: return 'İskonto 3';
+        default: return '—';
+    }
+};
+
 onMounted(async () => {
     productStore.fetchProducts();
+    invStore.fetchBalances();
     lookupStore.fetchAll();
 
     // Kayıtlı sütun seçimlerini yükle
@@ -218,7 +242,8 @@ function clearFilters() {
         category_id: null,
         type_id: null,
         brand_id: null,
-        status: null
+        status: null,
+        categoryDiscount: null
     };
     activeFilters.value = { ...filterForm.value };
 }
@@ -387,7 +412,7 @@ function getPriceUnitLabel(value: string | null | undefined) {
 
         <!-- 2. Card: Filtre Alanları (showFilters true ise görünür) -->
         <div v-if="showFilters" class="card mb-4">
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3 items-center">
                 <div class="col-span-1">
                     <InputText v-model="filterForm.name" placeholder="Ürün Adı" fluid />
                 </div>
@@ -412,11 +437,15 @@ function getPriceUnitLabel(value: string | null | undefined) {
                     <Select v-model="filterForm.status" :options="productStatuses" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
                 </div>
 
-                <div class="col-span-1 flex items-end">
+                <div class="col-span-1">
+                    <Select v-model="filterForm.categoryDiscount" :options="discountTypes" optionLabel="label" optionValue="value" placeholder="İskonto" showClear fluid />
+                </div>
+
+                <div class="col-span-1">
                     <Button label="Filtrele" class="w-full" @click="applyFilters" />
                 </div>
 
-                <div class="col-span-1 flex items-end">
+                <div class="col-span-1">
                     <Button label="Temizle" severity="secondary" class="w-full" @click="clearFilters" />
                 </div>
             </div>
@@ -491,7 +520,26 @@ function getPriceUnitLabel(value: string | null | undefined) {
 
                 <Column v-if="selectedColumns.find(c => c.field === 'minStock')" field="minStock" header="Min Stok" sortable style="min-width: 10rem"></Column>
                 <Column v-if="selectedColumns.find(c => c.field === 'maxStock')" field="maxStock" header="Max Stok" sortable style="min-width: 10rem"></Column>
-                <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem">
+                    <template #body="slotProps">
+                        <div class="flex flex-col">
+                            <span :class="[
+                                invStore.getTotalBalance(slotProps.data.id) < (slotProps.data.minStock || 0) ? 'text-orange-500 font-bold' : 'font-medium',
+                                invStore.getTotalBalance(slotProps.data.id) < 0 ? 'text-red-500' : ''
+                            ]">
+                                {{ invStore.getTotalBalance(slotProps.data.id) }}
+                            </span>
+                            <Tag v-if="invStore.getTotalBalance(slotProps.data.id) < (slotProps.data.minStock || 0)" severity="warn" value="Kritik" class="mt-1" />
+                        </div>
+                    </template>
+                </Column>
+
+                <Column v-if="selectedColumns.find(c => c.field === 'categoryDiscount')" field="categoryDiscount" header="İskonto Tipi" sortable style="min-width: 10rem">
+                    <template #body="slotProps">
+                        <Tag v-if="slotProps.data.categoryDiscount > 0" :value="getDiscountTypeLabel(slotProps.data.categoryDiscount)" severity="warn" />
+                        <span v-else class="text-surface-400">—</span>
+                    </template>
+                </Column>
 
                 <Column v-if="selectedColumns.find(c => c.field === 'status')" field="status" header="Durum" sortable style="min-width: 8rem">
                     <template #body="slotProps">

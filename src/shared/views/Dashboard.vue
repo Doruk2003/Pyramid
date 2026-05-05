@@ -1,4 +1,5 @@
 <script setup>
+import CriticalStockWidget from '@/modules/inventory/views/components/CriticalStockWidget.vue';
 import InventoryStatsWidget from '@/modules/inventory/views/components/InventoryStatsWidget.vue';
 import BestSellingWidget from '@/shared/components/dashboard/BestSellingWidget.vue';
 import NotificationsWidget from '@/shared/components/dashboard/NotificationsWidget.vue';
@@ -14,6 +15,7 @@ import StatsWidget from '@/shared/components/dashboard/StatsWidget.vue';
 
         <div class="col-span-12 xl:col-span-6">
             <RecentSalesWidget />
+            <CriticalStockWidget />
             <BestSellingWidget />
         </div>
         <div class="col-span-12 xl:col-span-6">

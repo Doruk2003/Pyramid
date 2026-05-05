@@ -80,6 +80,11 @@ const router = createRouter({
                     component: () => import('@/modules/inventory/views/movements/MovementCreate.vue')
                 },
                 {
+                    path: '/inventory/count',
+                    name: 'inventory-count',
+                    component: () => import('@/modules/inventory/views/warehouses/InventoryCount.vue')
+                },
+                {
                     path: '/finance/accounts',
                     name: 'finance-accounts',
                     component: () => import('@/modules/finance/views/accounts/AccountList.vue')
