@@ -78,6 +78,8 @@ export interface DbInvoice {
     exchange_rate: number;
     document_category: string;
     notes?: string;
+    source_type?: string;
+    source_ids?: string[];
     created_at: string;
     updated_at: string;
     invoice_lines?: DbInvoiceLine[]; // Join results
@@ -98,6 +100,7 @@ export interface DbInvoiceLine {
     discount_rate2: number;
     discount_rate3: number;
     line_total: number;
+    source_line_id?: string;
     created_at: string;
 }
 
@@ -165,6 +168,8 @@ export interface DbQuote {
     total: number;
     currency: string;
     exchange_rate: number;
+    project_id?: string;
+    type: 'sale' | 'purchase';
     notes?: string;
     created_at: string;
     updated_at: string;
@@ -175,12 +180,16 @@ export interface DbQuoteLine {
     id: string;
     quote_id: string;
     product_id: string;
+    warehouse_id?: string;
     description?: string;
     quantity: number;
     unit_price: number;
     vat_rate: number;
-    discount_rate: number;
+    discount_rate1: number;
+    discount_rate2: number;
+    discount_rate3: number;
     line_total: number;
+    ordered_quantity: number;
     sort_order: number;
     created_at: string;
 }
@@ -199,6 +208,8 @@ export interface DbOrder {
     total: number;
     currency: string;
     exchange_rate: number;
+    project_id?: string;
+    type: 'sale' | 'purchase';
     notes?: string;
     created_at: string;
     updated_at: string;
@@ -209,12 +220,18 @@ export interface DbOrderLine {
     id: string;
     order_id: string;
     product_id: string;
+    warehouse_id?: string;
     description?: string;
     quantity: number;
     unit_price: number;
     vat_rate: number;
-    discount_rate: number;
+    discount_rate1: number;
+    discount_rate2: number;
+    discount_rate3: number;
     line_total: number;
+    invoiced_quantity: number;
+    shipped_quantity: number;
+    source_line_id?: string;
     sort_order: number;
     created_at: string;
 }

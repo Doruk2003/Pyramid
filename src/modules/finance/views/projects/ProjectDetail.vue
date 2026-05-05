@@ -68,10 +68,7 @@ function goBack() {
 
 <template>
     <div>
-        <!-- Geri Butonu -->
-        <div class="mb-4">
-            <Button icon="pi pi-arrow-left" label="Projelere Dön" text @click="goBack" />
-        </div>
+        <!-- Proje İçeriği -->
 
         <!-- Yükleniyor -->
         <div v-if="projectStore.loading" class="flex justify-center py-16">
@@ -237,6 +234,11 @@ function goBack() {
                     </Column>
                     <Column field="currency" header="Döviz" />
                 </DataTable>
+            </div>
+
+            <!-- Sayfa Altı Geri Dön Butonu -->
+            <div class="flex justify-center mt-6">
+                <Button icon="pi pi-arrow-left" label="Projelere Dön" outlined @click="goBack" />
             </div>
         </template>
 

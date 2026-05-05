@@ -16,4 +16,5 @@ export interface ISalesRepository {
     saveOrder(order: Order): Promise<Result<Order>>;
     deleteOrder(id: string): Promise<Result<void>>;
     getNextOrderNumber(): Promise<string>;
+    updateSourceQuantities(sourceType: 'quote' | 'order', sourceIds: string[]): Promise<Result<void>>;
 }

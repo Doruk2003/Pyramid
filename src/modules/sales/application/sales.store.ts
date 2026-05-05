@@ -71,6 +71,9 @@ export const useSalesStore = defineStore('sales', () => {
         },
         async getNextOrderNumber(): Promise<string> {
             return salesRepo.getNextOrderNumber();
+        },
+        async updateSourceQuantities(sourceType: 'quote' | 'order', sourceIds: string[]) {
+            return salesRepo.updateSourceQuantities(sourceType, sourceIds);
         }
     };
 });

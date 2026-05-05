@@ -179,6 +179,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                     currency: row.currency,
                     exchangeRate: Number(row.exchange_rate),
                     notes: row.notes,
+                    sourceType: row.source_type as any,
+                    sourceIds: row.source_ids,
                     documentCategory: (row.document_category as DocumentCategory) || 'domestic',
                     lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
                         id: l.id,
@@ -194,7 +196,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                         discountRate1: Number(l.discount_rate1),
                         discountRate2: Number(l.discount_rate2),
                         discountRate3: Number(l.discount_rate3),
-                        lineTotal: Number(l.line_total)
+                        lineTotal: Number(l.line_total),
+                        sourceLineId: l.source_line_id
                     })),
                     createdAt: new Date(row.created_at),
                     updatedAt: new Date(row.updated_at)
@@ -229,6 +232,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 currency: row.currency,
                 exchangeRate: Number(row.exchange_rate),
                 notes: row.notes,
+                sourceType: row.source_type as any,
+                sourceIds: row.source_ids,
                 documentCategory: (row.document_category as DocumentCategory) || 'domestic',
                 lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
                     id: l.id,
@@ -244,7 +249,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                     discountRate1: Number(l.discount_rate1),
                     discountRate2: Number(l.discount_rate2),
                     discountRate3: Number(l.discount_rate3),
-                    lineTotal: Number(l.line_total)
+                    lineTotal: Number(l.line_total),
+                    sourceLineId: l.source_line_id
                 })),
                 createdAt: new Date(row.created_at),
                 updatedAt: new Date(row.updated_at)
@@ -298,6 +304,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 currency: obj.currency,
                 exchange_rate: obj.exchangeRate,
                 notes: obj.notes ?? null,
+                source_type: obj.sourceType ?? null,
+                source_ids: obj.sourceIds ?? null,
                 updated_at: new Date().toISOString()
             })
             .select('id')
@@ -332,7 +340,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 discount_rate1: l.discountRate1,
                 discount_rate2: l.discountRate2,
                 discount_rate3: l.discountRate3,
-                line_total: l.lineTotal // = net + KDV (görüntüleme için; toplamlar trigger'dan gelir)
+                line_total: l.lineTotal, // = net + KDV (görüntüleme için; toplamlar trigger'dan gelir)
+                source_line_id: l.sourceLineId || null
             }));
 
             const { error: lineError } = await supabase
