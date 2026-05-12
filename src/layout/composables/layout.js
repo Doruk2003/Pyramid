@@ -1,12 +1,17 @@
 import { computed, reactive } from 'vue';
 
-const layoutConfig = reactive({
+const STORAGE_KEY = 'pyramid-layout-config';
+
+const savedConfig = localStorage.getItem(STORAGE_KEY);
+const initialConfig = savedConfig ? JSON.parse(savedConfig) : {
     preset: 'Lara',
     primary: 'emerald',
     surface: null,
     darkTheme: false,
     menuMode: 'static'
-});
+};
+
+const layoutConfig = reactive(initialConfig);
 
 const layoutState = reactive({
     staticMenuInactive: false,
@@ -18,6 +23,11 @@ const layoutState = reactive({
     activeMenuItem: null,
     activePath: null
 });
+
+import { watch } from 'vue';
+watch(layoutConfig, (newConfig) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
+}, { deep: true });
 
 export function useLayout() {
     const toggleDarkMode = () => {
