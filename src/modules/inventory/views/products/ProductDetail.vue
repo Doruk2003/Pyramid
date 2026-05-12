@@ -2,9 +2,10 @@
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
-import JsBarcode from 'jsbarcode';
+import * as JsBarcodeModule from 'jsbarcode';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+const JsBarcode = (JsBarcodeModule as any).default || JsBarcodeModule;
 
 const route = useRoute();
 const router = useRouter();
@@ -189,204 +190,193 @@ function editProduct() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4 max-w-[1400px] mx-auto">
+    <div class="flex flex-col gap-4 w-full">
         <!-- Compact Header -->
-        <div class="flex items-center justify-between bg-surface-0 dark:bg-surface-900 p-4 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm">
+        <div class="flex items-center justify-between bg-surface-0 dark:bg-surface-900 px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 shadow-sm">
             <div class="flex items-center gap-3">
-                <Button icon="pi pi-arrow-left" text rounded @click="goBack" class="!w-10 !h-10" />
+                <Button icon="pi pi-arrow-left" text rounded @click="goBack" class="!w-8 !h-8" />
                 <div>
-                    <h1 class="text-xl font-bold m-0 leading-tight">{{ product?.name || 'Ürün Detayı' }}</h1>
-                    <div class="flex items-center gap-2 text-sm text-surface-500 mt-0.5">
-                        <span class="font-medium px-2 py-0.5 bg-surface-100 dark:bg-surface-800 rounded">{{ product?.code || 'Kod Yok' }}</span>
-                        <span v-if="product?.barcode" class="flex items-center gap-1">
-                            <i class="pi pi-barcode text-xs"></i>
+                    <h4 class="text-base font-bold m-0 leading-tight text-surface-900 dark:text-surface-0">{{ product?.name || 'Ürün Detayı' }}</h4>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-lg font-normal py-0.5 text-primary">{{ product?.code || 'Kod Yok' }}</span>
+                        <span v-if="product?.barcode" class="flex items-center gap-1.5 text-xs text-surface-500 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">
+                            <i class="pi pi-barcode"></i>
                             {{ product.barcode }}
                         </span>
                     </div>
                 </div>
             </div>
-            <div class="flex gap-2">
-                <Button v-if="product?.barcode" label="Barkod Yazdır" icon="pi pi-barcode" severity="secondary" outlined size="small" @click="openBarcodePrint" />
-                <Button label="Düzenle" icon="pi pi-pencil" outlined size="small" @click="editProduct" />
-                <Button icon="pi pi-times" severity="secondary" text rounded @click="goBack" />
+            <div class="flex gap-1.5">
+                <Button v-if="product?.barcode" icon="pi pi-barcode" severity="secondary" text size="small" @click="openBarcodePrint" v-tooltip.top="'Barkod Yazdır'" />
+                <Button label="Düzenle" icon="pi pi-pencil" outlined size="medium"@click="editProduct" />
+                <Button icon="pi pi-times" severity="secondary" text rounded @click="goBack" class="!w-8 !h-8" />
             </div>
         </div>
 
         <div v-if="product" class="grid grid-cols-12 gap-4">
-            <!-- Left Panel: Images & Status -->
-            <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
-                <div class="bg-surface-0 dark:bg-surface-900 p-4 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm">
-                    <!-- Main Image -->
-                    <div class="relative aspect-square rounded-lg overflow-hidden bg-surface-50 dark:bg-surface-800 border border-surface-100 dark:border-surface-800 mb-4">
-                        <img v-if="activeImage" :src="activeImage" class="w-full h-full object-contain p-2" alt="Product Image" />
-                        <div v-else class="w-full h-full flex flex-col items-center justify-center text-surface-300">
-                            <i class="pi pi-image text-5xl"></i>
-                        </div>
-                    </div>
-                    
-                    <!-- Thumbnails -->
-                    <div v-if="allImages.length > 1" class="flex gap-2 overflow-x-auto pb-1">
-                        <div 
-                            v-for="(img, idx) in allImages" :key="idx"
-                            @click="activeImage = img"
-                            class="w-16 h-16 rounded-md overflow-hidden cursor-pointer border-2 transition-all flex-shrink-0"
-                            :class="activeImage === img ? 'border-primary' : 'border-transparent opacity-50 hover:opacity-100'"
-                        >
-                            <img :src="img" class="w-full h-full object-cover" />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Status Card -->
-                <div class="bg-surface-0 dark:bg-surface-900 p-4 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-surface-100 dark:border-surface-800">
-                        <span class="text-sm font-semibold text-surface-600 uppercase tracking-wider">Durum & Takip</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-surface-500">Yayın Durumu</span>
-                            <Tag :severity="product.status === 'ACTIVE' ? 'success' : 'danger'" :value="product.status === 'ACTIVE' ? 'Aktif' : 'Pasif'" pt:root:class="!text-[10px] !px-2 !py-0" />
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-surface-500">Stok Takibi</span>
-                            <Tag :severity="product.inventoryStatus === 'TRACKED' ? 'info' : 'secondary'" :value="product.inventoryStatus === 'TRACKED' ? 'Aktif' : 'Pasif'" pt:root:class="!text-[10px] !px-2 !py-0" />
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-surface-500">Vergi Oranı</span>
-                            <span class="text-sm font-bold">%{{ product.taxRate }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel: Info & Specs -->
-            <div class="col-span-12 lg:col-span-8 flex flex-col gap-4">
-                <!-- Highlights Bar -->
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="bg-primary/5 border border-primary/20 p-4 rounded-xl">
-                        <span class="block text-xs font-semibold text-primary/60 uppercase mb-1">Satış Fiyatı</span>
-                        <span class="text-2xl font-black text-primary">{{ formatCurrency(product.price, product.currencyId) }}</span>
-                    </div>
-                    <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4 rounded-xl shadow-sm">
-                        <span class="block text-xs font-semibold text-surface-400 uppercase mb-1">Mevcut Stok</span>
-                        <span class="text-2xl font-black text-surface-900 dark:text-surface-0">
-                            {{ invStore.getTotalBalance(product.id) }} 
-                            <small class="text-xs font-normal text-surface-400">{{ getPriceUnitLabel(product.priceUnit) }}</small>
-                        </span>
-                    </div>
-                    <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4 rounded-xl shadow-sm">
-                        <span class="block text-xs font-semibold text-surface-400 uppercase mb-1">Kategori</span>
-                        <span class="text-base font-bold truncate block">{{ getCategoryName(product.categoryId) }}</span>
-                    </div>
-                </div>
-
-                <!-- Detailed Information -->
-                <div class="bg-surface-0 dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden flex-1">
-                    <div class="p-5 border-b border-surface-100 dark:border-surface-800 flex items-center justify-between">
-                        <h2 class="text-sm font-bold m-0 uppercase tracking-widest text-surface-500">Ürün Detayları</h2>
-                        <span class="text-[10px] bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded font-mono text-surface-400">ID: {{ product.id.split('-')[0] }}</span>
-                    </div>
-                    
-                    <div class="p-6">
-                        <div class="grid grid-cols-2 gap-x-12 gap-y-8">
-                            <!-- Column 1 -->
-                            <div class="space-y-6">
-                                <div class="flex flex-col">
-                                    <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Marka</label>
-                                    <p class="text-base font-semibold text-surface-800 dark:text-surface-100 m-0">{{ getBrandName(product.brandId) }}</p>
-                                </div>
-                                <div class="flex flex-col">
-                                    <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Ürün Tipi</label>
-                                    <p class="text-base font-semibold text-surface-800 dark:text-surface-100 m-0">{{ getTypeName(product.typeId) }}</p>
-                                </div>
-                                <div class="flex flex-col">
-                                    <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Birim</label>
-                                    <p class="text-base font-semibold text-surface-800 dark:text-surface-100 m-0">{{ getPriceUnitLabel(product.priceUnit) }}</p>
-                                </div>
-                                <div class="flex flex-col">
-                                    <label class="block text-[10px] font-bold text-primary uppercase tracking-widest mb-1.5">Kategori İskonto Tipi</label>
-                                    <p class="text-base font-bold text-primary m-0">{{ getDiscountTypeLabel(product.categoryDiscount) }}</p>
-                                </div>
+            <!-- Left Panel: Summary & Details -->
+            <div class="col-span-12 lg:col-span-6 flex flex-col gap-4">
+                <!-- Image & Vital Stats Card -->
+                <div class="bg-surface-0 dark:bg-surface-900 p-5 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm">
+                    <div class="flex gap-8 items-start">
+                        <div class="w-48 flex flex-col gap-3 flex-shrink-0">
+                            <div class="aspect-square rounded-xl border border-surface-100 dark:border-surface-800 bg-white dark:bg-surface-800 flex items-center justify-center overflow-hidden shadow-inner">
+                                <img v-if="activeImage" :src="activeImage" class="w-full h-full object-contain p-3" />
+                                <i v-else class="pi pi-image text-4xl text-surface-300"></i>
                             </div>
-                            
-                            <!-- Column 2 -->
-                            <div class="space-y-6">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="flex flex-col">
-                                        <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Min. Stok</label>
-                                        <p class="text-base font-semibold text-surface-800 dark:text-surface-100 m-0">{{ product.minStock || 'Belirtilmemiş' }}</p>
-                                    </div>
-                                    <div class="flex flex-col">
-                                        <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Max. Stok</label>
-                                        <p class="text-base font-semibold text-surface-800 dark:text-surface-100 m-0">{{ product.maxStock || 'Belirtilmemiş' }}</p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col">
-                                    <label class="block text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1.5">Açıklama</label>
-                                    <p class="text-sm font-semibold leading-relaxed text-surface-600 dark:text-surface-400 italic m-0">
-                                        {{ product.description || 'Bu ürün için açıklama girilmemiş.' }}
-                                    </p>
+                            <!-- Micro Thumbnails -->
+                            <div v-if="allImages.length > 1" class="flex gap-2 overflow-x-auto no-scrollbar justify-center">
+                                <div 
+                                    v-for="(img, idx) in allImages" :key="idx"
+                                    @click="activeImage = img"
+                                    class="w-10 h-10 rounded-md overflow-hidden cursor-pointer border-2 transition-all flex-shrink-0"
+                                    :class="activeImage === img ? 'border-primary' : 'border-surface-200 opacity-60 hover:opacity-100'"
+                                >
+                                    <img :src="img" class="w-full h-full object-cover" />
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Technical Timeline or Specs -->
-                        <div class="mt-12 pt-8 border-t border-dashed border-surface-200 dark:border-surface-700 flex gap-8">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                                    <i class="pi pi-calendar text-surface-400 text-xs"></i>
-                                </div>
-                                <div>
-                                    <span class="block text-[10px] text-surface-400 uppercase font-bold">Eklenme Tarihi</span>
-                                    <span class="text-xs font-medium">{{ new Date(product.createdAt).toLocaleDateString('tr-TR') }}</span>
-                                </div>
+                        <div class="flex-1 flex flex-col gap-4 self-stretch justify-center">
+                            <div class="bg-primary/5 px-5 py-4 rounded-2xl border border-primary/20">
+                                <span class="block text-xs font-bold text-primary/60 uppercase tracking-widest mb-2">Satış Fiyatı</span>
+                                <span class="text-3xl font-black text-primary">{{ formatCurrency(product.price, product.currencyId) }}</span>
+                            </div>
+                            <div class="bg-surface-50 dark:bg-surface-800/50 px-5 py-4 rounded-2xl border border-surface-100 dark:border-surface-700">
+                                <span class="block text-xs font-bold text-surface-400 uppercase tracking-widest mb-2">Mevcut Stok</span>
+                                <span class="text-3xl font-black text-surface-800 dark:text-surface-100">
+                                    {{ invStore.getTotalBalance(product.id) }} 
+                                    <small class="text-base font-normal text-surface-400">{{ getPriceUnitLabel(product.priceUnit) }}</small>
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        <!-- Stock Movement History (Kardeks) -->
-        <div v-if="product" class="card p-0 overflow-hidden border border-surface-200 dark:border-surface-700 shadow-sm mt-4">
-            <div class="p-5 border-b border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <i class="pi pi-history text-primary text-xl"></i>
-                    <h2 class="text-base font-bold m-0 uppercase tracking-widest text-surface-700 dark:text-surface-200">Stok Hareket Geçmişi (Kardeks)</h2>
+
+                <!-- Full Detailed Identification -->
+                <div class="bg-surface-0 dark:bg-surface-900 p-6 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm flex flex-col gap-8">
+                    <!-- Tech Grid -->
+                    <div class="grid grid-cols-2 gap-x-12 gap-y-6">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Marka</span>
+                            <span class="text-lg font-semibold truncate text-surface-700 dark:text-surface-200">{{ getBrandName(product.brandId) }}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Kategori</span>
+                            <span class="text-lg font-semibold truncate text-surface-700 dark:text-surface-200">{{ getCategoryName(product.categoryId) }}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Ürün Tipi</span>
+                            <span class="text-lg font-semibold truncate text-surface-700 dark:text-surface-200">{{ getTypeName(product.typeId) }}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Birim</span>
+                            <span class="text-lg font-semibold text-surface-700 dark:text-surface-200">{{ getPriceUnitLabel(product.priceUnit) }}</span>
+                        </div>
+                        
+                        <!-- Tax & Description Row -->
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Vergi Oranı</span>
+                            <span class="text-lg font-semibold text-surface-700 dark:text-surface-200">%{{ product.taxRate }}</span>
+                        </div>
+                        <div v-if="product.description" class="flex flex-col">
+                            <span class="text-xs font-bold text-surface-400 uppercase tracking-widest mb-1.5">Açıklama</span>
+                            <p class="text-sm text-surface-600 dark:text-surface-400 m-0 leading-relaxed italic line-clamp-3">
+                                {{ product.description }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Min-Max High-Visibility Section -->
+                    <div class="grid grid-cols-2 gap-x-12 pt-6 border-t border-surface-100 dark:border-surface-800">
+                        <div class="bg-red-50 dark:bg-red-900/10 p-3 rounded-lg border border-red-100 dark:border-red-900/20">
+                            <span class="block text-[10px] font-bold text-red-400 dark:text-red-300 uppercase tracking-widest mb-1">Minimum Stok</span>
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-2xl font-black text-red-600 dark:text-red-400">{{ product.minStock || '0' }}</span>
+                                <span class="text-xs font-medium text-red-400">{{ getPriceUnitLabel(product.priceUnit) }}</span>
+                            </div>
+                        </div>
+                        <div class="bg-indigo-50 dark:bg-indigo-900/10 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900/20">
+                            <span class="block text-[10px] font-bold text-indigo-400 dark:text-indigo-300 uppercase tracking-widest mb-1">Maksimum Stok</span>
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-2xl font-black text-indigo-600 dark:text-indigo-400">{{ product.maxStock || '∞' }}</span>
+                                <span class="text-xs font-medium text-indigo-400">{{ getPriceUnitLabel(product.priceUnit) }}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <Tag :value="String(productMovements.length) + ' Hareket'" severity="secondary" rounded />
+
+                <!-- Enlarged Global Status Tags -->
+                <div class="bg-surface-0 dark:bg-surface-900 p-6 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm mt-auto">
+                    <div class="flex flex-wrap items-center gap-4">
+                         <Tag :severity="product.status === 'ACTIVE' ? 'success' : 'danger'" size="large" class="!px-6 !py-2">
+                             <div class="flex items-center gap-2">
+                                <i :class="product.status === 'ACTIVE' ? 'pi pi-check-circle' : 'pi pi-times-circle'"></i>
+                                <span class="text-sm font-bold uppercase tracking-widest">{{ product.status === 'ACTIVE' ? 'Aktif' : 'Pasif' }}</span>
+                             </div>
+                         </Tag>
+                         <Tag :severity="product.inventoryStatus === 'TRACKED' ? 'info' : 'secondary'" size="large" class="!px-6 !py-2">
+                             <div class="flex items-center gap-2">
+                                <i class="pi pi-box"></i>
+                                <span class="text-sm font-bold uppercase tracking-widest">{{ product.inventoryStatus === 'TRACKED' ? 'Stok Takibi' : 'Takipsiz' }}</span>
+                             </div>
+                         </Tag>
+                         <Tag v-if="product.categoryDiscount" severity="warn" size="large" class="!px-6 !py-2">
+                             <div class="flex items-center gap-2">
+                                <i class="pi pi-percentage"></i>
+                                <span class="text-sm font-bold uppercase tracking-widest">{{ getDiscountTypeLabel(product.categoryDiscount) }}</span>
+                             </div>
+                         </Tag>
+                    </div>
+                </div>
             </div>
 
-            <DataTable :value="productMovements" class="p-datatable-sm" :paginator="true" :rows="10" 
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-                currentPageReportTemplate="{first}-{last} / {totalRecords}">
-                <Column field="createdAt" header="Tarih" sortable>
-                    <template #body="slotProps">
-                        <span class="text-sm">{{ new Date(slotProps.data.createdAt).toLocaleString('tr-TR') }}</span>
-                    </template>
-                </Column>
-                <Column field="warehouseId" header="Depo" sortable>
-                    <template #body="slotProps">
-                        <span class="text-sm font-medium">{{ getWarehouseName(slotProps.data.warehouseId) }}</span>
-                    </template>
-                </Column>
-                <Column field="movementType" header="İşlem" sortable>
-                    <template #body="slotProps">
-                        <Tag :severity="getMovementSeverity(slotProps.data.movementType)" :value="getMovementTypeLabel(slotProps.data.movementType)" pt:root:class="!text-[10px] !px-2 !py-0" />
-                    </template>
-                </Column>
-                <Column field="quantity" header="Miktar" sortable class="font-bold text-right" headerClass="text-right">
-                    <template #body="slotProps">
-                        <span :class="slotProps.data.movementType === 'out' ? 'text-red-500' : 'text-green-500'">
-                            {{ slotProps.data.movementType === 'out' ? '-' : '+' }}{{ slotProps.data.quantity }}
-                        </span>
-                    </template>
-                </Column>
-                <Column field="note" header="Açıklama">
-                    <template #body="slotProps">
-                        <span class="text-sm text-surface-500 italic">{{ slotProps.data.note || '—' }}</span>
-                    </template>
-                </Column>
-            </DataTable>
+            <!-- Right Panel: Kardeks (Stock Movement History) -->
+            <div class="col-span-12 lg:col-span-6 flex flex-col h-full min-h-0">
+                <div class="bg-surface-0 dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden flex flex-col flex-1">
+                    <div class="px-5 py-4 border-b border-surface-100 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <i class="pi pi-history text-primary text-lg"></i>
+                            <h4 class="text-sm font-bold m-0 uppercase tracking-widest text-surface-500 dark:text-surface-200">Stok Hareketleri (Kardeks)</h4>
+                        </div>
+                        <Tag :value="String(productMovements.length) + ' Kayıt'" severity="secondary" rounded />
+                    </div>
+
+                    <DataTable :value="productMovements" class="p-datatable-sm" :paginator="true" :rows="15" 
+                        paginatorPosition="bottom"
+                        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+                        currentPageReportTemplate="{first}-{last} / {totalRecords}"
+                        pt:pcPaginator:root:class="!py-2"
+                    >
+                        <Column field="createdAt" header="Tarih" sortable>
+                            <template #body="slotProps">
+                                <span class="text-xs">{{ new Date(slotProps.data.createdAt).toLocaleString('tr-TR') }}</span>
+                            </template>
+                        </Column>
+                        <Column field="warehouseId" header="Depo" sortable>
+                            <template #body="slotProps">
+                                <span class="text-xs font-medium">{{ getWarehouseName(slotProps.data.warehouseId) }}</span>
+                            </template>
+                        </Column>
+                        <Column field="movementType" header="İşlem" sortable>
+                            <template #body="slotProps">
+                                <Tag :severity="getMovementSeverity(slotProps.data.movementType)" :value="getMovementTypeLabel(slotProps.data.movementType)" pt:root:class="!text-[9px] !px-1.5 !py-0 !h-4" />
+                            </template>
+                        </Column>
+                        <Column field="quantity" header="Miktar" sortable class="font-bold text-right" headerClass="text-right">
+                            <template #body="slotProps">
+                                <span :class="slotProps.data.movementType === 'out' ? 'text-red-500' : 'text-green-500'" class="text-xs">
+                                    {{ slotProps.data.movementType === 'out' ? '-' : '+' }}{{ slotProps.data.quantity }}
+                                </span>
+                            </template>
+                        </Column>
+                        <Column field="note" header="Açıklama">
+                            <template #body="slotProps">
+                                <span class="text-xs text-surface-500 italic truncate block max-w-[200px]">{{ slotProps.data.note || '—' }}</span>
+                            </template>
+                        </Column>
+                    </DataTable>
+                </div>
+            </div>
         </div>
 
         <!-- Loading State -->

@@ -477,7 +477,13 @@ function getPriceUnitLabel(value: string | null | undefined) {
                 </Column>
 
                 <Column v-if="selectedColumns.find(c => c.field === 'code')" field="code" header="Ürün Kodu" sortable style="min-width: 8rem"></Column>
-                <Column v-if="selectedColumns.find(c => c.field === 'name')" field="name" header="Ürün Adı" sortable style="min-width: 12rem"></Column>
+                <Column v-if="selectedColumns.find(c => c.field === 'name')" field="name" header="Ürün Adı" sortable style="min-width: 12rem">
+                    <template #body="slotProps">
+                        <span class="font-medium text-surface-900 dark:text-surface-0">
+                            {{ slotProps.data.name }}
+                        </span>
+                    </template>
+                </Column>
                 <Column v-if="selectedColumns.find(c => c.field === 'barcode')" field="barcode" header="Barcode No" sortable style="min-width: 10rem"></Column>
 
                 <Column v-if="selectedColumns.find(c => c.field === 'priceUnit')" field="priceUnit" header="Birim" sortable style="min-width: 8rem">
@@ -522,14 +528,14 @@ function getPriceUnitLabel(value: string | null | undefined) {
                 <Column v-if="selectedColumns.find(c => c.field === 'maxStock')" field="maxStock" header="Max Stok" sortable style="min-width: 10rem"></Column>
                 <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem">
                     <template #body="slotProps">
-                        <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
                             <span :class="[
                                 invStore.getTotalBalance(slotProps.data.id) < (slotProps.data.minStock || 0) ? 'text-orange-500 font-bold' : 'font-medium',
                                 invStore.getTotalBalance(slotProps.data.id) < 0 ? 'text-red-500' : ''
                             ]">
                                 {{ invStore.getTotalBalance(slotProps.data.id) }}
                             </span>
-                            <Tag v-if="invStore.getTotalBalance(slotProps.data.id) < (slotProps.data.minStock || 0)" severity="warn" value="Kritik" class="mt-1" />
+                            <Tag v-if="invStore.getTotalBalance(slotProps.data.id) < (slotProps.data.minStock || 0)" severity="warn" value="Kritik" />
                         </div>
                     </template>
                 </Column>

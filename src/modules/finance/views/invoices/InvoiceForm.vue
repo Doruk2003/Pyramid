@@ -74,6 +74,16 @@ interface InvoiceFormModel {
     createdAt?: Date;
 }
 
+const stockWarning = ref({
+    visible: false,
+    title: '',
+    message: '',
+    severity: 'warn' as 'warn' | 'error',
+    canContinue: true,
+    lastQuantity: 1,
+    targetLine: null as InvoiceLineForm | null
+});
+
 const invoice = ref<InvoiceFormModel>({
     invoiceType: 'sale',
     documentCategory: 'domestic',
@@ -314,6 +324,50 @@ function getStock(productId: string, warehouseId?: string) {
     return balance ? balance.balance : 0;
 }
 
+function checkStock(line: InvoiceLineForm) {
+    if (!line.productId) return;
+    
+    const product = productStore.products.find(p => p.id === line.productId);
+    if (!product) return;
+
+    const warehouseId = line.warehouseId || invoice.value.warehouseId;
+    const currentStock = getStock(line.productId, warehouseId);
+    const requestedQty = line.quantity;
+    const minStock = product.minStock || 0;
+    const remainingStock = currentStock - requestedQty;
+
+    if (remainingStock < 0) {
+        const allowNegative = settingsStore.settings?.allowNegativeStock ?? false;
+        stockWarning.value = {
+            visible: true,
+            title: 'Negatif Stok Uyarısı',
+            message: `${product.name} ürünü için seçilen miktar stok bakiyesini negatife düşürüyor. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock}`,
+            severity: allowNegative ? 'warn' : 'error',
+            canContinue: allowNegative,
+            lastQuantity: requestedQty,
+            targetLine: line
+        };
+    } else if (remainingStock < minStock) {
+        stockWarning.value = {
+            visible: true,
+            title: 'Kritik Stok Seviyesi',
+            message: `${product.name} ürünü için kritik stok eşiğine ulaşıldı veya altına düşüldü. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock} \nKritik Eşik: ${minStock}`,
+            severity: 'warn',
+            canContinue: true,
+            lastQuantity: requestedQty,
+            targetLine: line
+        };
+    }
+}
+
+function closeStockWarning(confirm: boolean) {
+    if (!confirm && stockWarning.value.targetLine) {
+        // Eğer kullanıcı vazgeçerse miktarı 1'e veya eski haline çekebiliriz? 
+        // Kullanıcı genelde miktarı düzeltmek ister.
+    }
+    stockWarning.value.visible = false;
+}
+
 function addLine(autoOpenSelect = false) {
     const shouldOpen = autoOpenSelect === true;
     invoice.value.lines.push({
@@ -380,6 +434,9 @@ function onProductChange(line: InvoiceLineForm) {
         
         // Döviz dönüşümünü yap
         convertLinePrice(line);
+        
+        // Stok Kontrolü
+        checkStock(line);
         
         line.vatRate = product.taxRate || 20;
 
@@ -633,6 +690,14 @@ function goBack() {
                             <span class="text-xl font-mono font-bold text-primary leading-none">{{ invoice.invoiceNumber || '---' }}</span>
                         </div>
 
+                        <!-- Fatura Tipi Badge -->
+                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                            <i class="pi pi-tag text-surface-500 text-sm"></i>
+                            <span class="text-base font-bold text-surface-700 dark:text-surface-300">
+                                {{ invoiceTypes.find(t => t.value === invoice.invoiceType)?.label || '---' }}
+                            </span>
+                        </div>
+
                         <!-- Fatura Türü Badge -->
                         <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-file text-surface-500 text-sm"></i>
@@ -758,12 +823,7 @@ function goBack() {
                             <template #body="slotProps">
                                 <div class="flex flex-col gap-1">
                                     <Select :ref="(el) => setProductSelectRef(el, slotProps.index)" v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
-                                    <div v-if="slotProps.data.productId" class="flex items-center gap-1.5 px-1">
-                                        <i class="pi pi-box text-[10px]" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-500' : 'text-red-500'"></i>
-                                        <span class="text-[10px] font-medium" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-600' : 'text-red-600'">
-                                            Mevcut Stok: {{ getStock(slotProps.data.productId, slotProps.data.warehouseId) }} Adet
-                                        </span>
-                                    </div>
+
                                 </div>
                             </template>
                         </Column>
@@ -774,7 +834,7 @@ function goBack() {
                         </Column>
                         <Column header="Miktar" style="width: 6%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
                             <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.quantity" :min="1" fluid inputClass="text-right" />
+                                <InputNumber v-model="slotProps.data.quantity" :min="1" fluid inputClass="text-right" @blur="checkStock(slotProps.data)" />
                             </template>
                         </Column>
                         <Column header="Birim Fiyat" style="width: 8%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
@@ -917,31 +977,31 @@ function goBack() {
         </div>
 
         <!-- Table -->
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 11px;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 9px;">
             <thead>
                 <tr style="border-bottom: 2px solid #999;">
-                    <th style="text-align: left; padding: 10px 5px; color: #111; width: 30px; font-weight: 400;">#</th>
-                    <th style="text-align: left; padding: 10px 5px; color: #111; font-weight: 400;">Ürün</th>
-                    <th style="text-align: center; padding: 10px 5px; color: #111; width: 50px; font-weight: 400;">Miktar</th>
-                    <th style="text-align: right; padding: 10px 5px; color: #111; width: 70px; font-weight: 400;">Fiyat</th>
-                    <th style="text-align: right; padding: 10px 5px; color: #111; width: 50px; font-weight: 400;">İsk. (%)</th>
-                    <th style="text-align: right; padding: 10px 5px; color: #111; width: 70px; font-weight: 400;">İsk.Fiyat</th>
-                    <th style="text-align: right; padding: 10px 5px; color: #111; width: 80px; font-weight: 400;">Net Tutar</th>
-                    <th style="text-align: center; padding: 10px 5px; color: #111; width: 50px; font-weight: 400;">KDV %</th>
-                    <th style="text-align: right; padding: 10px 5px; color: #111; width: 80px; font-weight: 400;">Toplam</th>
+                    <th style="text-align: left; padding: 4px 5px; color: #111; width: 30px; font-weight: 400;">#</th>
+                    <th style="text-align: left; padding: 4px 5px; color: #111; font-weight: 400;">Ürün</th>
+                    <th style="text-align: center; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">Miktar</th>
+                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 70px; font-weight: 400;">Fiyat</th>
+                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">İsk. (%)</th>
+                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 70px; font-weight: 400;">İsk.Fiyat</th>
+                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 80px; font-weight: 400;">Net Tutar</th>
+                    <th style="text-align: center; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">KDV %</th>
+                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 80px; font-weight: 400;">Toplam</th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-for="(line, index) in invoice?.lines" :key="line.id" style="border-bottom: 1px solid #f9f9f9;">
-                    <td style="padding: 12px 5px; color: #777;">{{ index + 1 }}</td>
-                    <td style="padding: 12px 5px; color: #111; font-weight: 500;">{{ productStore.products.find(p => p.id === line.productId)?.name }}</td>
-                    <td style="text-align: center; padding: 12px 5px; color: #111;">{{ line.quantity }}</td>
-                    <td style="text-align: right; padding: 12px 5px; color: #111;">{{ (line.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: right; padding: 12px 5px; color: #111;">{{ ((line.discountRate1 || 0) + (line.discountRate2 || 0) + (line.discountRate3 || 0)).toFixed(2) }}</td>
-                    <td style="text-align: right; padding: 12px 5px; color: #111; font-weight: 500;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100) / (line.quantity || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: right; padding: 12px 5px; color: #111;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: center; padding: 12px 5px; color: #111;">{{ line.vatRate }}</td>
-                    <td style="text-align: right; padding: 12px 5px; color: #111; font-weight: 500;">{{ (line.lineTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="padding: 3px 5px; color: #777;">{{ index + 1 }}</td>
+                    <td style="padding: 3px 5px; color: #111; font-weight: 500;">{{ productStore.products.find(p => p.id === line.productId)?.name }}</td>
+                    <td style="text-align: center; padding: 3px 5px; color: #111;">{{ line.quantity }}</td>
+                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ (line.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ ((line.discountRate1 || 0) + (line.discountRate2 || 0) + (line.discountRate3 || 0)).toFixed(2) }}</td>
+                    <td style="text-align: right; padding: 3px 5px; color: #111; font-weight: 500;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100) / (line.quantity || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: center; padding: 3px 5px; color: #111;">{{ line.vatRate }}</td>
+                    <td style="text-align: right; padding: 3px 5px; color: #111; font-weight: 500;">{{ (line.lineTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -982,7 +1042,7 @@ function goBack() {
                         <span>Toplam KDV:</span>
                         <span style="color: #444;">{{ (totals?.vatTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
                     </div>
-                    <div style="font-size: 24px; font-weight: 300; color: #111; margin-top: 10px;">
+                    <div style="font-size: 14px; font-weight: 600; color: #111; margin-top: 5px;">
                         {{ invoice?.currency === 'TRY' ? '₺' : invoice?.currency }} {{ (totals?.total || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}
                     </div>
                 </div>
@@ -1006,6 +1066,26 @@ function goBack() {
             Bu belge elektronik ortamda oluşturulmuştur. NOKTA
         </div>
     </div>
+
+    <!-- Stok Uyarı Dialog -->
+    <Dialog v-model:visible="stockWarning.visible" :header="stockWarning.title" modal :style="{ width: '450px' }" :closable="stockWarning.severity === 'warn'">
+        <div class="flex items-center gap-4 py-4">
+            <i :class="stockWarning.severity === 'error' ? 'pi pi-exclamation-circle text-red-500' : 'pi pi-exclamation-triangle text-amber-500'" style="font-size: 3rem"></i>
+            <div class="flex flex-col gap-2">
+                <p class="whitespace-pre-line m-0 leading-relaxed">{{ stockWarning.message }}</p>
+                <div v-if="stockWarning.severity === 'error'" class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm mt-2">
+                    <i class="pi pi-info-circle mr-2"></i>
+                    Sistem ayarları gereği negatif stokla işlem yapılmasına izin verilmemektedir. Lütfen miktarı azaltın veya stok girişi yapın.
+                </div>
+            </div>
+        </div>
+        <template #footer>
+            <div class="flex justify-end gap-2">
+                <Button v-if="stockWarning.severity === 'warn'" label="Anladım, Devam Et" icon="pi pi-check" severity="warning" @click="closeStockWarning(true)" />
+                <Button v-else label="Tamam" icon="pi pi-check" severity="danger" @click="closeStockWarning(false)" />
+            </div>
+        </template>
+    </Dialog>
 </template>
 
 

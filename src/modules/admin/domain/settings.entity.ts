@@ -24,6 +24,7 @@ export interface CompanySettingsProps {
     cashStartingNumber?: number;
     employeeSerial?: string;
     employeeStartingNumber?: number;
+    allowNegativeStock?: boolean;
 }
 
 export class CompanySettings {
@@ -103,6 +104,9 @@ export class CompanySettings {
     }
     get employeeStartingNumber(): number | undefined {
         return this.props.employeeStartingNumber;
+    }
+    get allowNegativeStock(): boolean {
+        return !!this.props.allowNegativeStock;
     }
 
     toObject(): CompanySettingsProps {

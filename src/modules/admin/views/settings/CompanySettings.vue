@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { CompanySettings, type CompanySettingsProps } from '@/modules/admin/domain/settings.entity';
-import { useToast } from 'primevue/usetoast';
 import { getErrorMessage } from '@/shared/utils/error';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const settingsStore = useSettingsStore();
 const toast = useToast();
@@ -25,7 +25,8 @@ const settingsData = ref<CompanySettingsProps>({
     cashSerial: 'KSA',
     cashStartingNumber: 1,
     employeeSerial: 'PRS',
-    employeeStartingNumber: 1
+    employeeStartingNumber: 1,
+    allowNegativeStock: false
 });
 
 onMounted(async () => {
@@ -231,10 +232,18 @@ const triggerFileInput = () => {
                         </div>
                     </div>
                     
-                    <div class="flex flex-col items-center justify-center py-8 border-t border-surface-200 dark:border-surface-700 text-surface-500">
-                        <i class="pi pi-box text-6xl mb-4 text-surface-300 dark:text-surface-600"></i>
-                        <div class="text-xl font-medium">Stok & Depo Parametreleri</div>
-                        <p class="mt-2 text-center max-w-md">Negatif stok uyarısı, varsayılan depo, stok maliyetleme yöntemi ve diğer stok modülü ayarları yakında eklenecektir.</p>
+                    <div class="text-xl font-medium mb-4 border-t border-surface-200 dark:border-surface-700 pt-6">Stok Parametreleri</div>
+                    <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+                            <div class="flex flex-col gap-1">
+                                <span class="font-bold">Negatif Stoka İzin Ver</span>
+                                <span class="text-sm text-surface-500 text-pretty max-w-lg">
+                                    Bu seçenek aktif olduğunda, stokta yeterli ürün olmasa bile fatura kesilmesine izin verilir. 
+                                    Pasif olduğunda ise sistem kullanıcıyı engelleyecektir.
+                                </span>
+                            </div>
+                            <ToggleSwitch v-model="settingsData.allowNegativeStock" />
+                        </div>
                     </div>
                 </TabPanel>
 

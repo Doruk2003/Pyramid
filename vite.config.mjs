@@ -13,6 +13,7 @@ export default defineConfig({
         strictPort: false // Meşgulse bir sonrakine geçer (5174 gibi)
     },
     optimizeDeps: {
+        include: ['jsbarcode'],
         noDiscovery: true
     },
     plugins: [
