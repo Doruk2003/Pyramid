@@ -150,6 +150,36 @@ const router = createRouter({
                     component: () => import('@/modules/sales/views/orders/OrderForm.vue')
                 },
                 {
+                    path: '/purchases/quotes',
+                    name: 'purchases-quotes',
+                    component: () => import('@/modules/purchases/views/quotes/QuoteList.vue')
+                },
+                {
+                    path: '/purchases/quotes/create',
+                    name: 'purchases-quote-create',
+                    component: () => import('@/modules/purchases/views/quotes/QuoteForm.vue')
+                },
+                {
+                    path: '/purchases/quotes/edit/:id',
+                    name: 'purchases-quote-edit',
+                    component: () => import('@/modules/purchases/views/quotes/QuoteForm.vue')
+                },
+                {
+                    path: '/purchases/orders',
+                    name: 'purchases-orders',
+                    component: () => import('@/modules/purchases/views/orders/OrderList.vue')
+                },
+                {
+                    path: '/purchases/orders/create',
+                    name: 'purchases-order-create',
+                    component: () => import('@/modules/purchases/views/orders/OrderForm.vue')
+                },
+                {
+                    path: '/purchases/orders/edit/:id',
+                    name: 'purchases-order-edit',
+                    component: () => import('@/modules/purchases/views/orders/OrderForm.vue')
+                },
+                {
                     path: '/finance/projects',
                     name: 'finance-projects',
                     component: () => import('@/modules/finance/views/projects/ProjectList.vue')

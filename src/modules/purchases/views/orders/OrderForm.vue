@@ -7,8 +7,8 @@ import { useProjectStore } from '@/modules/finance/application/project.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
-import { useSalesStore } from '@/modules/sales/application/sales.store';
-import { Order, type OrderStatus } from '@/modules/sales/domain/order.entity';
+import { usePurchasesStore } from '@/modules/purchases/application/purchases.store';
+import { Order, type OrderStatus } from '@/modules/purchases/domain/order.entity';
 import DocumentItemsTable from '@/shared/components/DocumentItemsTable.vue';
 import DocumentSummary from '@/shared/components/DocumentSummary.vue';
 import { DocumentCalculator } from '@/shared/utils/document-calculator';
@@ -17,7 +17,7 @@ import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-const salesStore = useSalesStore();
+const purchasesStore = usePurchasesStore();
 const financeStore = useFinanceStore();
 const projectStore = useProjectStore();
 const productStore = useProductStore();
@@ -113,7 +113,7 @@ const order = ref<any>({
     issueDate: new Date(),
     dueDate: null,
     status: 'draft',
-    type: 'sale',
+    type: 'purchase',
     currency: 'TRY',
     exchangeRate: 1,
     discountRate: 0,
@@ -145,8 +145,8 @@ onMounted(async () => {
     ]);
 
     if (isEdit) {
-        await salesStore.fetchOrders();
-        const found = salesStore.orders.find((o) => o.id === orderId);
+        await purchasesStore.fetchOrders();
+        const found = purchasesStore.orders.find((o) => o.id === orderId);
         if (found) {
             const obj = found.toObject();
             order.value = { 
@@ -161,7 +161,7 @@ onMounted(async () => {
             };
         }
     } else {
-        order.value.orderNumber = await salesStore.getNextOrderNumber();
+        order.value.orderNumber = await purchasesStore.getNextOrderNumber();
         if (order.value.lines.length === 0) {
             // DocumentItemsTable will handle the empty state if needed
         }
@@ -207,17 +207,17 @@ async function saveOrder() {
         }))
     });
 
-    const result = await salesStore.saveOrder(o);
+    const result = await purchasesStore.saveOrder(o);
     if (result.success) {
-        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Sipariş kaydedildi', life: 3000 });
-        router.push('/sales/orders');
+        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Alış siparişi kaydedildi', life: 3000 });
+        router.push('/purchases/orders');
     } else {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 
 function goBack() {
-    router.push('/sales/orders');
+    router.push('/purchases/orders');
 }
 </script>
 
@@ -226,7 +226,7 @@ function goBack() {
         <!-- Header -->
         <div class="card p-6 min-h-32 flex flex-col gap-4">
             <div class="flex flex-col gap-2">
-                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Siparişi Düzenle' : 'Yeni Sipariş' }}</div>
+                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Alış Siparişini Düzenle' : 'Yeni Alış Siparişi' }}</div>
                 
                 <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-3">
@@ -350,7 +350,7 @@ function goBack() {
                     <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" outlined @click="goBack" />
                 </div>
                 <div class="col-span-6">
-                    <Button label="Siparişi Kaydet" icon="pi pi-check" class="w-full" @click="saveOrder" />
+                    <Button label="Alış Siparişini Kaydet" icon="pi pi-check" class="w-full" @click="saveOrder" />
                 </div>
             </div>
         </div>

@@ -7,8 +7,8 @@ import { useProjectStore } from '@/modules/finance/application/project.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
-import { useSalesStore } from '@/modules/sales/application/sales.store';
-import { Order, type OrderStatus } from '@/modules/sales/domain/order.entity';
+import { usePurchasesStore } from '@/modules/purchases/application/purchases.store';
+import { Quote, type QuoteStatus } from '@/modules/purchases/domain/quote.entity';
 import DocumentItemsTable from '@/shared/components/DocumentItemsTable.vue';
 import DocumentSummary from '@/shared/components/DocumentSummary.vue';
 import { DocumentCalculator } from '@/shared/utils/document-calculator';
@@ -17,7 +17,7 @@ import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-const salesStore = useSalesStore();
+const purchasesStore = usePurchasesStore();
 const financeStore = useFinanceStore();
 const projectStore = useProjectStore();
 const productStore = useProductStore();
@@ -46,14 +46,14 @@ function checkStock(line: any) {
     const product = productStore.products.find(p => p.id === line.productId);
     if (!product) return;
 
-    const warehouseId = line.warehouseId || order.value.warehouseId;
+    const warehouseId = line.warehouseId || quote.value.warehouseId;
     const currentStock = inventoryStore.balances.find(
         (b) => b.productId === line.productId && b.warehouseId === warehouseId
     )?.balance || 0;
     
     const requestedQty = line.quantity;
     
-    if (order.value.type === 'sale') {
+    if (quote.value.type === 'sale') {
         const minStock = product.minStock || 0;
         const remainingStock = currentStock - requestedQty;
 
@@ -101,19 +101,18 @@ function closeStockWarning() {
     stockWarning.value.visible = false;
 }
 
-const orderId = route.params.id as string;
-const isEdit = !!orderId;
+const quoteId = route.params.id as string;
+const isEdit = !!quoteId;
 
-const order = ref<any>({
-    orderNumber: '',
+const quote = ref<any>({
+    quoteNumber: '',
     accountId: '',
-    quoteId: null,
     warehouseId: '',
     projectId: null,
     issueDate: new Date(),
-    dueDate: null,
+    validUntil: null,
     status: 'draft',
-    type: 'sale',
+    type: 'purchase',
     currency: 'TRY',
     exchangeRate: 1,
     discountRate: 0,
@@ -121,15 +120,14 @@ const order = ref<any>({
     lines: []
 });
 
-const statusOptions: Array<{ label: string; value: OrderStatus }> = [
+const statusOptions: Array<{ label: string; value: QuoteStatus }> = [
     { label: 'Taslak', value: 'draft' },
-    { label: 'Onaylandı', value: 'confirmed' },
-    { label: 'Hazırlanıyor', value: 'processing' },
-    { label: 'Sevk Edildi', value: 'shipped' },
-    { label: 'Teslim Edildi', value: 'delivered' },
-    { label: 'Kısmi Faturalandı', value: 'partially_invoiced' },
+    { label: 'Gönderildi', value: 'sent' },
+    { label: 'Onaylandı', value: 'accepted' },
+    { label: 'Reddedildi', value: 'rejected' },
     { label: 'İptal', value: 'cancelled' },
-    { label: 'Tamamlandı', value: 'completed' }
+    { label: 'Siparişe Dönüştü', value: 'converted' },
+    { label: 'Kısmi Sipariş', value: 'partially_converted' }
 ];
 
 onMounted(async () => {
@@ -145,79 +143,77 @@ onMounted(async () => {
     ]);
 
     if (isEdit) {
-        await salesStore.fetchOrders();
-        const found = salesStore.orders.find((o) => o.id === orderId);
+        await purchasesStore.fetchQuotes();
+        const found = purchasesStore.quotes.find((q) => q.id === quoteId);
         if (found) {
             const obj = found.toObject();
-            order.value = { 
+            quote.value = { 
                 ...obj, 
                 warehouseId: obj.lines[0]?.warehouseId || '',
                 notes: obj.notes || '',
-                quoteId: obj.quoteId || null,
                 projectId: obj.projectId || null,
                 discountRate: (obj as any).discountRate || 0,
                 issueDate: new Date(obj.issueDate), 
-                dueDate: obj.dueDate ? new Date(obj.dueDate) : null
+                validUntil: obj.validUntil ? new Date(obj.validUntil) : null 
             };
         }
     } else {
-        order.value.orderNumber = await salesStore.getNextOrderNumber();
-        if (order.value.lines.length === 0) {
-            // DocumentItemsTable will handle the empty state if needed
+        quote.value.quoteNumber = await purchasesStore.getNextQuoteNumber();
+        if (quote.value.lines.length === 0) {
+            // Initial line will be added by the component if we don't have any
         }
     }
 });
 
-watch(() => order.value.currency, (newCode) => {
+watch(() => quote.value.currency, (newCode) => {
     if (!newCode || newCode === 'TRY') {
-        order.value.exchangeRate = 1;
+        quote.value.exchangeRate = 1;
     } else {
         const rate = exchangeRateStore.getRateByCode(newCode || '');
-        if (rate > 0) order.value.exchangeRate = rate;
+        if (rate > 0) quote.value.exchangeRate = rate;
     }
 });
 
 const totals = computed(() => {
-    return DocumentCalculator.calculateTotals(order.value.lines, order.value.discountRate, order.value.currency);
+    return DocumentCalculator.calculateTotals(quote.value.lines, quote.value.discountRate, quote.value.currency);
 });
 
-async function saveOrder() {
-    if (!order.value.accountId || !order.value.orderNumber || order.value.lines.length === 0) {
+async function saveQuote() {
+    if (!quote.value.accountId || !quote.value.quoteNumber || quote.value.lines.length === 0) {
         toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 });
         return;
     }
 
     const t = totals.value;
-    const o = Order.create({
-        ...order.value,
-        quoteId: order.value.quoteId || undefined,
-        dueDate: order.value.dueDate || undefined,
-        projectId: order.value.projectId || undefined,
-        id: orderId || crypto.randomUUID(),
+    const q = Quote.create({
+        ...quote.value,
+        validUntil: quote.value.validUntil || undefined,
+        id: quoteId || crypto.randomUUID(),
         companyId: authStore.user?.companyId || '',
         subtotal: t.subtotal,
         vatTotal: t.vatTotal,
         total: t.total,
-        type: order.value.type,
-        createdAt: order.value.createdAt || new Date(),
+        type: quote.value.type,
+        projectId: quote.value.projectId || undefined,
+        createdAt: quote.value.createdAt || new Date(),
         updatedAt: new Date(),
-        lines: order.value.lines.map((l: any) => ({
+        lines: quote.value.lines.map((l: any) => ({
             ...l,
-            orderId: orderId || ''
+            quoteId: quoteId || ''
         }))
     });
 
-    const result = await salesStore.saveOrder(o);
+    const result = await purchasesStore.saveQuote(q);
     if (result.success) {
-        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Sipariş kaydedildi', life: 3000 });
-        router.push('/sales/orders');
+        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Alış teklifi kaydedildi', life: 3000 });
+        router.push('/purchases/quotes');
     } else {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
     }
 }
 
 function goBack() {
-    router.push('/sales/orders');
+    router.push('/purchases/quotes');
 }
 </script>
 
@@ -226,31 +222,26 @@ function goBack() {
         <!-- Header -->
         <div class="card p-6 min-h-32 flex flex-col gap-4">
             <div class="flex flex-col gap-2">
-                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Siparişi Düzenle' : 'Yeni Sipariş' }}</div>
+                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Alış Teklifini Düzenle' : 'Yeni Alış Teklifi' }}</div>
                 
                 <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-3">
                         <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-hashtag text-primary text-sm"></i>
-                            <span class="text-xl font-mono font-bold text-primary leading-none">{{ order.orderNumber || '---' }}</span>
+                            <span class="text-xl font-mono font-bold text-primary leading-none">{{ quote.quoteNumber || '---' }}</span>
                         </div>
 
                         <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-file text-surface-500 text-sm"></i>
                             <span class="text-base font-bold text-surface-700 dark:text-surface-300">
-                                {{ order.type === 'sale' ? 'Satış Siparişi' : 'Alış Siparişi' }}
+                                {{ quote.type === 'sale' ? 'Satış Teklifi' : 'Alış Teklifi' }}
                             </span>
                         </div>
 
-                        <div v-if="order.quoteId" class="flex items-center gap-2 px-3 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <i class="pi pi-link text-blue-500 text-sm"></i>
-                            <span class="text-sm font-medium text-blue-700 dark:text-blue-300">Kaynak Teklif Bağlı</span>
-                        </div>
-
-                        <div v-if="order.currency !== 'TRY'" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                        <div v-if="quote.currency !== 'TRY'" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
                             <i class="pi pi-money-bill text-surface-500 text-sm"></i>
                             <div class="text-base font-medium leading-none">
-                                1 {{ order.currency }} = <span class="font-bold text-primary">{{ order.exchangeRate.toFixed(4) }}</span> ₺
+                                1 {{ quote.currency }} = <span class="font-bold text-primary">{{ quote.exchangeRate.toFixed(4) }}</span> ₺
                             </div>
                         </div>
                     </div>
@@ -263,72 +254,73 @@ function goBack() {
             </div>
         </div>
 
+        <!-- Form Content -->
         <div class="card">
             <div class="flex flex-col gap-8 mb-6">
                 <!-- Top Fields -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div>
                         <label class="block font-bold mb-3">Tarih</label>
-                        <DatePicker v-model="order.issueDate" dateFormat="dd.mm.yy" fluid />
+                        <DatePicker v-model="quote.issueDate" dateFormat="dd.mm.yy" fluid />
                     </div>
                     <div>
-                        <label class="block font-bold mb-3">Teslim Tarihi</label>
-                        <DatePicker v-model="order.dueDate" dateFormat="dd.mm.yy" fluid />
+                        <label class="block font-bold mb-3">Geçerlilik Tarihi</label>
+                        <DatePicker v-model="quote.validUntil" dateFormat="dd.mm.yy" fluid />
                     </div>
                     <div>
                         <label class="block font-bold mb-3">Depo (Varsayılan)</label>
-                        <Select v-model="order.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
+                        <Select v-model="quote.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
                     </div>
                     <div class="lg:col-span-2">
                         <label class="block font-bold mb-3">Cari Hesap</label>
-                        <Select v-model="order.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
+                        <Select v-model="quote.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
                     </div>
 
                     <div>
                         <label class="block font-bold mb-3">Proje</label>
-                        <Select v-model="order.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid />
+                        <Select v-model="quote.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid />
                     </div>
                     <div>
                         <label class="block font-bold mb-3">Döviz</label>
-                        <Select v-model="order.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid />
+                        <Select v-model="quote.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid />
                     </div>
                     <div>
                         <label class="block font-bold mb-3">Kur</label>
-                        <InputNumber v-model="order.exchangeRate" :minFractionDigits="4" :disabled="order.currency === 'TRY'" fluid />
+                        <InputNumber v-model="quote.exchangeRate" :minFractionDigits="4" :disabled="quote.currency === 'TRY'" fluid />
                     </div>
                     <div>
                         <label class="block font-bold mb-3">Durum</label>
-                        <Select v-model="order.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid />
+                        <Select v-model="quote.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid />
                     </div>
                     <div>
                         <label class="block font-bold mb-3">Genel İndirim %</label>
-                        <InputNumber v-model="order.discountRate" :min="0" :max="100" fluid />
+                        <InputNumber v-model="quote.discountRate" :min="0" :max="100" fluid />
                     </div>
                 </div>
 
                 <!-- Lines Table -->
                 <DocumentItemsTable 
-                    :lines="order.lines" 
-                    :currency="order.currency" 
-                    :exchangeRate="order.exchangeRate" 
-                    :accountId="order.accountId"
-                    :warehouseId="order.warehouseId"
-                    documentType="order"
+                    :lines="quote.lines" 
+                    :currency="quote.currency" 
+                    :exchangeRate="quote.exchangeRate" 
+                    :accountId="quote.accountId"
+                    :warehouseId="quote.warehouseId"
+                    documentType="quote"
                     @change="() => {}"
                     @stock-check="checkStock"
                 >
                     <template #extra-columns>
-                        <Column v-if="isEdit" header="Fatura/Sevk" style="width: 10%">
+                        <Column v-if="isEdit" header="Siparişleşme" style="width: 10%">
                             <template #body="slotProps">
                                 <div class="flex flex-col gap-1">
                                     <ProgressBar 
-                                        :value="Math.min(100, Math.round((slotProps.data.invoicedQuantity / slotProps.data.quantity) * 100))" 
+                                        :value="Math.min(100, Math.round((slotProps.data.orderedQuantity / slotProps.data.quantity) * 100))" 
                                         :showValue="false" 
                                         style="height: 6px"
-                                        :severity="slotProps.data.invoicedQuantity >= slotProps.data.quantity ? 'success' : (slotProps.data.invoicedQuantity > 0 ? 'warn' : 'secondary')"
+                                        :severity="slotProps.data.orderedQuantity >= slotProps.data.quantity ? 'success' : (slotProps.data.orderedQuantity > 0 ? 'warn' : 'secondary')"
                                     />
                                     <span class="text-[10px] text-surface-500 font-medium text-center">
-                                        {{ slotProps.data.invoicedQuantity || 0 }} / {{ slotProps.data.quantity }}
+                                        {{ slotProps.data.orderedQuantity || 0 }} / {{ slotProps.data.quantity }}
                                     </span>
                                 </div>
                             </template>
@@ -339,8 +331,8 @@ function goBack() {
                 <!-- Summary -->
                 <DocumentSummary 
                     :totals="totals" 
-                    :currency="order.currency" 
-                    v-model:notes="order.notes" 
+                    :currency="quote.currency" 
+                    v-model:notes="quote.notes" 
                 />
             </div>
 
@@ -350,7 +342,7 @@ function goBack() {
                     <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" outlined @click="goBack" />
                 </div>
                 <div class="col-span-6">
-                    <Button label="Siparişi Kaydet" icon="pi pi-check" class="w-full" @click="saveOrder" />
+                    <Button label="Alış Teklifini Kaydet" icon="pi pi-check" class="w-full" @click="saveQuote" />
                 </div>
             </div>
         </div>

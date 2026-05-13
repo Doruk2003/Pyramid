@@ -94,6 +94,28 @@ const model = computed(() => {
                     ]
                 }
             ]
+        },
+        {
+            label: '',
+            items: [
+                {
+                    label: 'Alış',
+                    icon: 'pi pi-fw pi-shopping-bag',
+                    path: '/purchases',
+                    items: [
+                        {
+                            label: 'Teklifler',
+                            icon: 'pi pi-fw pi-file',
+                            to: '/purchases/quotes'
+                        },
+                        {
+                            label: 'Siparişler',
+                            icon: 'pi pi-fw pi-cart-plus',
+                            to: '/purchases/orders'
+                        }
+                    ]
+                }
+            ]
         }
     ];
 

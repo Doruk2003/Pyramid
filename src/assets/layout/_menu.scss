@@ -2,7 +2,7 @@
 
 .layout-sidebar {
     position: fixed;
-    width: 20rem;
+    width: 16rem;
     height: calc(100vh - 8rem);
     z-index: 999;
     display: flex;
@@ -10,13 +10,14 @@
     overflow-y: hidden; // Dış kapsayıcı sabit kalsın, iç flex div (AppSidebar.vue'deki) kaydıracak
     user-select: none;
     top: 6rem;
-    left: 2rem;
+    left: 1rem;
     transition:
         transform var(--layout-section-transition-duration),
         left var(--layout-section-transition-duration);
     background-color: var(--surface-overlay);
     border-radius: var(--content-border-radius);
-    padding: 0.5rem 1.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.925rem;
 }
 
 .layout-menu {
@@ -26,7 +27,7 @@
 
     .layout-root-menuitem {
         > .layout-menuitem-root-text {
-            font-size: 0.857rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
             font-weight: 700;
             color: var(--text-color);
@@ -68,7 +69,7 @@
             outline: 0 none;
             color: var(--text-color);
             cursor: pointer;
-            padding: 0.75rem 1rem;
+            padding: 0.6rem 0.85rem;
             border-radius: var(--content-border-radius);
             transition:
                 box-shadow var(--element-transition-duration);

@@ -30,6 +30,77 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
+const stockWarning = ref({
+    visible: false,
+    title: '',
+    message: '',
+    severity: 'warn' as 'warn' | 'error',
+    canContinue: true,
+    lastQuantity: 1,
+    targetLine: null as any
+});
+
+function checkStock(line: any) {
+    if (!line.productId) return;
+    
+    const product = productStore.products.find(p => p.id === line.productId);
+    if (!product) return;
+
+    const warehouseId = line.warehouseId || quote.value.warehouseId;
+    const currentStock = inventoryStore.balances.find(
+        (b) => b.productId === line.productId && b.warehouseId === warehouseId
+    )?.balance || 0;
+    
+    const requestedQty = line.quantity;
+    
+    if (quote.value.type === 'sale') {
+        const minStock = product.minStock || 0;
+        const remainingStock = currentStock - requestedQty;
+
+        if (remainingStock < 0) {
+            const allowNegative = settingsStore.settings?.allowNegativeStock ?? false;
+            stockWarning.value = {
+                visible: true,
+                title: 'Negatif Stok Uyarısı',
+                message: `${product.name} ürünü için seçilen miktar stok bakiyesini negatife düşürüyor. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock}`,
+                severity: allowNegative ? 'warn' : 'error',
+                canContinue: allowNegative,
+                lastQuantity: requestedQty,
+                targetLine: line
+            };
+        } else if (remainingStock < minStock) {
+            stockWarning.value = {
+                visible: true,
+                title: 'Kritik Stok Seviyesi',
+                message: `${product.name} ürünü için kritik stok eşiğine ulaşıldı veya altına düşüldü. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock} \nKritik Eşik: ${minStock}`,
+                severity: 'warn',
+                canContinue: true,
+                lastQuantity: requestedQty,
+                targetLine: line
+            };
+        }
+    } else {
+        const maxStock = product.maxStock || 0;
+        const afterStock = currentStock + requestedQty;
+        
+        if (maxStock > 0 && afterStock > maxStock) {
+            stockWarning.value = {
+                visible: true,
+                title: 'Maksimum Stok Uyarısı',
+                message: `${product.name} ürünü için seçilen miktar maksimum stok seviyesini aşıyor. \n\nMevcut Stok: ${currentStock} \nEklenen Miktar: ${requestedQty} \nYeni Bakiye: ${afterStock} \nMaksimum Eşik: ${maxStock}`,
+                severity: 'warn',
+                canContinue: true,
+                lastQuantity: requestedQty,
+                targetLine: line
+            };
+        }
+    }
+}
+
+function closeStockWarning() {
+    stockWarning.value.visible = false;
+}
+
 const quoteId = route.params.id as string;
 const isEdit = !!quoteId;
 
@@ -236,6 +307,7 @@ function goBack() {
                     :warehouseId="quote.warehouseId"
                     documentType="quote"
                     @change="() => {}"
+                    @stock-check="checkStock"
                 >
                     <template #extra-columns>
                         <Column v-if="isEdit" header="Siparişleşme" style="width: 10%">
@@ -275,4 +347,24 @@ function goBack() {
             </div>
         </div>
     </div>
+
+    <!-- Stok Uyarı Dialog -->
+    <Dialog v-model:visible="stockWarning.visible" :header="stockWarning.title" modal :style="{ width: '450px' }" :closable="stockWarning.severity === 'warn'">
+        <div class="flex items-center gap-4 py-4">
+            <i :class="stockWarning.severity === 'error' ? 'pi pi-exclamation-circle text-red-500' : 'pi pi-exclamation-triangle text-amber-500'" style="font-size: 3rem"></i>
+            <div class="flex flex-col gap-2">
+                <p class="whitespace-pre-line m-0 leading-relaxed">{{ stockWarning.message }}</p>
+                <div v-if="stockWarning.severity === 'error'" class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm mt-2">
+                    <i class="pi pi-info-circle mr-2"></i>
+                    Sistem ayarları gereği negatif stokla işlem yapılmasına izin verilmemektedir. Lütfen miktarı azaltın veya stok girişi yapın.
+                </div>
+            </div>
+        </div>
+        <template #footer>
+            <div class="flex justify-end gap-2">
+                <Button v-if="stockWarning.severity === 'warn'" label="Anladım, Devam Et" icon="pi pi-check" severity="warning" @click="closeStockWarning" />
+                <Button v-else label="Tamam" icon="pi pi-check" severity="danger" @click="closeStockWarning" />
+            </div>
+        </template>
+    </Dialog>
 </template>

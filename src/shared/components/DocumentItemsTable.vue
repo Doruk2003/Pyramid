@@ -18,7 +18,7 @@ const props = defineProps<{
     documentType: 'quote' | 'order' | 'invoice';
 }>();
 
-const emit = defineEmits(['update:lines', 'change']);
+const emit = defineEmits(['update:lines', 'change', 'stock-check']);
 
 const productStore = useProductStore();
 const inventoryStore = useInventoryStore();
@@ -144,7 +144,7 @@ defineExpose({ addLine });
 <template>
     <div>
         <div class="flex justify-between items-center mb-4">
-            <h6 class="font-normal m-0 uppercase tracking-wider text-sm text-surface-500">Belge Kalemleri</h6>
+            <h6 class="font-normal m-0 text-surface-900 dark:text-surface-0">Belge Kalemleri</h6>
             <Button label="Kalem Ekle" icon="pi pi-plus" text size="small" @click="() => addLine(true)" id="btnAddLine" />
         </div>
         <DataTable :value="lines" class="p-datatable-sm items-table" dataKey="id">
@@ -155,27 +155,21 @@ defineExpose({ addLine });
                                 v-model="slotProps.data.productId" 
                                 :options="productStore.products" 
                                 optionLabel="name" optionValue="id" 
-                                @change="onProductChange(slotProps.data)" 
+                                @change="() => { onProductChange(slotProps.data); emit('stock-check', slotProps.data); }" 
                                 fluid filter />
-                        <div v-if="slotProps.data.productId" class="flex items-center gap-1.5 px-1">
-                            <i class="pi pi-box text-[10px]" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-500' : 'text-red-500'"></i>
-                            <span class="text-[10px] font-medium" :class="getStock(slotProps.data.productId, slotProps.data.warehouseId) > 0 ? 'text-green-600' : 'text-red-600'">
-                                Stok: {{ getStock(slotProps.data.productId, slotProps.data.warehouseId) }}
-                            </span>
-                        </div>
                     </div>
                 </template>
             </Column>
             
-            <Column header="Açıklama" style="width: 15%">
+            <Column header="Depo" style="width: 10%">
                 <template #body="slotProps">
-                    <InputText v-model="slotProps.data.description" placeholder="..." fluid />
+                    <Select v-model="slotProps.data.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo" fluid />
                 </template>
             </Column>
 
             <Column header="Miktar" style="width: 8%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
                 <template #body="slotProps">
-                    <InputNumber v-model="slotProps.data.quantity" :min="0.001" :minFractionDigits="0" :maxFractionDigits="3" @input="() => emit('change')" fluid inputClass="text-right" />
+                    <InputNumber v-model="slotProps.data.quantity" :min="0.001" :minFractionDigits="0" :maxFractionDigits="3" @input="() => emit('change')" @blur="() => emit('stock-check', slotProps.data)" fluid inputClass="text-right" />
                 </template>
             </Column>
 
@@ -215,13 +209,13 @@ defineExpose({ addLine });
             <Column header="Toplam" style="width: 12%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
                 <template #body="slotProps">
                     <InputText :value="slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })" 
-                               readonly fluid class="font-bold text-right" />
+                                readonly fluid class="font-bold text-right" />
                 </template>
             </Column>
 
             <Column style="width: 3%">
                 <template #body="slotProps">
-                    <Button icon="pi pi-trash" severity="danger" text rounded @click="removeLine(slotProps.index)" />
+                    <Button icon="pi pi-trash" severity="danger" text rounded tabindex="-1" @click="removeLine(slotProps.index)" />
                 </template>
             </Column>
         </DataTable>
