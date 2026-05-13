@@ -7,7 +7,7 @@
 
 .card {
     background: var(--surface-card);
-    padding: 2rem;
+    padding: 1.5rem;
     margin-bottom: 1rem;
     border-radius: var(--content-border-radius);
 
@@ -17,6 +17,7 @@
 }
 
 .p-toast {
+
     &.p-toast-top-right,
     &.p-toast-top-left,
     &.p-toast-top-center {

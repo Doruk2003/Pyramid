@@ -3,13 +3,13 @@
 .layout-sidebar {
     position: fixed;
     width: 16rem;
-    height: calc(100vh - 8rem);
+    height: calc(100vh - 6rem);
     z-index: 999;
     display: flex;
     flex-direction: column;
-    overflow-y: hidden; // Dış kapsayıcı sabit kalsın, iç flex div (AppSidebar.vue'deki) kaydıracak
+    overflow-y: hidden;
     user-select: none;
-    top: 6rem;
+    top: 5rem;
     left: 1rem;
     transition:
         transform var(--layout-section-transition-duration),
@@ -26,7 +26,7 @@
     list-style-type: none;
 
     .layout-root-menuitem {
-        > .layout-menuitem-root-text {
+        >.layout-menuitem-root-text {
             font-size: 0.75rem;
             text-transform: uppercase;
             font-weight: 700;
@@ -34,7 +34,7 @@
             margin: 0.75rem 0;
         }
 
-        > a {
+        >a {
             display: none;
         }
     }
@@ -43,14 +43,14 @@
         user-select: none;
 
         &.active-menuitem {
-            > .layout-submenu-toggler {
+            >.layout-submenu-toggler {
                 transform: rotate(-180deg);
             }
         }
     }
 
     li.active-menuitem {
-        > a {
+        >a {
             .layout-submenu-toggler {
                 transform: rotate(-180deg);
             }

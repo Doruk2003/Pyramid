@@ -9,7 +9,7 @@ import StatsWidget from '@/shared/components/dashboard/StatsWidget.vue';
 </script>
 
 <template>
-    <div class="grid grid-cols-12 gap-8">
+    <div class="grid grid-cols-12 gap-4">
         <StatsWidget />
         <InventoryStatsWidget />
 
