@@ -960,54 +960,55 @@ function goBack() {
                 <div v-if="settingsStore.settings?.logoUrl" style="margin-bottom: 15px;">
                     <img :src="settingsStore.settings.logoUrl" style="max-height: 60px; max-width: 200px; object-fit: contain;" />
                 </div>
-                <div style="font-size: 14px; font-weight: 500; color: #111; margin-bottom: 5px;">{{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.name }}</div>
-                <div style="font-size: 12px; line-height: 1.4; color: #777; max-width: 300px;">
+                <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">SAYIN</div>
+                <div style="font-size: 14px; font-weight: 500; color: #1e293b; margin-bottom: 6px;">{{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.name }}</div>
+                <div style="font-size: 11px; line-height: 1.5; color: #64748b; max-width: 320px;">
                     {{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.address }}<br>
-                    <span v-if="financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber">VN/TC: {{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber }}</span>
+                    <span v-if="financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber" style="color: #475569; font-weight: 500;">VN/TC: {{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber }}</span>
                 </div>
             </div>
             <div style="flex: 1; text-align: right;">
-                <div style="font-size: 32px; font-weight: 400; color: #1e293b; margin-bottom: 10px; line-height: 1;">FATURA</div>
-                <div style="display: inline-block; text-align: left; font-size: 13px; color: #777;">
-                    <div><span style="color: #64748b; width: 50px; display: inline-block;">No:</span> <span style="color: #111; font-weight: 400;">{{ invoice?.invoiceNumber || '---' }}</span></div>
-                    <div><span style="color: #64748b; width: 50px; display: inline-block;">Tarih:</span> <span style="color: #111; font-weight: 400;">{{ invoice?.issueDate ? new Date(invoice.issueDate).toLocaleDateString('tr-TR') : '---' }}</span></div>
-                    <div><span style="color: #64748b; width: 50px; display: inline-block;">Tür:</span> <span style="color: #111; font-weight: 400;">{{ documentCategories.find(c => c.value === invoice?.documentCategory)?.label || '---' }}</span></div>
+                <div style="font-size: 24px; font-weight: 400; color: #1e293b; margin-bottom: 12px; letter-spacing: 2px;">FATURA</div>
+                <div style="display: inline-block; text-align: left; font-size: 11px; color: #64748b;">
+                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">No:</span> <span style="color: #475569; font-weight: 400;">{{ invoice?.invoiceNumber || '---' }}</span></div>
+                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">Tarih:</span> <span style="color: #475569; font-weight: 400;">{{ invoice?.issueDate ? new Date(invoice.issueDate).toLocaleDateString('tr-TR') : '---' }}</span></div>
+                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">Tür:</span> <span style="color: #475569; font-weight: 400;">{{ documentCategories.find(c => c.value === invoice?.documentCategory)?.label || '---' }}</span></div>
                 </div>
             </div>
         </div>
 
         <!-- Table -->
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 9px;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 9px;">
             <thead>
-                <tr style="border-bottom: 2px solid #999;">
-                    <th style="text-align: left; padding: 4px 5px; color: #111; width: 30px; font-weight: 400;">#</th>
-                    <th style="text-align: left; padding: 4px 5px; color: #111; font-weight: 400;">Ürün</th>
-                    <th style="text-align: center; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">Miktar</th>
-                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 70px; font-weight: 400;">Fiyat</th>
-                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">İsk. (%)</th>
-                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 70px; font-weight: 400;">İsk.Fiyat</th>
-                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 80px; font-weight: 400;">Net Tutar</th>
-                    <th style="text-align: center; padding: 4px 5px; color: #111; width: 50px; font-weight: 400;">KDV %</th>
-                    <th style="text-align: right; padding: 4px 5px; color: #111; width: 80px; font-weight: 400;">Toplam</th>
+                <tr style="border-bottom: 1.5px solid #cbd5e1;">
+                    <th style="text-align: left; padding: 4px 5px 6px 5px; color: #1e293b; width: 30px; font-weight: 600;">#</th>
+                    <th style="text-align: left; padding: 4px 5px 6px 5px; color: #1e293b; font-weight: 600;">Ürün</th>
+                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">Miktar</th>
+                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 70px; font-weight: 600;">Fiyat</th>
+                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">İsk. (%)</th>
+                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 70px; font-weight: 600;">İsk.Fiyat</th>
+                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 80px; font-weight: 600;">Net Tutar</th>
+                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">KDV %</th>
+                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 80px; font-weight: 600;">Toplam</th>
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="(line, index) in invoice?.lines" :key="line.id" style="border-bottom: 1px solid #f9f9f9;">
-                    <td style="padding: 3px 5px; color: #777;">{{ index + 1 }}</td>
-                    <td style="padding: 3px 5px; color: #111; font-weight: 500;">{{ productStore.products.find(p => p.id === line.productId)?.name }}</td>
-                    <td style="text-align: center; padding: 3px 5px; color: #111;">{{ line.quantity }}</td>
-                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ (line.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ ((line.discountRate1 || 0) + (line.discountRate2 || 0) + (line.discountRate3 || 0)).toFixed(2) }}</td>
-                    <td style="text-align: right; padding: 3px 5px; color: #111; font-weight: 500;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100) / (line.quantity || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: right; padding: 3px 5px; color: #111;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: center; padding: 3px 5px; color: #111;">{{ line.vatRate }}</td>
-                    <td style="text-align: right; padding: 3px 5px; color: #111; font-weight: 500;">{{ (line.lineTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                <tr v-for="(line, index) in invoice?.lines" :key="line.id">
+                    <td style="padding: 4px 5px; color: #777; vertical-align: middle;">{{ index + 1 }}</td>
+                    <td style="padding: 4px 5px; color: #1e293b; font-weight: 400; vertical-align: middle;">{{ productStore.products.find(p => p.id === line.productId)?.name }}</td>
+                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ line.quantity }}</td>
+                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ (line.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.discountRate1 || 0) + (line.discountRate2 || 0) + (line.discountRate3 || 0)).toFixed(2) }}</td>
+                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100) / (line.quantity || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
+                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ line.vatRate }}</td>
+                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; font-weight: 400; vertical-align: middle;">{{ (line.lineTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
                 </tr>
             </tbody>
         </table>
 
         <!-- Footer Section -->
-        <div style="border-top: 2px solid #eee; padding-top: 20px; display: flex; justify-content: space-between; align-items: stretch;">
+        <div style="border-top: 1.5px solid #cbd5e1; padding-top: 30px; display: flex; justify-content: space-between; align-items: stretch;">
             <!-- Left: Notes -->
             <div style="flex: 1.5; display: flex; flex-direction: column; justify-content: space-between;">
                 <div v-if="invoice?.notes">
@@ -1018,7 +1019,7 @@ function goBack() {
                 </div>
                 <div v-else></div> <!-- Spacer -->
                 
-                <div style="font-size: 12px; font-weight: 400; color: #444; margin-top: auto;">
+                <div style="font-size: 11px; font-weight: 400; color: #64748b; margin-top: auto; font-style: italic;">
                     # {{ totalAsWords }} #
                 </div>
             </div>
@@ -1026,44 +1027,57 @@ function goBack() {
             <!-- Right: Totals -->
             <div style="flex: 1; text-align: right;">
                 <div style="display: inline-block; width: 100%; max-width: 220px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #777;">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
                         <span>Ara Toplam:</span>
                         <span style="color: #444;">{{ (totals?.grossTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #777;">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
                         <span>Toplam İndirim:</span>
                         <span style="color: #444;">{{ (totals?.discountTotal + totals?.globalDiscount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #777;">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
                         <span>Net Toplam:</span>
                         <span style="color: #444;">{{ (totals?.netSubtotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; color: #777;">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px; color: #777;">
                         <span>Toplam KDV:</span>
                         <span style="color: #444;">{{ (totals?.vatTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
                     </div>
-                    <div style="font-size: 14px; font-weight: 600; color: #111; margin-top: 5px;">
-                        {{ invoice?.currency === 'TRY' ? '₺' : invoice?.currency }} {{ (totals?.total || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 500; color: #111; margin-top: 4px; border-top: 1px solid #1e293b; padding-top: 6px;">
+                        <span>GENEL TOPLAM:</span>
+                        <span>
+                            <span style="font-size: 10px; margin-right: 2px; font-weight: 400;">{{ invoice?.currency === 'TRY' ? '₺' : invoice?.currency }}</span>
+                            {{ (totals?.total || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Gönderici Bilgisi (Şirket) -->
-        <div style="margin-top: 60px; border-top: 1px solid #eee; padding-top: 15px;">
-            <div style="font-size: 12px; color: #111; font-weight: 500;">{{ settingsStore.settings?.companyName }}</div>
-            <div style="font-size: 11px; color: #777; margin-top: 2px; max-width: 600px;">
-                {{ settingsStore.settings?.address }}
-            </div>
-            <div style="font-size: 11px; color: #777; margin-top: 2px;">
-                <span v-if="settingsStore.settings?.taxNumber">VD: {{ settingsStore.settings?.taxOffice }} | VN: {{ settingsStore.settings?.taxNumber }}</span>
-                <span v-if="settingsStore.settings?.phone" style="margin-left: 10px;">P: {{ settingsStore.settings?.phone }}</span>
+        <div style="margin-top: 80px; border-top: 1px solid #cbd5e1; padding-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 2;">
+                    <div style="font-size: 13px; color: #1e293b; font-weight: 500; margin-bottom: 5px;">{{ settingsStore.settings?.companyName }}</div>
+                    <div style="font-size: 11px; color: #64748b; line-height: 1.5; max-width: 500px;">
+                        {{ settingsStore.settings?.address }}
+                    </div>
+                </div>
+                <div style="flex: 1; text-align: right; font-size: 11px; color: #64748b; line-height: 1.6;">
+                    <div v-if="settingsStore.settings?.taxNumber">
+                        <span style="color: #94a3b8;">VD:</span> {{ settingsStore.settings?.taxOffice }}<br>
+                        <span style="color: #94a3b8;">VN:</span> {{ settingsStore.settings?.taxNumber }}
+                    </div>
+                    <div v-if="settingsStore.settings?.phone" style="margin-top: 4px;">
+                        <span style="color: #94a3b8;">Tel:</span> {{ settingsStore.settings?.phone }}
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- System Footer -->
-        <div style="position: absolute; bottom: 15mm; left: 15mm; right: 15mm; text-align: center; font-size: 9px; color: #bbb; border-top: 1px solid #f5f5f5; padding-top: 10px;">
-            Bu belge elektronik ortamda oluşturulmuştur. NOKTA
+        <div style="position: absolute; bottom: 10mm; left: 15mm; right: 15mm; text-align: center; font-size: 9px; color: #94a3b8; font-style: italic;">
+            Bu belge elektronik ortamda oluşturulmuştur.
         </div>
     </div>
 
