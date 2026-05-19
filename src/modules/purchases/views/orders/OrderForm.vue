@@ -224,8 +224,8 @@ function goBack() {
 <template>
     <div class="flex flex-col gap-0">
         <!-- Header -->
-        <div class="card p-6 min-h-32 flex flex-col gap-4">
-            <div class="flex flex-col gap-2">
+        <div class="card p-4 min-h-32 flex flex-col gap-2">
+            <div class="flex flex-col gap-1">
                 <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Alış Siparişini Düzenle' : 'Yeni Alış Siparişi' }}</div>
                 
                 <div class="flex items-center justify-between mt-2">
@@ -264,9 +264,9 @@ function goBack() {
         </div>
 
         <div class="card">
-            <div class="flex flex-col gap-8 mb-6">
+            <div class="flex flex-col gap-4 mb-4">
                 <!-- Top Fields -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div>
                         <label class="block font-bold mb-3">Tarih</label>
                         <DatePicker v-model="order.issueDate" dateFormat="dd.mm.yy" fluid />
