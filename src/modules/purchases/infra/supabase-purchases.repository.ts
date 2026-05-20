@@ -20,6 +20,7 @@ export class SupabasePurchasesRepository implements IPurchasesRepository {
 
         const quotes = (data as DbQuote[]).map(row => Quote.create({
             id: row.id,
+            type: (row.type as 'sale' | 'purchase') || 'purchase',
             companyId: row.company_id,
             accountId: row.account_id,
             accountName: (row as unknown as { accounts?: { name: string } }).accounts?.name,
@@ -69,6 +70,7 @@ export class SupabasePurchasesRepository implements IPurchasesRepository {
 
         return ok(Quote.create({
             id: row.id,
+            type: (row.type as 'sale' | 'purchase') || 'purchase',
             companyId: row.company_id,
             accountId: row.account_id,
             quoteNumber: row.quote_number,

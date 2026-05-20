@@ -2,7 +2,28 @@ import { computed, reactive } from 'vue';
 
 const STORAGE_KEY = 'pyramid-layout-config';
 
-let initialConfig = {
+interface LayoutConfig {
+    preset: string;
+    primary: string;
+    surface: string | null;
+    darkTheme: boolean;
+    menuMode: string;
+}
+
+interface LayoutState {
+    staticMenuInactive: boolean;
+    overlayMenuActive: boolean;
+    profileSidebarVisible: boolean;
+    configSidebarVisible: boolean;
+    sidebarExpanded: boolean;
+    menuHoverActive: boolean;
+    activeMenuItem: string | null;
+    activePath: string | null;
+    mobileMenuActive: boolean;
+    anchored: boolean;
+}
+
+let initialConfig: LayoutConfig = {
     preset: 'Lara',
     primary: 'emerald',
     surface: null,
@@ -20,9 +41,9 @@ try {
     console.error('Error loading layout config:', e);
 }
 
-const layoutConfig = reactive(initialConfig);
+export const layoutConfig = reactive<LayoutConfig>(initialConfig);
 
-const layoutState = reactive({
+export const layoutState = reactive<LayoutState>({
     staticMenuInactive: false,
     overlayMenuActive: false,
     profileSidebarVisible: false,
@@ -30,7 +51,9 @@ const layoutState = reactive({
     sidebarExpanded: false,
     menuHoverActive: false,
     activeMenuItem: null,
-    activePath: null
+    activePath: null,
+    mobileMenuActive: false,
+    anchored: false
 });
 
 import { getPresetExt, presets, surfaces } from '@/layout/theme-utils';
@@ -100,7 +123,7 @@ export function useLayout() {
         layoutState.mobileMenuActive = false;
     };
 
-    const changeMenuMode = (event) => {
+    const changeMenuMode = (event: { value: string }) => {
         layoutConfig.menuMode = event.value;
         layoutState.staticMenuInactive = false;
         layoutState.mobileMenuActive = false;

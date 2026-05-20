@@ -2,7 +2,7 @@ import Aura from '@primeuix/themes/aura';
 import Lara from '@primeuix/themes/lara';
 import Nora from '@primeuix/themes/nora';
 
-export const presets = {
+export const presets: Record<string, any> = {
     Lara,
     Aura,
     Nora
@@ -63,7 +63,7 @@ export const surfaces = [
     }
 ];
 
-export function getPresetExt(layoutConfig) {
+export function getPresetExt(layoutConfig: { primary: string }) {
     const color = primaryColors.find((c) => c.name === layoutConfig.primary);
 
     if (!color) return null;

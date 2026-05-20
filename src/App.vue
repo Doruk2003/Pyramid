@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useInactivityTimer } from '@/core/auth/useInactivityTimer';
-import { applyTheme } from '@/layout/composables/layout';
+import { applyTheme } from '@/layout/composables/layout'; // theme manager
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 

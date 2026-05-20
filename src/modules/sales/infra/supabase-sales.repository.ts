@@ -19,6 +19,7 @@ export class SupabaseSalesRepository implements ISalesRepository {
 
         const quotes = (data as DbQuote[]).map(row => Quote.create({
             id: row.id,
+            type: (row.type as 'sale' | 'purchase') || 'sale',
             companyId: row.company_id,
             accountId: row.account_id,
             accountName: (row as unknown as { accounts?: { name: string } }).accounts?.name,
@@ -68,6 +69,7 @@ export class SupabaseSalesRepository implements ISalesRepository {
 
         return ok(Quote.create({
             id: row.id,
+            type: (row.type as 'sale' | 'purchase') || 'sale',
             companyId: row.company_id,
             accountId: row.account_id,
             quoteNumber: row.quote_number,
