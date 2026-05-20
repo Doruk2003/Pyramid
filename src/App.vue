@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useInactivityTimer } from '@/core/auth/useInactivityTimer';
+import { applyTheme } from '@/layout/composables/layout';
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -16,6 +17,7 @@ useInactivityTimer(async () => {
 });
 
 onMounted(() => {
+    applyTheme();
     authStore.listenToAuthChanges((path) => {
         if (router.currentRoute.value.path !== path) {
             router.push(path);

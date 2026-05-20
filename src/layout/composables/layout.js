@@ -2,14 +2,23 @@ import { computed, reactive } from 'vue';
 
 const STORAGE_KEY = 'pyramid-layout-config';
 
-const savedConfig = localStorage.getItem(STORAGE_KEY);
-const initialConfig = savedConfig ? JSON.parse(savedConfig) : {
+let initialConfig = {
     preset: 'Lara',
     primary: 'emerald',
     surface: null,
     darkTheme: false,
     menuMode: 'static'
 };
+
+try {
+    const savedConfig = localStorage.getItem(STORAGE_KEY);
+    if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        initialConfig = { ...initialConfig, ...parsed };
+    }
+} catch (e) {
+    console.error('Error loading layout config:', e);
+}
 
 const layoutConfig = reactive(initialConfig);
 
@@ -24,9 +33,34 @@ const layoutState = reactive({
     activePath: null
 });
 
+import { getPresetExt, presets, surfaces } from '@/layout/theme-utils';
+import { $t } from '@primeuix/themes';
 import { watch } from 'vue';
+
+export function applyTheme() {
+    const presetValue = presets[layoutConfig.preset];
+    const surface = surfaces.find((s) => s.name === layoutConfig.surface);
+    const surfacePalette = surface ? surface.palette : null;
+
+    if (presetValue) {
+        $t().preset(presetValue)
+            .preset(getPresetExt(layoutConfig))
+            .surfacePalette(surfacePalette)
+            .use({ useDefaultOptions: true });
+    }
+
+    if (layoutConfig.darkTheme) {
+        document.documentElement.classList.add('app-dark');
+    } else {
+        document.documentElement.classList.remove('app-dark');
+    }
+}
+
+// The theme will be applied in onMounted of the main layout to ensure PrimeVue is ready
+
 watch(layoutConfig, (newConfig) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
+    applyTheme();
 }, { deep: true });
 
 export function useLayout() {
@@ -37,12 +71,11 @@ export function useLayout() {
             return;
         }
 
-        document.startViewTransition(() => executeDarkModeToggle(event));
+        document.startViewTransition(() => executeDarkModeToggle());
     };
 
     const executeDarkModeToggle = () => {
         layoutConfig.darkTheme = !layoutConfig.darkTheme;
-        document.documentElement.classList.toggle('app-dark');
     };
 
     const toggleMenu = () => {

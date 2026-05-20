@@ -1,7 +1,6 @@
 <script setup>
 import { useLayout } from '@/layout/composables/layout';
-import { getPresetExt, presets, primaryColors, surfaces } from '@/layout/theme-utils';
-import { $t, updatePreset, updateSurfacePalette } from '@primeuix/themes';
+import { presets, primaryColors, surfaces } from '@/layout/theme-utils';
 import { ref } from 'vue';
 
 const { layoutConfig, isDarkTheme, changeMenuMode } = useLayout();
@@ -21,24 +20,10 @@ function updateColors(type, color) {
     } else if (type === 'surface') {
         layoutConfig.surface = color.name;
     }
-
-    applyTheme(type, color);
-}
-
-function applyTheme(type, color) {
-    if (type === 'primary') {
-        updatePreset(getPresetExt(layoutConfig));
-    } else if (type === 'surface') {
-        updateSurfacePalette(color.palette);
-    }
 }
 
 function onPresetChange() {
     layoutConfig.preset = preset.value;
-    const presetValue = presets[preset.value];
-    const surfacePalette = surfaces.find((s) => s.name === layoutConfig.surface)?.palette;
-
-    $t().preset(presetValue).preset(getPresetExt(layoutConfig)).surfacePalette(surfacePalette).use({ useDefaultOptions: true });
 }
 </script>
 

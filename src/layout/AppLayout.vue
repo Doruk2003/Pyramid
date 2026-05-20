@@ -1,7 +1,5 @@
 <script setup>
-import { useLayout } from '@/layout/composables/layout';
-import { getPresetExt, presets, surfaces } from '@/layout/theme-utils';
-import { $t } from '@primeuix/themes';
+import { applyTheme, useLayout } from '@/layout/composables/layout';
 import { computed, onMounted } from 'vue';
 import AppSidebar from './AppSidebar.vue';
 import AppTopbar from './AppTopbar.vue';
@@ -9,21 +7,7 @@ import AppTopbar from './AppTopbar.vue';
 const { layoutConfig, layoutState, hideMobileMenu } = useLayout();
 
 onMounted(() => {
-    // Apply saved theme settings on mount
-    const presetValue = presets[layoutConfig.preset];
-    const surface = surfaces.find((s) => s.name === layoutConfig.surface);
-    const surfacePalette = surface ? surface.palette : null;
-
-    if (presetValue) {
-        $t().preset(presetValue).preset(getPresetExt(layoutConfig)).surfacePalette(surfacePalette).use({ useDefaultOptions: true });
-    }
-    
-    // Set initial dark mode
-    if (layoutConfig.darkTheme) {
-        document.documentElement.classList.add('app-dark');
-    } else {
-        document.documentElement.classList.remove('app-dark');
-    }
+    applyTheme();
 });
 
 const containerClass = computed(() => {
