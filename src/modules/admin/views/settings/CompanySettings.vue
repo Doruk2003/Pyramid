@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useSettingsStore } from '@/modules/admin/application/settings.store';
 import { CompanySettings, type CompanySettingsProps } from '@/modules/admin/domain/settings.entity';
+import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 
 const settingsStore = useSettingsStore();
+const inventoryStore = useInventoryStore();
 const toast = useToast();
 const settingsData = ref<CompanySettingsProps>({
     id: '',
@@ -26,11 +28,16 @@ const settingsData = ref<CompanySettingsProps>({
     cashStartingNumber: 1,
     employeeSerial: 'PRS',
     employeeStartingNumber: 1,
-    allowNegativeStock: false
+    allowNegativeStock: false,
+    defaultPurchaseWarehouseId: undefined,
+    defaultSalesWarehouseId: undefined
 });
 
 onMounted(async () => {
-    await settingsStore.fetchSettings();
+    await Promise.all([
+        settingsStore.fetchSettings(),
+        inventoryStore.fetchWarehouses()
+    ]);
     if (settingsStore.settings) {
         settingsData.value = settingsStore.settings.toObject();
     }
@@ -243,6 +250,44 @@ const triggerFileInput = () => {
                                 </span>
                             </div>
                             <ToggleSwitch v-model="settingsData.allowNegativeStock" />
+                        </div>
+                    </div>
+
+                    <div class="text-xl font-medium mb-4 border-t border-surface-200 dark:border-surface-700 pt-6">Varsayılan Depo Seçimleri</div>
+                    <div class="grid grid-cols-12 gap-4">
+                        <div class="col-span-12 md:col-span-6">
+                            <label for="defaultPurchaseWarehouse" class="block font-bold mb-2">Alış Faturaları İçin Varsayılan Depo</label>
+                            <Select
+                                id="defaultPurchaseWarehouse"
+                                v-model="settingsData.defaultPurchaseWarehouseId"
+                                :options="inventoryStore.warehouses"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Varsayılan depo seçin"
+                                showClear
+                                fluid
+                                :loading="inventoryStore.loading"
+                            />
+                        </div>
+                        <div class="col-span-12 md:col-span-6">
+                            <label for="defaultSalesWarehouse" class="block font-bold mb-2">Satış Faturaları İçin Varsayılan Depo</label>
+                            <Select
+                                id="defaultSalesWarehouse"
+                                v-model="settingsData.defaultSalesWarehouseId"
+                                :options="inventoryStore.warehouses"
+                                optionLabel="name"
+                                optionValue="id"
+                                placeholder="Varsayılan depo seçin"
+                                showClear
+                                fluid
+                                :loading="inventoryStore.loading"
+                            />
+                        </div>
+                        <div class="col-span-12">
+                            <div class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300">
+                                <i class="pi pi-info-circle"></i>
+                                <span>Yeni bir belge oluşturulduğunda bu depo otomatik seçilir. Form üzerinden her zaman değiştirilebilir.</span>
+                            </div>
                         </div>
                     </div>
                 </TabPanel>

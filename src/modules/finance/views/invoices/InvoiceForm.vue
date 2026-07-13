@@ -6,7 +6,7 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useProjectStore } from '@/modules/finance/application/project.store';
 import '@/modules/finance/assets/css/invoice-pdf.css';
 import { CurrencyConversionService } from '@/modules/finance/domain/currency-conversion.service';
-import { Invoice, type DocumentCategory, type InvoiceStatus, type InvoiceType, type PaymentType } from '@/modules/finance/domain/invoice.entity';
+import { Invoice, type DocumentCategory, type InvoiceType, type PaymentType } from '@/modules/finance/domain/invoice.entity';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useLookupStore } from '@/modules/inventory/application/lookup.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
@@ -18,6 +18,11 @@ import { jsPDF } from 'jspdf';
 import { useToast } from 'primevue/usetoast';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import type { InvoiceFormModel, InvoiceLineForm } from './invoice-form.types';
+import InvoiceFormHeader from './InvoiceFormHeader.vue';
+import InvoiceFormLines from './InvoiceFormLines.vue';
+import InvoiceFormSummary from './InvoiceFormSummary.vue';
+import InvoiceFormPdfTemplate from './InvoiceFormPdfTemplate.vue';
 
 const financeStore = useFinanceStore();
 const projectStore = useProjectStore();
@@ -35,44 +40,7 @@ const settingsStore = useSettingsStore();
 const invoiceId = route.params.id as string;
 const isEdit = !!invoiceId;
 
-interface InvoiceLineForm {
-    id: string;
-    productId: string;
-    warehouseId?: string; // Yeni eklendi
-    description?: string;
-    quantity: number;
-    unitPrice: number;
-    originalPrice?: number;
-    originalCurrency?: string;
-    vatRate: number;
-    discountRate1: number;
-    discountRate2: number;
-    discountRate3: number;
-    lineTotal: number;
-    sourceLineId?: string; // Yeni eklendi
-}
-
-interface InvoiceFormModel {
-    invoiceType: InvoiceType;
-    documentCategory: DocumentCategory;
-    invoiceNumber: string;
-    accountId: string;
-    warehouseId: string;
-    projectId: string;          // PRJ entegrasyonu
-    paymentType: PaymentType;
-    issueDate: Date;
-    dueDate: Date | null;
-    status: InvoiceStatus;
-    currency: string;
-    exchangeRate: number;
-    discountRate: number;
-    notes: string;
-    lines: InvoiceLineForm[];
-    paidAmount?: number;
-    sourceType?: 'quote' | 'order'; // Yeni eklendi
-    sourceIds?: string[];           // Yeni eklendi
-    createdAt?: Date;
-}
+// InvoiceLineForm ve InvoiceFormModel tipleri invoice-form.types.ts'e taşındı
 
 const stockWarning = ref({
     visible: false,
@@ -256,6 +224,14 @@ onMounted(async () => {
                 }
             }
         }
+
+        // Ayarlardan varsayılan depoyu uygula (henüz depo atanmamışsa)
+        if (!invoice.value.warehouseId && settingsStore.settings) {
+            const isPurchaseType = invoice.value.invoiceType === 'purchase' || invoice.value.invoiceType === 'return_purchase';
+            invoice.value.warehouseId = isPurchaseType
+                ? (settingsStore.settings.defaultPurchaseWarehouseId || '')
+                : (settingsStore.settings.defaultSalesWarehouseId || '');
+        }
     }
 });
 
@@ -283,8 +259,8 @@ watch(
 );
 
 // TRY karşılığı toplamlar (yabancı dövizli faturalar için)
-const isForeignCurrency = computed(() => invoice.value.currency && invoice.value.currency !== 'TRY');
-const isExport = computed(() => invoice.value.documentCategory === 'export' || invoice.value.documentCategory === 'export_registered');
+const isForeignCurrency = computed<boolean>(() => !!invoice.value.currency && invoice.value.currency !== 'TRY');
+const isExport = computed<boolean>(() => invoice.value.documentCategory === 'export' || invoice.value.documentCategory === 'export_registered');
 
 const totalsTRY = computed(() => {
     if (!isForeignCurrency.value) return null;
@@ -298,20 +274,8 @@ const totalsTRY = computed(() => {
     };
 });
 
-const productSelectRefs = ref<any[]>([]);
-
-function setProductSelectRef(el: any, index: number) {
-    if (el) {
-        productSelectRefs.value[index] = el;
-    }
-}
-
-function focusAddLineButton() {
-    const btn = document.getElementById('btnAddLine');
-    if (btn) {
-        btn.focus();
-    }
-}
+// Alt bileşen ref — openLastProductSelect() çağırmak için
+const linesComponent = ref<InstanceType<typeof InvoiceFormLines> | null>(null);
 
 function getStock(productId: string, warehouseId?: string) {
     if (!productId) return 0;
@@ -368,12 +332,11 @@ function closeStockWarning(confirm: boolean) {
     stockWarning.value.visible = false;
 }
 
-function addLine(autoOpenSelect = false) {
-    const shouldOpen = autoOpenSelect === true;
+function addLine(autoOpen = false) {
     invoice.value.lines.push({
         id: crypto.randomUUID(),
         productId: '',
-        warehouseId: invoice.value.warehouseId, // Header'daki depoyu varsayılan yap
+        warehouseId: invoice.value.warehouseId,
         description: '',
         quantity: 1,
         unitPrice: 0,
@@ -385,19 +348,9 @@ function addLine(autoOpenSelect = false) {
         discountRate3: 0,
         lineTotal: 0
     });
-
-    if (shouldOpen) {
-        nextTick(() => {
-            const lastIndex = invoice.value.lines.length - 1;
-            const lastSelect = productSelectRefs.value[lastIndex];
-            if (lastSelect) {
-                if (lastSelect.show) {
-                    lastSelect.show();
-                } else if (lastSelect.$el) {
-                    lastSelect.$el.click();
-                }
-            }
-        });
+    // InvoiceFormLines bileşeni dropdown açmayı kendi yönetir
+    if (autoOpen) {
+        nextTick(() => linesComponent.value?.openLastProductSelect());
     }
 }
 
@@ -678,59 +631,17 @@ function goBack() {
 
 <template>
     <div class="flex flex-col gap-0">
-        <div class="card p-4 min-h-32 flex flex-col gap-2">
-            <div class="flex flex-col gap-1">
-                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura' }}</div>
-                
-                <div class="flex items-center justify-between mt-2">
-                    <div class="flex items-center gap-3">
-                        <!-- Fatura Numarası -->
-                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-hashtag text-primary text-sm"></i>
-                            <span class="text-xl font-mono font-bold text-primary leading-none">{{ invoice.invoiceNumber || '---' }}</span>
-                        </div>
-
-                        <!-- Fatura Tipi Badge -->
-                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-tag text-surface-500 text-sm"></i>
-                            <span class="text-base font-bold text-surface-700 dark:text-surface-300">
-                                {{ invoiceTypes.find(t => t.value === invoice.invoiceType)?.label || '---' }}
-                            </span>
-                        </div>
-
-                        <!-- Fatura Türü Badge -->
-                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-file text-surface-500 text-sm"></i>
-                            <span class="text-base font-bold text-surface-700 dark:text-surface-300">
-                                {{ documentCategories.find(c => c.value === invoice.documentCategory)?.label || '---' }}
-                            </span>
-                        </div>
-
-                        <!-- Kaynak Belge Badge -->
-                        <div v-if="invoice.sourceType" class="flex items-center gap-2 px-3 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <i class="pi pi-link text-blue-500 text-sm"></i>
-                            <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                Kaynak {{ invoice.sourceType === 'order' ? 'Sipariş' : 'Teklif' }} Bağlı
-                            </span>
-                        </div>
-
-                        <!-- Döviz Kuru (Yabancı döviz ise) -->
-                        <div v-if="isForeignCurrency" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-money-bill text-surface-500 text-sm"></i>
-                            <div class="text-base font-medium leading-none">
-                                1 {{ invoice.currency }} = <span class="font-bold text-primary">{{ invoice.exchangeRate.toFixed(4) }}</span> ₺
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- PDF ve Yazdır Butonları -->
-                    <div class="flex items-center gap-2">
-                        <Button icon="pi pi-file-pdf" label="PDF" severity="secondary" outlined size="small" @click="exportToPDF" />
-                        <Button icon="pi pi-print" label="YAZDIR" severity="secondary" outlined size="small" />
-                    </div>
-                </div>
-            </div>
-        </div>
+        <InvoiceFormHeader
+            :isEdit="isEdit"
+            :invoiceNumber="invoice.invoiceNumber"
+            :invoiceType="invoice.invoiceType"
+            :documentCategory="invoice.documentCategory"
+            :sourceType="invoice.sourceType"
+            :isForeignCurrency="isForeignCurrency"
+            :currency="invoice.currency"
+            :exchangeRate="invoice.exchangeRate"
+            @export-pdf="exportToPDF"
+        />
 
         <div class="card">
             <div class="flex flex-col gap-4 mb-4">
@@ -813,129 +724,39 @@ function goBack() {
                     </div>
                 </div>
 
-                <div>
-                    <div class="flex justify-between items-center mb-4">
-                        <h6 class="font-normal m-0">Fatura Kalemleri</h6>
+                <InvoiceFormLines
+                    ref="linesComponent"
+                    :lines="invoice.lines"
+                    :warehouses="inventoryStore.warehouses"
+                    :products="productStore.products"
+                    :taxRates="taxRates"
+                    :discountLabel1="settingsStore.settings?.discountLabel1 || 'İskonto 1'"
+                    :discountLabel2="settingsStore.settings?.discountLabel2 || 'İskonto 2'"
+                    :discountLabel3="settingsStore.settings?.discountLabel3 || 'İskonto 3'"
+                    @remove-line="removeLine"
+                    @product-changed="onProductChange"
+                    @quantity-blurred="checkStock"
+                >
+                    <template #add-button>
                         <Button id="btnAddLine" label="Kalem Ekle" icon="pi pi-plus" text size="small" @click="() => addLine(true)" />
-                    </div>
-                    <DataTable :value="invoice.lines" class="p-datatable-sm">
-                        <Column header="Ürün" style="width: 25%">
-                            <template #body="slotProps">
-                                <div class="flex flex-col gap-1">
-                                    <Select :ref="(el) => setProductSelectRef(el, slotProps.index)" v-model="slotProps.data.productId" :options="productStore.products" optionLabel="name" optionValue="id" @change="onProductChange(slotProps.data)" fluid filter />
+                    </template>
+                </InvoiceFormLines>
 
-                                </div>
-                            </template>
-                        </Column>
-                        <Column header="Depo" style="width: 8%">
-                            <template #body="slotProps">
-                                <Select v-model="slotProps.data.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo" fluid />
-                            </template>
-                        </Column>
-                        <Column header="Miktar" style="width: 6%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.quantity" :min="1" fluid inputClass="text-right" @blur="checkStock(slotProps.data)" />
-                            </template>
-                        </Column>
-                        <Column header="Birim Fiyat" style="width: 8%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.unitPrice" :minFractionDigits="2" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column header="Döviz" style="width: 6%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputText :value="slotProps.data.originalCurrency || '-'" readonly fluid class="text-right" />
-                            </template>
-                        </Column>
-                        <Column header="KDV %" style="width: 6%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel1 || 'İskonto 1'" style="width: 4%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate1" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel2 || 'İskonto 2'" style="width: 4%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate2" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column :header="settingsStore.settings?.discountLabel3 || 'İskonto 3'" style="width: 4%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputNumber v-model="slotProps.data.discountRate3" :min="0" :max="100" fluid inputClass="text-right" />
-                            </template>
-                        </Column>
-                        <Column header="Toplam" style="width: 10%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
-                            <template #body="slotProps">
-                                <InputText :value="slotProps.data.lineTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })" readonly fluid class="font-bold text-right" @keydown.tab.exact.prevent="focusAddLineButton" />
-                            </template>
-                        </Column>
-                        <Column style="width: 1%">
-                            <template #body="slotProps">
-                                <Button icon="pi pi-trash" severity="danger" text rounded tabindex="-1" @click="removeLine(slotProps.index)" />
-                            </template>
-                        </Column>
-                    </DataTable>
-                </div>
 
-                <div class="flex flex-col lg:flex-row justify-between gap-6">
-                    <div class="w-full lg:w-6/12">
-                        
-                        <Textarea id="notes" v-model="invoice.notes" rows="6" placeholder="Fatura notu ekleyin..." fluid />
-                        
-                        <div class="mt-3 p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-dashed border-surface-300 dark:border-surface-600">
-                            <div class="text-xs text-surface-500 uppercase font-bold mb-1">
-                                {{ invoice.currency === 'TRY' ? 'Yazıyla Genel Toplam:' : 'Total in Words:' }}
-                            </div>
-                            <div class="text-sm font-medium italic text-primary">#{{ totalAsWords }}#</div>
-                        </div>
-                    </div>
-
-                    <div class="w-full lg:w-6/12">
-                        <div class="flex flex-col gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded">
-                                <div class="flex justify-between">
-                                    <span>{{ isExport ? 'Gross Total:' : 'Brüt Toplam:' }}</span>
-                                    <span class="font-medium">{{ totals.grossTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div class="flex justify-between text-red-500">
-                                    <span>{{ isExport ? 'Total Discount:' : 'İskonto Toplamı:' }}</span>
-                                    <span class="font-medium">- {{ totals.discountTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div class="flex justify-between border-t pt-2 mt-1">
-                                    <span>{{ isExport ? 'Subtotal:' : 'Ara Toplam:' }}</span>
-                                    <span class="font-medium">{{ totals.subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div v-if="invoice.discountRate > 0" class="flex justify-between text-red-500">
-                                    <span>{{ isExport ? 'Global Discount' : 'Genel İndirim' }} (%{{ invoice.discountRate }}):</span>
-                                    <span class="font-medium">- {{ totals.globalDiscount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div v-if="invoice.discountRate > 0" class="flex justify-between font-bold border-t pt-2">
-                                    <span>{{ isExport ? 'Net Subtotal:' : 'Net Ara Toplam:' }}</span>
-                                    <span class="font-medium">{{ totals.netSubtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>{{ isExport ? 'VAT Total:' : 'KDV Toplam:' }}</span>
-                                    <span class="font-medium">{{ totals.vatTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <div class="flex justify-between text-medium font-semibold border-t pt-4">
-                                    <span>{{ isExport ? 'Grand Total:' : 'Genel Toplam:' }}</span>
-                                    <span>{{ totals.total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} {{ invoice.currency }}</span>
-                                </div>
-                                <!-- TRY karşılığı (yabancı döviz ise göster) -->
-                                <div v-if="isForeignCurrency && totalsTRY" class="border-t pt-3 mt-1">
-                                    <div class="text-surface-500 text-sm mb-1">{{ isExport ? 'TRY Equivalent' : 'TRY Karşılığı' }} (Kur: {{ invoice.exchangeRate }})</div>
-                                    <div class="flex justify-between font-bold text-primary">
-                                        <span>≈ {{ isExport ? 'Total TRY:' : 'TRY Toplam:' }}</span>
-                                        <span>{{ totalsTRY.total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} ₺</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
+                <InvoiceFormSummary
+                    :totals="totals"
+                    :totalsTRY="totalsTRY"
+                    :isForeignCurrency="isForeignCurrency"
+                    :isExport="isExport"
+                    :currency="invoice.currency"
+                    :exchangeRate="invoice.exchangeRate"
+                    :discountRate="invoice.discountRate"
+                    :notes="invoice.notes"
+                    :totalAsWords="totalAsWords"
+                    @update:notes="invoice.notes = $event"
+                    @update:discountRate="invoice.discountRate = $event"
+                />
+            </div>
 
             <!-- Butonlar -->
             <div class="grid grid-cols-12 gap-4 mt-8">
@@ -949,137 +770,14 @@ function goBack() {
         </div>
     </div>
 
-    <!-- PDF Tasarımı (Gizli) -->
-    <!-- PDF Tasarımı (Minimalist Style) -->
-    <!-- PDF Tasarımı (Minimalist Style) -->
-    <div id="invoice-pdf-template" style="display: none; width: 210mm; min-height: 297mm; padding: 5mm; font-family: 'Helvetica', 'Arial', sans-serif; background: #ffffff; color: #444444; position: absolute; left: -9999px;">
-        
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px;">
-            <div style="flex: 1;">
-                <div v-if="settingsStore.settings?.logoUrl" style="margin-bottom: 15px;">
-                    <img :src="settingsStore.settings.logoUrl" style="max-height: 60px; max-width: 200px; object-fit: contain;" />
-                </div>
-                <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">SAYIN</div>
-                <div style="font-size: 14px; font-weight: 500; color: #1e293b; margin-bottom: 6px;">{{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.name }}</div>
-                <div style="font-size: 11px; line-height: 1.5; color: #64748b; max-width: 320px;">
-                    {{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.address }}<br>
-                    <span v-if="financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber" style="color: #475569; font-weight: 500;">VN/TC: {{ financeStore.accounts.find((a: any) => a.id === invoice?.accountId)?.taxNumber }}</span>
-                </div>
-            </div>
-            <div style="flex: 1; text-align: right;">
-                <div style="font-size: 24px; font-weight: 400; color: #1e293b; margin-bottom: 12px; letter-spacing: 2px;">FATURA</div>
-                <div style="display: inline-block; text-align: left; font-size: 11px; color: #64748b;">
-                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">No:</span> <span style="color: #475569; font-weight: 400;">{{ invoice?.invoiceNumber || '---' }}</span></div>
-                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">Tarih:</span> <span style="color: #475569; font-weight: 400;">{{ invoice?.issueDate ? new Date(invoice.issueDate).toLocaleDateString('tr-TR') : '---' }}</span></div>
-                    <div style="margin-bottom: 4px;"><span style="color: #94a3b8; width: 45px; display: inline-block;">Tür:</span> <span style="color: #475569; font-weight: 400;">{{ documentCategories.find(c => c.value === invoice?.documentCategory)?.label || '---' }}</span></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Table -->
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 9px;">
-            <thead>
-                <tr style="border-bottom: 1.5px solid #cbd5e1;">
-                    <th style="text-align: left; padding: 4px 5px 6px 5px; color: #1e293b; width: 30px; font-weight: 600;">#</th>
-                    <th style="text-align: left; padding: 4px 5px 6px 5px; color: #1e293b; font-weight: 600;">Ürün</th>
-                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">Miktar</th>
-                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 70px; font-weight: 600;">Fiyat</th>
-                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">İsk. (%)</th>
-                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 70px; font-weight: 600;">İsk.Fiyat</th>
-                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 80px; font-weight: 600;">Net Tutar</th>
-                    <th style="text-align: center; padding: 4px 5px 6px 5px; color: #1e293b; width: 50px; font-weight: 600;">KDV %</th>
-                    <th style="text-align: right; padding: 4px 5px 6px 5px; color: #1e293b; width: 80px; font-weight: 600;">Toplam</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="(line, index) in invoice?.lines" :key="line.id">
-                    <td style="padding: 4px 5px; color: #777; vertical-align: middle;">{{ index + 1 }}</td>
-                    <td style="padding: 4px 5px; color: #1e293b; font-weight: 400; vertical-align: middle;">{{ productStore.products.find(p => p.id === line.productId)?.name }}</td>
-                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ line.quantity }}</td>
-                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ (line.unitPrice || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.discountRate1 || 0) + (line.discountRate2 || 0) + (line.discountRate3 || 0)).toFixed(2) }}</td>
-                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100) / (line.quantity || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ ((line.lineTotal || 0) / (1 + (line.vatRate || 0) / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                    <td style="text-align: center; padding: 4px 5px; color: #1e293b; vertical-align: middle;">{{ line.vatRate }}</td>
-                    <td style="text-align: right; padding: 4px 5px; color: #1e293b; font-weight: 400; vertical-align: middle;">{{ (line.lineTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- Footer Section -->
-        <div style="border-top: 1.5px solid #cbd5e1; padding-top: 30px; display: flex; justify-content: space-between; align-items: stretch;">
-            <!-- Left: Notes -->
-            <div style="flex: 1.5; display: flex; flex-direction: column; justify-content: space-between;">
-                <div v-if="invoice?.notes">
-                    <div style="font-size: 16px; font-weight: 500; color: #444; margin-bottom: 10px;">Not</div>
-                    <div style="font-size: 11px; color: #777; line-height: 1.6; max-width: 450px; white-space: pre-wrap;">
-                        {{ invoice.notes }}
-                    </div>
-                </div>
-                <div v-else></div> <!-- Spacer -->
-                
-                <div style="font-size: 11px; font-weight: 400; color: #64748b; margin-top: auto; font-style: italic;">
-                    # {{ totalAsWords }} #
-                </div>
-            </div>
-
-            <!-- Right: Totals -->
-            <div style="flex: 1; text-align: right;">
-                <div style="display: inline-block; width: 100%; max-width: 220px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
-                        <span>Ara Toplam:</span>
-                        <span style="color: #444;">{{ (totals?.grossTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
-                        <span>Toplam İndirim:</span>
-                        <span style="color: #444;">{{ (totals?.discountTotal + totals?.globalDiscount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
-                        <span>Net Toplam:</span>
-                        <span style="color: #444;">{{ (totals?.netSubtotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px; color: #777;">
-                        <span>Toplam KDV:</span>
-                        <span style="color: #444;">{{ (totals?.vatTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 500; color: #111; margin-top: 4px; border-top: 1px solid #1e293b; padding-top: 6px;">
-                        <span>GENEL TOPLAM:</span>
-                        <span>
-                            <span style="font-size: 10px; margin-right: 2px; font-weight: 400;">{{ invoice?.currency === 'TRY' ? '₺' : invoice?.currency }}</span>
-                            {{ (totals?.total || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gönderici Bilgisi (Şirket) -->
-        <div style="margin-top: 80px; border-top: 1px solid #cbd5e1; padding-top: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div style="flex: 2;">
-                    <div style="font-size: 13px; color: #1e293b; font-weight: 500; margin-bottom: 5px;">{{ settingsStore.settings?.companyName }}</div>
-                    <div style="font-size: 11px; color: #64748b; line-height: 1.5; max-width: 500px;">
-                        {{ settingsStore.settings?.address }}
-                    </div>
-                </div>
-                <div style="flex: 1; text-align: right; font-size: 11px; color: #64748b; line-height: 1.6;">
-                    <div v-if="settingsStore.settings?.taxNumber">
-                        <span style="color: #94a3b8;">VD:</span> {{ settingsStore.settings?.taxOffice }}<br>
-                        <span style="color: #94a3b8;">VN:</span> {{ settingsStore.settings?.taxNumber }}
-                    </div>
-                    <div v-if="settingsStore.settings?.phone" style="margin-top: 4px;">
-                        <span style="color: #94a3b8;">Tel:</span> {{ settingsStore.settings?.phone }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- System Footer -->
-        <div style="position: absolute; bottom: 10mm; left: 15mm; right: 15mm; text-align: center; font-size: 9px; color: #94a3b8; font-style: italic;">
-            Bu belge elektronik ortamda oluşturulmuştur.
-        </div>
-    </div>
+    <InvoiceFormPdfTemplate
+        :invoice="invoice"
+        :totals="totals"
+        :totalAsWords="totalAsWords"
+        :settings="settingsStore.settings"
+        :accounts="financeStore.accounts"
+        :products="productStore.products"
+    />
 
     <!-- Stok Uyarı Dialog -->
     <Dialog v-model:visible="stockWarning.visible" :header="stockWarning.title" modal :style="{ width: '450px' }" :closable="stockWarning.severity === 'warn'">

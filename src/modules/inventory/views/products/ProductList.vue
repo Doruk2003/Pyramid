@@ -68,7 +68,7 @@ const columns = ref([
     { field: 'typeId', header: 'Tip' },
     { field: 'minStock', header: 'Min Stok' },
     { field: 'maxStock', header: 'Max Stok' },
-    { field: 'initialStock', header: 'Mevcut Stok' },
+    { field: 'initialStock', header: 'Stok' },
     { field: 'categoryDiscount', header: 'İskonto Tipi' },
     { field: 'status', header: 'Durum' },
     { field: 'inventoryStatus', header: 'Stok Takibi' }
@@ -526,7 +526,7 @@ function getPriceUnitLabel(value: string | null | undefined) {
 
                 <Column v-if="selectedColumns.find(c => c.field === 'minStock')" field="minStock" header="Min Stok" sortable style="min-width: 10rem"></Column>
                 <Column v-if="selectedColumns.find(c => c.field === 'maxStock')" field="maxStock" header="Max Stok" sortable style="min-width: 10rem"></Column>
-                <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Mevcut Stok" sortable style="min-width: 10rem">
+                <Column v-if="selectedColumns.find(c => c.field === 'initialStock')" field="initialStock" header="Stok" sortable style="min-width: 10rem">
                     <template #body="slotProps">
                         <div class="flex items-center gap-2">
                             <span :class="[

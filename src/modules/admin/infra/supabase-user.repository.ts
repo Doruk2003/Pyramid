@@ -85,7 +85,7 @@ export class SupabaseUserRepository implements IUserRepository {
             companyId: row.company_id,
             email: row.email,
             fullName: row.full_name,
-            role: row.role,
+            role: row.role as 'admin' | 'user' | 'manager' | 'viewer',
             isActive: row.is_active,
             createdAt: new Date(row.created_at)
         });

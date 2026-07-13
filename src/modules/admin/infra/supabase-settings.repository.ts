@@ -36,7 +36,10 @@ export class SupabaseSettingsRepository implements ISettingsRepository {
                 cashSerial: data.settings?.cashSerial,
                 cashStartingNumber: data.settings?.cashStartingNumber,
                 employeeSerial: data.settings?.employeeSerial,
-                employeeStartingNumber: data.settings?.employeeStartingNumber
+                employeeStartingNumber: data.settings?.employeeStartingNumber,
+                allowNegativeStock: data.settings?.allowNegativeStock,
+                defaultPurchaseWarehouseId: data.settings?.defaultPurchaseWarehouseId,
+                defaultSalesWarehouseId: data.settings?.defaultSalesWarehouseId
             })
         );
     }
@@ -67,7 +70,10 @@ export class SupabaseSettingsRepository implements ISettingsRepository {
                 cashSerial: obj.cashSerial,
                 cashStartingNumber: obj.cashStartingNumber,
                 employeeSerial: obj.employeeSerial,
-                employeeStartingNumber: obj.employeeStartingNumber
+                employeeStartingNumber: obj.employeeStartingNumber,
+                allowNegativeStock: obj.allowNegativeStock,
+                defaultPurchaseWarehouseId: obj.defaultPurchaseWarehouseId,
+                defaultSalesWarehouseId: obj.defaultSalesWarehouseId
             },
             invoice_serial: obj.invoiceSerial,
             invoice_starting_number: obj.invoiceStartingNumber

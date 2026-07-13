@@ -162,6 +162,12 @@ onMounted(async () => {
         }
     } else {
         order.value.orderNumber = await salesStore.getNextOrderNumber();
+
+        // Ayarlardan varsayılan satış deposunu uygula
+        if (!order.value.warehouseId && settingsStore.settings?.defaultSalesWarehouseId) {
+            order.value.warehouseId = settingsStore.settings.defaultSalesWarehouseId;
+        }
+
         if (order.value.lines.length === 0) {
             // DocumentItemsTable will handle the empty state if needed
         }

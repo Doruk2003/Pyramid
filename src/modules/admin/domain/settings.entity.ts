@@ -25,6 +25,8 @@ export interface CompanySettingsProps {
     employeeSerial?: string;
     employeeStartingNumber?: number;
     allowNegativeStock?: boolean;
+    defaultPurchaseWarehouseId?: string;
+    defaultSalesWarehouseId?: string;
 }
 
 export class CompanySettings {
@@ -107,6 +109,12 @@ export class CompanySettings {
     }
     get allowNegativeStock(): boolean {
         return !!this.props.allowNegativeStock;
+    }
+    get defaultPurchaseWarehouseId(): string | undefined {
+        return this.props.defaultPurchaseWarehouseId;
+    }
+    get defaultSalesWarehouseId(): string | undefined {
+        return this.props.defaultSalesWarehouseId;
     }
 
     toObject(): CompanySettingsProps {

@@ -12,11 +12,12 @@ const showFilters = ref(false);
 
 const menu = ref();
 const actionTarget = ref<any | null>(null);
-const selectedQuotes = ref<any[]>([]); // Çoklu seçim için
+const selectedQuotes = ref<any[]>([]);
 
 const menuItems = computed(() => [
     {
         label: 'Düzenle',
+        icon: 'pi pi-pencil',
         command: () => {
             if (actionTarget.value) viewQuote(actionTarget.value.id);
         }
@@ -60,31 +61,31 @@ const statusOptions: Array<{ label: string; value: QuoteStatus }> = [
 
 onMounted(() => {
     purchasesStore.fetchQuotes();
-    financeStore.fetchAccounts(); // Cari hesaplar listesi için
+    financeStore.fetchAccounts();
 });
 
 function openNew() {
     router.push('/purchases/quotes/create');
 }
 
-function bulkInvoice() {
+function bulkOrder() {
     if (selectedQuotes.value.length === 0) return;
 
     const accountIds = new Set(selectedQuotes.value.map(q => q.accountId));
     if (accountIds.size > 1) {
-        alert('Farklı cari hesaplara ait teklifler toplu faturalandırılamaz.');
+        alert('Farklı tedarikçilere ait teklifler toplu siparişe dönüştürülemez.');
         return;
     }
 
     const currencies = new Set(selectedQuotes.value.map(q => q.currency));
     if (currencies.size > 1) {
-        alert('Farklı döviz cinsinden teklifler toplu faturalandırılamaz.');
+        alert('Farklı döviz cinsinden teklifler toplu siparişe dönüştürülemez.');
         return;
     }
 
     const ids = selectedQuotes.value.map(q => q.id).join(',');
     router.push({
-        path: '/finance/invoices/create',
+        path: '/purchases/orders/create',
         query: { sourceIds: ids, sourceType: 'quote' }
     });
 }
@@ -183,18 +184,18 @@ function clearFilters() {
     <div>
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
-                <div class="m-0 text-2xl font-medium">Alış Teklifleri</div>
+                <div class="m-0 text-2xl font-medium">Satın Alma Teklifleri</div>
             </div>
             <Toolbar>
                 <template #start>
                     <div class="flex gap-2">
-                        <Button label="Yeni Alış Teklifi" icon="pi pi-plus" severity="secondary" @click="openNew" />
-                        <Button 
-                            v-if="selectedQuotes.length > 0" 
-                            label="Faturalandır" 
-                            icon="pi pi-file-export" 
-                            severity="success" 
-                            @click="bulkInvoice" 
+                        <Button label="Yeni Teklif" icon="pi pi-plus" severity="secondary" @click="openNew" />
+                        <Button
+                            v-if="selectedQuotes.length > 0"
+                            label="Siparişe Dönüştür"
+                            icon="pi pi-arrow-right"
+                            severity="success"
+                            @click="bulkOrder"
                         />
                     </div>
                 </template>
@@ -207,13 +208,13 @@ function clearFilters() {
         <div v-if="showFilters" class="card mb-4">
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                 <div class="col-span-1">
-                    <InputText v-model="filterForm.quoteNumber" placeholder="Alış Teklif No" fluid />
+                    <InputText v-model="filterForm.quoteNumber" placeholder="Teklif No" fluid />
                 </div>
                 <div class="col-span-1">
                     <Select v-model="filterForm.status" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Durum" fluid />
                 </div>
                 <div class="col-span-1">
-                    <Select v-model="filterForm.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Cari Hesap" fluid />
+                    <Select v-model="filterForm.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Tedarikçi" fluid />
                 </div>
                 <div class="col-span-1">
                     <DatePicker v-model="filterForm.startDate" placeholder="Başlangıç" dateFormat="dd.mm.yy" fluid />
@@ -236,10 +237,11 @@ function clearFilters() {
                 :paginator="true"
                 :rows="10"
                 :rowsPerPageOptions="[10, 25, 50]"
-                emptyMessage="Kayıtlı alış teklifi bulunamadı."
+                emptyMessage="Kayıtlı satın alma teklifi bulunamadı."
+                :loading="purchasesStore.loading"
             >
                 <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
-                <Column field="quoteNumber" header="Alış Teklif No" sortable style="min-width: 130px" />
+                <Column field="quoteNumber" header="Teklif No" sortable style="min-width: 130px" />
                 <Column header="Tedarikçi (Cari)" sortable style="min-width: 180px">
                     <template #body="slotProps">
                         <span class="font-medium">{{ slotProps.data.accountName ?? '—' }}</span>
@@ -258,9 +260,9 @@ function clearFilters() {
                 <Column header="Dönüşüm" style="min-width: 120px">
                     <template #body="slotProps">
                         <div class="flex flex-col gap-1 w-full">
-                            <ProgressBar 
-                                :value="Math.round((slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) / slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0)) * 100) || 0" 
-                                :showValue="false" 
+                            <ProgressBar
+                                :value="Math.round((slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) / slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0)) * 100) || 0"
+                                :showValue="false"
                                 style="height: 4px"
                                 :severity="slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) >= slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.quantity || 0), 0) ? 'success' : (slotProps.data.lines.reduce((sum: number, l: any) => sum + (l.orderedQuantity || 0), 0) > 0 ? 'warn' : 'secondary')"
                             />

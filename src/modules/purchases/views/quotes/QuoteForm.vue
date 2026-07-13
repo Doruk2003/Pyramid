@@ -30,341 +30,151 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
-const stockWarning = ref({
-    visible: false,
-    title: '',
-    message: '',
-    severity: 'warn' as 'warn' | 'error',
-    canContinue: true,
-    lastQuantity: 1,
-    targetLine: null as any
-});
+const stockWarning = ref({ visible: false, title: '', message: '', severity: 'warn' as 'warn' | 'error' });
 
 function checkStock(line: any) {
     if (!line.productId) return;
-    
     const product = productStore.products.find(p => p.id === line.productId);
     if (!product) return;
-
     const warehouseId = line.warehouseId || quote.value.warehouseId;
-    const currentStock = inventoryStore.balances.find(
-        (b) => b.productId === line.productId && b.warehouseId === warehouseId
-    )?.balance || 0;
-    
-    const requestedQty = line.quantity;
-    
-    if (quote.value.type === 'sale') {
-        const minStock = product.minStock || 0;
-        const remainingStock = currentStock - requestedQty;
-
-        if (remainingStock < 0) {
-            const allowNegative = settingsStore.settings?.allowNegativeStock ?? false;
-            stockWarning.value = {
-                visible: true,
-                title: 'Negatif Stok Uyarısı',
-                message: `${product.name} ürünü için seçilen miktar stok bakiyesini negatife düşürüyor. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock}`,
-                severity: allowNegative ? 'warn' : 'error',
-                canContinue: allowNegative,
-                lastQuantity: requestedQty,
-                targetLine: line
-            };
-        } else if (remainingStock < minStock) {
-            stockWarning.value = {
-                visible: true,
-                title: 'Kritik Stok Seviyesi',
-                message: `${product.name} ürünü için kritik stok eşiğine ulaşıldı veya altına düşüldü. \n\nMevcut Stok: ${currentStock} \nİstenen Miktar: ${requestedQty} \nKalan Bakiye: ${remainingStock} \nKritik Eşik: ${minStock}`,
-                severity: 'warn',
-                canContinue: true,
-                lastQuantity: requestedQty,
-                targetLine: line
-            };
-        }
-    } else {
-        const maxStock = product.maxStock || 0;
-        const afterStock = currentStock + requestedQty;
-        
-        if (maxStock > 0 && afterStock > maxStock) {
-            stockWarning.value = {
-                visible: true,
-                title: 'Maksimum Stok Uyarısı',
-                message: `${product.name} ürünü için seçilen miktar maksimum stok seviyesini aşıyor. \n\nMevcut Stok: ${currentStock} \nEklenen Miktar: ${requestedQty} \nYeni Bakiye: ${afterStock} \nMaksimum Eşik: ${maxStock}`,
-                severity: 'warn',
-                canContinue: true,
-                lastQuantity: requestedQty,
-                targetLine: line
-            };
-        }
+    const currentStock = inventoryStore.balances.find(b => b.productId === line.productId && b.warehouseId === warehouseId)?.balance || 0;
+    const afterStock = currentStock + line.quantity;
+    const maxStock = product.maxStock || 0;
+    if (maxStock > 0 && afterStock > maxStock) {
+        stockWarning.value = { visible: true, title: 'Maksimum Stok Uyarısı', message: `${product.name}: Mevcut ${currentStock} + Eklenecek ${line.quantity} = ${afterStock} (Max: ${maxStock})`, severity: 'warn' };
     }
-}
-
-function closeStockWarning() {
-    stockWarning.value.visible = false;
 }
 
 const quoteId = route.params.id as string;
 const isEdit = !!quoteId;
 
 const quote = ref<any>({
-    quoteNumber: '',
-    accountId: '',
-    warehouseId: '',
-    projectId: null,
-    issueDate: new Date(),
-    validUntil: null,
-    status: 'draft',
-    type: 'purchase',
-    currency: 'TRY',
-    exchangeRate: 1,
-    discountRate: 0,
-    notes: '',
-    lines: []
+    quoteNumber: '', accountId: '', warehouseId: '', projectId: null,
+    issueDate: new Date(), validUntil: null, status: 'draft', type: 'purchase',
+    currency: 'TRY', exchangeRate: 1, discountRate: 0, notes: '', lines: []
 });
 
 const statusOptions: Array<{ label: string; value: QuoteStatus }> = [
-    { label: 'Taslak', value: 'draft' },
-    { label: 'Gönderildi', value: 'sent' },
-    { label: 'Onaylandı', value: 'accepted' },
-    { label: 'Reddedildi', value: 'rejected' },
-    { label: 'İptal', value: 'cancelled' },
-    { label: 'Siparişe Dönüştü', value: 'converted' },
+    { label: 'Taslak', value: 'draft' }, { label: 'Gönderildi', value: 'sent' },
+    { label: 'Onaylandı', value: 'accepted' }, { label: 'Reddedildi', value: 'rejected' },
+    { label: 'İptal', value: 'cancelled' }, { label: 'Siparişe Dönüştü', value: 'converted' },
     { label: 'Kısmi Sipariş', value: 'partially_converted' }
 ];
 
 onMounted(async () => {
     await Promise.all([
-        financeStore.fetchAccounts(),
-        productStore.fetchProducts(),
-        inventoryStore.fetchWarehouses(),
-        lookupStore.fetchAll(),
-        exchangeRateStore.fetchCurrentRates(),
-        projectStore.fetchProjects(),
-        settingsStore.fetchSettings(),
-        inventoryStore.fetchBalances()
+        financeStore.fetchAccounts(), productStore.fetchProducts(),
+        inventoryStore.fetchWarehouses(), lookupStore.fetchAll(),
+        exchangeRateStore.fetchCurrentRates(), projectStore.fetchProjects(),
+        settingsStore.fetchSettings(), inventoryStore.fetchBalances()
     ]);
-
     if (isEdit) {
         await purchasesStore.fetchQuotes();
-        const found = purchasesStore.quotes.find((q) => q.id === quoteId);
+        const found = purchasesStore.quotes.find(q => q.id === quoteId);
         if (found) {
             const obj = found.toObject();
-            quote.value = { 
-                ...obj, 
-                warehouseId: obj.lines[0]?.warehouseId || '',
-                notes: obj.notes || '',
-                projectId: obj.projectId || null,
-                discountRate: (obj as any).discountRate || 0,
-                issueDate: new Date(obj.issueDate), 
-                validUntil: obj.validUntil ? new Date(obj.validUntil) : null 
-            };
+            quote.value = { ...obj, warehouseId: obj.lines[0]?.warehouseId || '', notes: obj.notes || '',
+                projectId: obj.projectId || null, discountRate: (obj as any).discountRate || 0,
+                issueDate: new Date(obj.issueDate), validUntil: obj.validUntil ? new Date(obj.validUntil) : null };
         }
     } else {
         quote.value.quoteNumber = await purchasesStore.getNextQuoteNumber();
-        if (quote.value.lines.length === 0) {
-            // Initial line will be added by the component if we don't have any
-        }
     }
 });
 
 watch(() => quote.value.currency, (newCode) => {
-    if (!newCode || newCode === 'TRY') {
-        quote.value.exchangeRate = 1;
-    } else {
-        const rate = exchangeRateStore.getRateByCode(newCode || '');
-        if (rate > 0) quote.value.exchangeRate = rate;
-    }
+    if (!newCode || newCode === 'TRY') { quote.value.exchangeRate = 1; }
+    else { const rate = exchangeRateStore.getRateByCode(newCode); if (rate > 0) quote.value.exchangeRate = rate; }
 });
 
-const totals = computed(() => {
-    return DocumentCalculator.calculateTotals(quote.value.lines, quote.value.discountRate, quote.value.currency);
-});
+const totals = computed(() => DocumentCalculator.calculateTotals(quote.value.lines, quote.value.discountRate, quote.value.currency));
 
 async function saveQuote() {
     if (!quote.value.accountId || !quote.value.quoteNumber || quote.value.lines.length === 0) {
-        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 });
-        return;
+        toast.add({ severity: 'warn', summary: 'Doğrulama', detail: 'Lütfen zorunlu alanları doldurun', life: 3000 }); return;
     }
-
     const t = totals.value;
-    const q = Quote.create({
-        ...quote.value,
-        validUntil: quote.value.validUntil || undefined,
-        id: quoteId || crypto.randomUUID(),
-        companyId: authStore.user?.companyId || '',
-        subtotal: t.subtotal,
-        vatTotal: t.vatTotal,
-        total: t.total,
-        type: quote.value.type,
-        projectId: quote.value.projectId || undefined,
-        createdAt: quote.value.createdAt || new Date(),
-        updatedAt: new Date(),
-        lines: quote.value.lines.map((l: any) => ({
-            ...l,
-            quoteId: quoteId || ''
-        }))
+    const q = Quote.create({ ...quote.value, validUntil: quote.value.validUntil || undefined,
+        id: quoteId || crypto.randomUUID(), companyId: authStore.user?.companyId || '',
+        subtotal: t.subtotal, vatTotal: t.vatTotal, total: t.total, type: 'purchase',
+        projectId: quote.value.projectId || undefined, createdAt: quote.value.createdAt || new Date(), updatedAt: new Date(),
+        lines: quote.value.lines.map((l: any) => ({ ...l, quoteId: quoteId || '' }))
     });
-
     const result = await purchasesStore.saveQuote(q);
-    if (result.success) {
-        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Alış teklifi kaydedildi', life: 3000 });
-        router.push('/purchases/quotes');
-    } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 });
-    }
-}
-
-function goBack() {
-    router.push('/purchases/quotes');
+    if (result.success) { toast.add({ severity: 'success', summary: 'Başarılı', detail: 'Teklif kaydedildi', life: 3000 }); router.push('/purchases/quotes'); }
+    else { toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 3000 }); }
 }
 </script>
 
 <template>
     <div class="flex flex-col gap-0">
-        <!-- Header -->
         <div class="card p-4 min-h-32 flex flex-col gap-2">
-            <div class="flex flex-col gap-1">
-                <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Alış Teklifini Düzenle' : 'Yeni Alış Teklifi' }}</div>
-                
-                <div class="flex items-center justify-between mt-2">
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-hashtag text-primary text-sm"></i>
-                            <span class="text-xl font-mono font-bold text-primary leading-none">{{ quote.quoteNumber || '---' }}</span>
-                        </div>
-
-                        <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-file text-surface-500 text-sm"></i>
-                            <span class="text-base font-bold text-surface-700 dark:text-surface-300">
-                                {{ quote.type === 'sale' ? 'Satış Teklifi' : 'Alış Teklifi' }}
-                            </span>
-                        </div>
-
-                        <div v-if="quote.currency !== 'TRY'" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                            <i class="pi pi-money-bill text-surface-500 text-sm"></i>
-                            <div class="text-base font-medium leading-none">
-                                1 {{ quote.currency }} = <span class="font-bold text-primary">{{ quote.exchangeRate.toFixed(4) }}</span> ₺
-                            </div>
-                        </div>
+            <div class="m-0 text-2xl font-medium">{{ isEdit ? 'Teklifi Düzenle' : 'Yeni Satın Alma Teklifi' }}</div>
+            <div class="flex items-center justify-between mt-2">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                        <i class="pi pi-hashtag text-primary text-sm"></i>
+                        <span class="text-xl font-mono font-bold text-primary leading-none">{{ quote.quoteNumber || '---' }}</span>
                     </div>
-
-                    <div class="flex items-center gap-2">
-                        <Button icon="pi pi-file-pdf" label="PDF" severity="secondary" outlined size="small" />
-                        <Button icon="pi pi-print" label="YAZDIR" severity="secondary" outlined size="small" />
+                    <div class="flex items-center gap-2 px-3 h-10 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <i class="pi pi-shopping-cart text-amber-600 text-sm"></i>
+                        <span class="text-base font-bold text-amber-700 dark:text-amber-300">Alış Teklifi</span>
+                    </div>
+                    <div v-if="quote.currency !== 'TRY'" class="flex items-center gap-2 px-3 h-10 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                        <i class="pi pi-money-bill text-surface-500 text-sm"></i>
+                        <span class="text-base font-medium">1 {{ quote.currency }} = <strong class="text-primary">{{ quote.exchangeRate.toFixed(4) }}</strong> ₺</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Form Content -->
         <div class="card">
             <div class="flex flex-col gap-4 mb-4">
-                <!-- Top Fields -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                    <div>
-                        <label class="block font-bold mb-3">Tarih</label>
-                        <DatePicker v-model="quote.issueDate" dateFormat="dd.mm.yy" fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Geçerlilik Tarihi</label>
-                        <DatePicker v-model="quote.validUntil" dateFormat="dd.mm.yy" fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Depo (Varsayılan)</label>
-                        <Select v-model="quote.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid />
-                    </div>
-                    <div class="lg:col-span-2">
-                        <label class="block font-bold mb-3">Cari Hesap</label>
-                        <Select v-model="quote.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Hesap Seçin" filter fluid />
-                    </div>
-
-                    <div>
-                        <label class="block font-bold mb-3">Proje</label>
-                        <Select v-model="quote.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Döviz</label>
-                        <Select v-model="quote.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Kur</label>
-                        <InputNumber v-model="quote.exchangeRate" :minFractionDigits="4" :disabled="quote.currency === 'TRY'" fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Durum</label>
-                        <Select v-model="quote.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid />
-                    </div>
-                    <div>
-                        <label class="block font-bold mb-3">Genel İndirim %</label>
-                        <InputNumber v-model="quote.discountRate" :min="0" :max="100" fluid />
-                    </div>
+                    <div><label class="block font-bold mb-3">Tarih</label><DatePicker v-model="quote.issueDate" dateFormat="dd.mm.yy" fluid /></div>
+                    <div><label class="block font-bold mb-3">Geçerlilik Tarihi</label><DatePicker v-model="quote.validUntil" dateFormat="dd.mm.yy" fluid /></div>
+                    <div><label class="block font-bold mb-3">Depo</label><Select v-model="quote.warehouseId" :options="inventoryStore.warehouses" optionLabel="name" optionValue="id" placeholder="Depo Seçin" fluid /></div>
+                    <div class="lg:col-span-2"><label class="block font-bold mb-3">Tedarikçi (Cari Hesap)</label><Select v-model="quote.accountId" :options="financeStore.accounts" optionLabel="name" optionValue="id" placeholder="Tedarikçi Seçin" filter fluid /></div>
+                    <div><label class="block font-bold mb-3">Proje</label><Select v-model="quote.projectId" :options="projectStore.projects" optionLabel="name" optionValue="id" placeholder="Proje Seçin" filter showClear fluid /></div>
+                    <div><label class="block font-bold mb-3">Döviz</label><Select v-model="quote.currency" :options="lookupStore.currencies" optionLabel="code" optionValue="code" fluid /></div>
+                    <div><label class="block font-bold mb-3">Kur</label><InputNumber v-model="quote.exchangeRate" :minFractionDigits="4" :disabled="quote.currency === 'TRY'" fluid /></div>
+                    <div><label class="block font-bold mb-3">Durum</label><Select v-model="quote.status" :options="statusOptions" optionLabel="label" optionValue="value" fluid /></div>
+                    <div><label class="block font-bold mb-3">Genel İndirim %</label><InputNumber v-model="quote.discountRate" :min="0" :max="100" fluid /></div>
                 </div>
 
-                <!-- Lines Table -->
-                <DocumentItemsTable 
-                    :lines="quote.lines" 
-                    :currency="quote.currency" 
-                    :exchangeRate="quote.exchangeRate" 
-                    :accountId="quote.accountId"
-                    :warehouseId="quote.warehouseId"
-                    documentType="quote"
-                    @change="() => {}"
-                    @stock-check="checkStock"
-                >
+                <DocumentItemsTable :lines="quote.lines" :currency="quote.currency" :exchangeRate="quote.exchangeRate"
+                    :accountId="quote.accountId" :warehouseId="quote.warehouseId" documentType="quote"
+                    @change="() => {}" @stock-check="checkStock">
                     <template #extra-columns>
                         <Column v-if="isEdit" header="Siparişleşme" style="width: 10%">
                             <template #body="slotProps">
                                 <div class="flex flex-col gap-1">
-                                    <ProgressBar 
-                                        :value="Math.min(100, Math.round((slotProps.data.orderedQuantity / slotProps.data.quantity) * 100))" 
-                                        :showValue="false" 
-                                        style="height: 6px"
-                                        :severity="slotProps.data.orderedQuantity >= slotProps.data.quantity ? 'success' : (slotProps.data.orderedQuantity > 0 ? 'warn' : 'secondary')"
-                                    />
-                                    <span class="text-[10px] text-surface-500 font-medium text-center">
-                                        {{ slotProps.data.orderedQuantity || 0 }} / {{ slotProps.data.quantity }}
-                                    </span>
+                                    <ProgressBar :value="Math.min(100, Math.round((slotProps.data.orderedQuantity / slotProps.data.quantity) * 100))" :showValue="false" style="height: 6px"
+                                        :severity="slotProps.data.orderedQuantity >= slotProps.data.quantity ? 'success' : (slotProps.data.orderedQuantity > 0 ? 'warn' : 'secondary')" />
+                                    <span class="text-[10px] text-surface-500 font-medium text-center">{{ slotProps.data.orderedQuantity || 0 }} / {{ slotProps.data.quantity }}</span>
                                 </div>
                             </template>
                         </Column>
                     </template>
                 </DocumentItemsTable>
 
-                <!-- Summary -->
-                <DocumentSummary 
-                    :totals="totals" 
-                    :currency="quote.currency" 
-                    v-model:notes="quote.notes" 
-                />
+                <DocumentSummary :totals="totals" :currency="quote.currency" v-model:notes="quote.notes" />
             </div>
 
-            <!-- Actions -->
             <div class="grid grid-cols-12 gap-4 mt-8">
-                <div class="col-span-6">
-                    <Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" outlined @click="goBack" />
-                </div>
-                <div class="col-span-6">
-                    <Button label="Alış Teklifini Kaydet" icon="pi pi-check" class="w-full" @click="saveQuote" />
-                </div>
+                <div class="col-span-6"><Button label="İptal" icon="pi pi-times" severity="secondary" class="w-full" outlined @click="router.push('/purchases/quotes')" /></div>
+                <div class="col-span-6"><Button label="Teklifi Kaydet" icon="pi pi-check" class="w-full" @click="saveQuote" /></div>
             </div>
         </div>
     </div>
 
-    <!-- Stok Uyarı Dialog -->
-    <Dialog v-model:visible="stockWarning.visible" :header="stockWarning.title" modal :style="{ width: '450px' }" :closable="stockWarning.severity === 'warn'">
+    <Dialog v-model:visible="stockWarning.visible" :header="stockWarning.title" modal :style="{ width: '450px' }" :closable="true">
         <div class="flex items-center gap-4 py-4">
-            <i :class="stockWarning.severity === 'error' ? 'pi pi-exclamation-circle text-red-500' : 'pi pi-exclamation-triangle text-amber-500'" style="font-size: 3rem"></i>
-            <div class="flex flex-col gap-2">
-                <p class="whitespace-pre-line m-0 leading-relaxed">{{ stockWarning.message }}</p>
-                <div v-if="stockWarning.severity === 'error'" class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm mt-2">
-                    <i class="pi pi-info-circle mr-2"></i>
-                    Sistem ayarları gereği negatif stokla işlem yapılmasına izin verilmemektedir. Lütfen miktarı azaltın veya stok girişi yapın.
-                </div>
-            </div>
+            <i class="pi pi-exclamation-triangle text-amber-500" style="font-size: 3rem"></i>
+            <p class="whitespace-pre-line m-0 leading-relaxed">{{ stockWarning.message }}</p>
         </div>
         <template #footer>
-            <div class="flex justify-end gap-2">
-                <Button v-if="stockWarning.severity === 'warn'" label="Anladım, Devam Et" icon="pi pi-check" severity="warning" @click="closeStockWarning" />
-                <Button v-else label="Tamam" icon="pi pi-check" severity="danger" @click="closeStockWarning" />
-            </div>
+            <Button label="Anladım" icon="pi pi-check" severity="warning" @click="stockWarning.visible = false" />
         </template>
     </Dialog>
 </template>

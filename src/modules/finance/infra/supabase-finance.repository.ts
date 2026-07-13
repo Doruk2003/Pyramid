@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Account, type AddressValue } from '@/modules/finance/domain/account.entity';
-import { Invoice, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
+import { Invoice, type InvoiceLineProps, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
 import type { AccountFilters, IFinanceRepository, InvoiceFilters } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
@@ -20,7 +20,7 @@ function rowToAccount(row: DbAccount): Account {
         companyId: row.company_id,
         code: row.code,
         parentId: row.parent_id ?? undefined,
-        accountType: row.account_type,
+        accountType: row.account_type as 'customer' | 'supplier' | 'both',
         name: row.name,
         taxNumber: row.tax_number,
         taxOffice: row.tax_office,
@@ -42,6 +42,59 @@ function rowToAccount(row: DbAccount): Account {
         dealerDiscount3: row.dealer_discount3 !== undefined ? Number(row.dealer_discount3) : undefined,
         creditLimit: Number(row.credit_limit),
         isActive: row.is_active,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+    });
+}
+
+// K4 — Tekrarlayan satır mapping kodu tek fonksiyona çekildi (DRY)
+function rowToInvoiceLine(l: DbInvoiceLine): InvoiceLineProps {
+    return {
+        id: l.id,
+        invoiceId: l.invoice_id,
+        productId: l.product_id,
+        warehouseId: l.warehouse_id,
+        description: l.description,
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unit_price),
+        originalPrice: l.original_price ? Number(l.original_price) : undefined,
+        originalCurrency: l.original_currency,
+        vatRate: Number(l.vat_rate),
+        discountRate1: Number(l.discount_rate1),
+        discountRate2: Number(l.discount_rate2),
+        discountRate3: Number(l.discount_rate3),
+        lineTotal: Number(l.line_total),
+        sourceLineId: l.source_line_id
+    };
+}
+
+function rowToInvoice(row: DbInvoice): Invoice {
+    return Invoice.create({
+        id: row.id,
+        companyId: row.company_id,
+        invoiceType: row.invoice_type as InvoiceType,
+        invoiceNumber: row.invoice_number,
+        accountId: row.account_id,
+        warehouseId: row.warehouse_id,
+        projectId: row.project_id ?? undefined,
+        issueDate: new Date(row.issue_date),
+        dueDate: row.due_date ? new Date(row.due_date) : undefined,
+        status: row.status as InvoiceStatus,
+        paymentType: (row.payment_type as PaymentType) || 'cash',
+        subtotal: Number(row.subtotal),
+        discountRate: Number(row.discount_rate || 0),
+        discountAmount: Number(row.discount_amount || 0),
+        vatTotal: Number(row.vat_total),
+        total: Number(row.total),
+        paidAmount: Number(row.paid_amount),
+        currency: row.currency,
+        exchangeRate: Number(row.exchange_rate),
+        notes: row.notes,
+        // K5 — `as any` kaldırıldı; geçerli değerler union type ile kısıtlandı
+        sourceType: (row.source_type as 'quote' | 'order' | undefined) ?? undefined,
+        sourceIds: row.source_ids,
+        documentCategory: (row.document_category as DocumentCategory) || 'domestic',
+        lines: (row.invoice_lines || []).map(rowToInvoiceLine),
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
     });
@@ -156,106 +209,15 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const { data, error } = await query.order('issue_date', { ascending: false });
         if (error) return err(new Error(error.message));
 
-        return ok(
-            ((data as DbInvoice[]) || []).map((row: DbInvoice) =>
-                Invoice.create({
-                    id: row.id,
-                    companyId: row.company_id,
-                    invoiceType: row.invoice_type as InvoiceType,
-                    invoiceNumber: row.invoice_number,
-                    accountId: row.account_id,
-                    warehouseId: row.warehouse_id,
-                    projectId: row.project_id ?? undefined,
-                    issueDate: new Date(row.issue_date),
-                    dueDate: row.due_date ? new Date(row.due_date) : undefined,
-                    status: row.status as InvoiceStatus,
-                    paymentType: (row.payment_type as PaymentType) || 'cash',
-                    subtotal: Number(row.subtotal),
-                    discountRate: Number(row.discount_rate || 0),
-                    discountAmount: Number(row.discount_amount || 0),
-                    vatTotal: Number(row.vat_total),
-                    total: Number(row.total),
-                    paidAmount: Number(row.paid_amount),
-                    currency: row.currency,
-                    exchangeRate: Number(row.exchange_rate),
-                    notes: row.notes,
-                    sourceType: row.source_type as any,
-                    sourceIds: row.source_ids,
-                    documentCategory: (row.document_category as DocumentCategory) || 'domestic',
-                    lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
-                        id: l.id,
-                        invoiceId: l.invoice_id,
-                        productId: l.product_id,
-                        warehouseId: l.warehouse_id,
-                        description: l.description,
-                        quantity: Number(l.quantity),
-                        unitPrice: Number(l.unit_price),
-                        originalPrice: l.original_price ? Number(l.original_price) : undefined,
-                        originalCurrency: l.original_currency,
-                        vatRate: Number(l.vat_rate),
-                        discountRate1: Number(l.discount_rate1),
-                        discountRate2: Number(l.discount_rate2),
-                        discountRate3: Number(l.discount_rate3),
-                        lineTotal: Number(l.line_total),
-                        sourceLineId: l.source_line_id
-                    })),
-                    createdAt: new Date(row.created_at),
-                    updatedAt: new Date(row.updated_at)
-                })
-            )
-        );
+        // K4 — rowToInvoice() helper kullanılıyor (tekrar eden mapping kaldırıldı)
+        return ok(((data as DbInvoice[]) || []).map(rowToInvoice));
     }
 
     async getInvoiceById(id: string): Promise<Result<Invoice>> {
         const { data, error } = await supabase.from('invoices').select('*, invoice_lines(*)').eq('id', id).single();
         if (error) return err(new Error(error.message));
-        const row = data as DbInvoice;
-        return ok(
-            Invoice.create({
-                id: row.id,
-                companyId: row.company_id,
-                invoiceType: row.invoice_type as InvoiceType,
-                invoiceNumber: row.invoice_number,
-                accountId: row.account_id,
-                warehouseId: row.warehouse_id,
-                projectId: row.project_id ?? undefined,
-                issueDate: new Date(row.issue_date),
-                dueDate: row.due_date ? new Date(row.due_date) : undefined,
-                status: row.status as InvoiceStatus,
-                paymentType: (row.payment_type as PaymentType) || 'cash',
-                subtotal: Number(row.subtotal),
-                discountRate: Number(row.discount_rate || 0),
-                discountAmount: Number(row.discount_amount || 0),
-                vatTotal: Number(row.vat_total),
-                total: Number(row.total),
-                paidAmount: Number(row.paid_amount),
-                currency: row.currency,
-                exchangeRate: Number(row.exchange_rate),
-                notes: row.notes,
-                sourceType: row.source_type as any,
-                sourceIds: row.source_ids,
-                documentCategory: (row.document_category as DocumentCategory) || 'domestic',
-                lines: (row.invoice_lines || []).map((l: DbInvoiceLine) => ({
-                    id: l.id,
-                    invoiceId: l.invoice_id,
-                    productId: l.product_id,
-                    warehouseId: l.warehouse_id,
-                    description: l.description,
-                    quantity: Number(l.quantity),
-                    unitPrice: Number(l.unit_price),
-                    originalPrice: l.original_price ? Number(l.original_price) : undefined,
-                    originalCurrency: l.original_currency,
-                    vatRate: Number(l.vat_rate),
-                    discountRate1: Number(l.discount_rate1),
-                    discountRate2: Number(l.discount_rate2),
-                    discountRate3: Number(l.discount_rate3),
-                    lineTotal: Number(l.line_total),
-                    sourceLineId: l.source_line_id
-                })),
-                createdAt: new Date(row.created_at),
-                updatedAt: new Date(row.updated_at)
-            })
-        );
+        // K4 — rowToInvoice() helper kullanılıyor
+        return ok(rowToInvoice(data as DbInvoice));
     }
 
     async saveInvoice(invoice: Invoice): Promise<Result<void>> {

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Task, CreateTaskDTO, UpdateTaskDTO } from '../domain/task.entity';
+import { Task, CreateTaskDTO, UpdateTaskDTO, TaskStatus, TaskPriority } from '../domain/task.entity';
 import { ITodoRepository } from '../domain/todo.repository';
 import { ok, err, Result } from '@/shared/types/result';
 import { DbTask } from '@/shared/infra/db-types';
@@ -100,8 +100,8 @@ export class SupabaseTodoRepository implements ITodoRepository {
             startDate: new Date(row.start_date),
             endDate: row.end_date ? new Date(row.end_date) : null,
             isAllDay: row.is_all_day,
-            status: row.status,
-            priority: row.priority,
+            status: row.status as TaskStatus,
+            priority: row.priority as TaskPriority,
             category: row.category || null,
             color: row.color || null,
             createdAt: new Date(row.created_at),

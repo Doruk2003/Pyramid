@@ -5,6 +5,7 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
+        "test": "vitest run",
         "lint": "eslint --fix . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
     },
     "dependencies": {
@@ -31,11 +32,13 @@
         "@vue/tsconfig": "^0.9.0",
         "eslint": "^8.57.1",
         "eslint-plugin-vue": "^9.23.0",
+        "jsdom": "^29.1.1",
         "sass": "^1.55.0",
         "tailwindcss": "^4.1.17",
         "typescript": "^5.9.3",
         "unplugin-vue-components": "^0.27.3",
         "vite": "^7.0.0",
+        "vitest": "^3.0.0",
         "vue-tsc": "^3.2.5"
     }
 }

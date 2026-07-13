@@ -99,7 +99,7 @@ const model = computed(() => {
             label: '',
             items: [
                 {
-                    label: 'Alış',
+                    label: 'Satın Alma',
                     icon: 'pi pi-fw pi-shopping-bag',
                     path: '/purchases',
                     items: [
@@ -142,7 +142,23 @@ const model = computed(() => {
                     label: 'Raporlar',
                     icon: 'pi pi-fw pi-chart-bar',
                     path: '/reports',
-                    items: []
+                    items: [
+                        {
+                            label: 'Stok Durum Raporu',
+                            icon: 'pi pi-fw pi-box',
+                            to: '/reports/stock-status'
+                        },
+                        {
+                            label: 'Stok Hareketleri Raporu',
+                            icon: 'pi pi-fw pi-sync',
+                            to: '/reports/stock-movements'
+                        },
+                        {
+                            label: 'Kritik Stok Raporu',
+                            icon: 'pi pi-fw pi-exclamation-triangle',
+                            to: '/reports/stock-critical'
+                        }
+                    ]
                 }
             ]
         },

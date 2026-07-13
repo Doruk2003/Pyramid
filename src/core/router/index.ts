@@ -193,6 +193,21 @@ const router = createRouter({
                     path: '/todo/calendar',
                     name: 'todo-calendar',
                     component: () => import('@/modules/todo/views/CalendarPage.vue')
+                },
+                {
+                    path: '/reports/stock-status',
+                    name: 'report-stock-status',
+                    component: () => import('@/modules/inventory/views/reports/StockStatusReport.vue')
+                },
+                {
+                    path: '/reports/stock-movements',
+                    name: 'report-stock-movements',
+                    component: () => import('@/modules/inventory/views/reports/StockMovementsReport.vue')
+                },
+                {
+                    path: '/reports/stock-critical',
+                    name: 'report-stock-critical',
+                    component: () => import('@/modules/inventory/views/reports/StockCriticalReport.vue')
                 }
             ]
         },
