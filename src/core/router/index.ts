@@ -195,19 +195,34 @@ const router = createRouter({
                     component: () => import('@/modules/todo/views/CalendarPage.vue')
                 },
                 {
-                    path: '/reports/stock-status',
+                    path: '/reports/stock/status',
                     name: 'report-stock-status',
                     component: () => import('@/modules/inventory/views/reports/StockStatusReport.vue')
                 },
                 {
-                    path: '/reports/stock-movements',
+                    path: '/reports/stock/movements',
                     name: 'report-stock-movements',
                     component: () => import('@/modules/inventory/views/reports/StockMovementsReport.vue')
                 },
                 {
-                    path: '/reports/stock-critical',
+                    path: '/reports/stock/critical',
                     name: 'report-stock-critical',
                     component: () => import('@/modules/inventory/views/reports/StockCriticalReport.vue')
+                },
+                {
+                    path: '/reports/accounts/balances',
+                    name: 'report-accounts-balances',
+                    component: () => import('@/modules/finance/views/reports/AccountBalancesReport.vue')
+                },
+                {
+                    path: '/reports/accounts/statement',
+                    name: 'report-accounts-statement',
+                    component: () => import('@/modules/finance/views/reports/AccountStatementReport.vue')
+                },
+                {
+                    path: '/reports/accounts/aging',
+                    name: 'report-accounts-aging',
+                    component: () => import('@/modules/finance/views/reports/AccountAgingReport.vue')
                 }
             ]
         },

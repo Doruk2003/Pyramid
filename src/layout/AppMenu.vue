@@ -2,8 +2,26 @@
 import { computed } from 'vue';
 import AppMenuItem from './AppMenuItem.vue';
 
+interface MenuItem {
+    label: string;
+    icon?: string;
+    to?: string;
+    path?: string;
+    items?: MenuItem[];
+    class?: string;
+    target?: string;
+    url?: string;
+    visible?: boolean;
+    disabled?: boolean;
+}
+
+interface MenuSection {
+    label: string;
+    items: MenuItem[];
+}
+
 const model = computed(() => {
-    const menu = [
+    const menu: MenuSection[] = [
         {
             label: '',
             items: [
@@ -144,19 +162,48 @@ const model = computed(() => {
                     path: '/reports',
                     items: [
                         {
-                            label: 'Stok Durum Raporu',
+                            label: 'Stok',
                             icon: 'pi pi-fw pi-box',
-                            to: '/reports/stock-status'
+                            path: '/reports/stock',
+                            items: [
+                                {
+                                    label: 'Stok Durum Raporu',
+                                    icon: 'pi pi-fw pi-box',
+                                    to: '/reports/stock/status'
+                                },
+                                {
+                                    label: 'Stok Hareketleri Raporu',
+                                    icon: 'pi pi-fw pi-sync',
+                                    to: '/reports/stock/movements'
+                                },
+                                {
+                                    label: 'Kritik Stok Raporu',
+                                    icon: 'pi pi-fw pi-exclamation-triangle',
+                                    to: '/reports/stock/critical'
+                                }
+                            ]
                         },
                         {
-                            label: 'Stok Hareketleri Raporu',
-                            icon: 'pi pi-fw pi-sync',
-                            to: '/reports/stock-movements'
-                        },
-                        {
-                            label: 'Kritik Stok Raporu',
-                            icon: 'pi pi-fw pi-exclamation-triangle',
-                            to: '/reports/stock-critical'
+                            label: 'Cari',
+                            icon: 'pi pi-fw pi-address-book',
+                            path: '/reports/accounts',
+                            items: [
+                                {
+                                    label: 'Cari Bakiye Raporu',
+                                    icon: 'pi pi-fw pi-wallet',
+                                    to: '/reports/accounts/balances'
+                                },
+                                {
+                                    label: 'Cari Hesap Ekstresi',
+                                    icon: 'pi pi-fw pi-file-pdf',
+                                    to: '/reports/accounts/statement'
+                                },
+                                {
+                                    label: 'Cari Borç/Alacak Raporu',
+                                    icon: 'pi pi-fw pi-chart-line',
+                                    to: '/reports/accounts/aging'
+                                }
+                            ]
                         }
                     ]
                 }
