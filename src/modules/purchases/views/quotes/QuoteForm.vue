@@ -142,7 +142,7 @@ async function saveQuote() {
                     <div><label class="block font-bold mb-3">Genel İndirim %</label><InputNumber v-model="quote.discountRate" :min="0" :max="100" fluid /></div>
                 </div>
 
-                <DocumentItemsTable :lines="quote.lines" :currency="quote.currency" :exchangeRate="quote.exchangeRate"
+                <DocumentItemsTable v-model:lines="quote.lines" :currency="quote.currency" :exchangeRate="quote.exchangeRate"
                     :accountId="quote.accountId" :warehouseId="quote.warehouseId" documentType="quote"
                     @change="() => {}" @stock-check="checkStock">
                     <template #extra-columns>

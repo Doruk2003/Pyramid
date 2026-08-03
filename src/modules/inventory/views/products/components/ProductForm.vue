@@ -8,7 +8,6 @@ import { Product, ProductProps } from '@/modules/inventory/domain/product.entity
 import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 
 const props = defineProps<{
     initialData?: Partial<ProductProps>;
@@ -18,7 +17,6 @@ const props = defineProps<{
 const emit = defineEmits(['save', 'cancel']);
 
 const toast = useToast();
-const router = useRouter();
 const productStore = useProductStore();
 const lookupStore = useLookupStore();
 const authStore = useAuthStore();
@@ -36,10 +34,7 @@ const statuses = ref([
     { label: 'Hayır', value: 'UNTRACKED' }
 ]);
 
-const productStatuses = ref([
-    { label: 'Aktif', value: 'ACTIVE' },
-    { label: 'Pasif', value: 'PASSIVE' }
-]);
+
 
 const taxRates = ref([
     { label: '%0', value: 0 },
@@ -82,7 +77,7 @@ const additionalImageFiles = ref<(File | null)[]>([null, null, null, null, null,
 const additionalImagePreviews = ref<(string | null)[]>([null, null, null, null, null, null]);
 const coverInputRef = ref<HTMLInputElement | null>(null);
 const additionalInputRefs = ref<(HTMLInputElement | null)[]>([null, null, null, null, null, null]);
-const isDragOver = ref(false);
+
 
 const selectedCurrencyCode = computed(() => {
     if (!product.value.currencyId) return 'USD';

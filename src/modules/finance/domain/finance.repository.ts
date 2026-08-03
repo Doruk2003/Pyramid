@@ -1,5 +1,7 @@
 import type { Account, AccountType } from '@/modules/finance/domain/account.entity';
 import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
+import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
+import type { Payment } from '@/modules/finance/domain/payment.entity';
 import type { Result } from '@/shared/types/result';
 
 export interface AccountFilters {
@@ -10,6 +12,12 @@ export interface AccountFilters {
 export interface InvoiceFilters {
     invoiceType?: InvoiceType;
     accountId?: string;
+}
+
+export interface PaymentFilters {
+    accountId?: string;
+    cashRegisterId?: string;
+    paymentType?: 'collection' | 'payment' | 'debit_note' | 'credit_note';
 }
 
 export interface IFinanceRepository {
@@ -28,4 +36,14 @@ export interface IFinanceRepository {
     updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>>;
     // Soft delete: sadece 'draft' statüsündeki faturalar silinebilir
     deleteInvoice(id: string): Promise<Result<void>>;
+
+    // Cash Register
+    getCashRegisters(): Promise<Result<CashRegister[]>>;
+    getCashRegisterById(id: string): Promise<Result<CashRegister>>;
+    saveCashRegister(register: CashRegister): Promise<Result<void>>;
+
+    // Payment
+    getPayments(filters?: PaymentFilters): Promise<Result<Payment[]>>;
+    savePayment(payment: Payment): Promise<Result<void>>;
+    deletePayment(id: string): Promise<Result<void>>;
 }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
-import { ref } from 'vue';
 
 const props = defineProps<{
     lines: any[];
@@ -9,15 +8,10 @@ const props = defineProps<{
     movementType: 'in' | 'out' | 'transfer' | 'adjustment';
 }>();
 
-const emit = defineEmits(['change']);
+const emit = defineEmits(['update:lines', 'change']);
 
 const productStore = useProductStore();
 const invStore = useInventoryStore();
-
-const productSelectRefs = ref<any[]>([]);
-const setProductSelectRef = (el: any, index: number) => {
-    if (el) productSelectRefs.value[index] = el;
-};
 
 function getStock(productId: string) {
     if (!productId || !props.warehouseId) return 0;
@@ -33,19 +27,19 @@ function onProductChange(line: any) {
 }
 
 function addLine() {
-    props.lines.push({
+    emit('update:lines', [...props.lines, {
         id: crypto.randomUUID(),
         productId: '',
         description: '',
         quantity: 1,
         unitCost: 0,
         note: ''
-    });
+    }]);
     emit('change');
 }
 
 function removeLine(index: number) {
-    props.lines.splice(index, 1);
+    emit('update:lines', props.lines.filter((_, i) => i !== index));
     emit('change');
 }
 

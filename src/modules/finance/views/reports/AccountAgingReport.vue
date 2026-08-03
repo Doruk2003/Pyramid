@@ -191,18 +191,9 @@ function getAccountTypeLabel(type: string) {
     }
 }
 
-function getAccountTypeSeverity(type: string) {
-    switch (type) {
-        case 'customer': return 'info';
-        case 'supplier': return 'warn';
-        case 'both': return 'success';
-        default: return 'secondary';
-    }
-}
+
 
 function exportCSV() {
-    const isReceivable = agingType.value === 'receivables';
-    const typeTitle = isReceivable ? 'Alacak Yaşlandırma' : 'Borç Yaşlandırma';
 
     const headers = [
         'Cari Kodu', 'Cari Adı', 'Cari Tipi', 'Kredi Limiti', 'Net Bakiye',

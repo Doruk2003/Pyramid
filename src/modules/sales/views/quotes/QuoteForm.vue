@@ -300,7 +300,7 @@ function goBack() {
 
                 <!-- Lines Table -->
                 <DocumentItemsTable 
-                    :lines="quote.lines" 
+                    v-model:lines="quote.lines" 
                     :currency="quote.currency" 
                     :exchangeRate="quote.exchangeRate" 
                     :accountId="quote.accountId"

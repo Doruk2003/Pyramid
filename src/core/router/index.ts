@@ -100,6 +100,26 @@ const router = createRouter({
                     component: () => import('@/modules/finance/views/accounts/AccountEdit.vue')
                 },
                 {
+                    path: '/finance/cash-registers',
+                    name: 'finance-cash-registers',
+                    component: () => import('@/modules/finance/views/cash-registers/CashRegisterList.vue')
+                },
+                {
+                    path: '/finance/cash-registers/statement/:id',
+                    name: 'finance-cash-register-statement',
+                    component: () => import('@/modules/finance/views/cash-registers/CashRegisterStatement.vue')
+                },
+                {
+                    path: '/finance/transactions',
+                    name: 'finance-transactions',
+                    component: () => import('@/modules/finance/views/transactions/TransactionList.vue')
+                },
+                {
+                    path: '/finance/transactions/create',
+                    name: 'finance-transaction-create',
+                    component: () => import('@/modules/finance/views/transactions/TransactionForm.vue')
+                },
+                {
                     path: '/finance/invoices',
                     name: 'finance-invoices',
                     component: () => import('@/modules/finance/views/invoices/InvoiceList.vue')

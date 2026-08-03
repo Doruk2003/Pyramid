@@ -238,7 +238,7 @@ function goBack() {
 
                 <!-- Bulk Items Table -->
                 <MovementItemsTable 
-                    :lines="lines" 
+                    v-model:lines="lines" 
                     :warehouseId="header.warehouseId" 
                     :movementType="header.movementType" 
                     @change="() => {}"

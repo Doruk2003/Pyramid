@@ -2,13 +2,11 @@
 import { useProjectStore } from '@/modules/finance/application/project.store';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_SEVERITIES } from '@/modules/finance/domain/project.entity';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
 
 const route = useRoute();
 const router = useRouter();
-const toast = useToast();
 const projectStore = useProjectStore();
 const financeStore = useFinanceStore();
 

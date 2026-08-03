@@ -14,7 +14,8 @@ const endDate = ref<Date | null>(null);
 onMounted(async () => {
     await Promise.all([
         financeStore.fetchAccounts(),
-        financeStore.fetchInvoices()
+        financeStore.fetchInvoices(),
+        financeStore.fetchPayments()
     ]);
 
     // Varsayılan olarak ilk cariyi seç
@@ -34,7 +35,9 @@ const allAccountTransactions = computed(() => {
     if (!selectedAccountId.value) return [];
     
     const invoices = financeStore.invoices || [];
-    return invoices
+    const payments = financeStore.payments || [];
+
+    const invoiceTx = invoices
         .filter((inv) => inv.accountId === selectedAccountId.value && inv.status !== 'draft' && inv.status !== 'cancelled')
         .map((inv) => ({
             id: inv.id,
@@ -44,7 +47,21 @@ const allAccountTransactions = computed(() => {
             notes: inv.notes || '-',
             total: inv.total || 0,
             currency: inv.currency || 'TRY'
-        }))
+        }));
+
+    const paymentTx = payments
+        .filter((p) => p.accountId === selectedAccountId.value && p.status === 'completed')
+        .map((p) => ({
+            id: p.id,
+            date: new Date(p.paymentDate),
+            invoiceNumber: p.documentNumber || 'KASA-FİŞİ',
+            invoiceType: p.paymentType, // collection, payment, debit_note, credit_note
+            notes: p.description || `${getInvoiceTypeLabel(p.paymentType)} işlemi`,
+            total: p.amount || 0,
+            currency: 'TRY'
+        }));
+
+    return [...invoiceTx, ...paymentTx]
         // Tarihe göre artan sırada (kronolojik)
         .sort((a, b) => a.date.getTime() - b.date.getTime());
 });
@@ -64,9 +81,10 @@ const statementData = computed(() => {
     // 1) Devreden Bakiye Hesapla (Başlangıç tarihinden önceki hareketler)
     transactions.forEach((tx) => {
         if (start && tx.date.getTime() < start.getTime()) {
-            if (tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase') {
+            const isDebit = tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase' || tx.invoiceType === 'payment' || tx.invoiceType === 'debit_note';
+            if (isDebit) {
                 initialDebit += tx.total;
-            } else if (tx.invoiceType === 'purchase' || tx.invoiceType === 'return_sale') {
+            } else {
                 initialCredit += tx.total;
             }
         }
@@ -81,7 +99,7 @@ const statementData = computed(() => {
             (!start || tx.date.getTime() >= start.getTime()) && 
             (!end || tx.date.getTime() <= end.getTime());
 
-        const isDebit = tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase';
+        const isDebit = tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase' || tx.invoiceType === 'payment' || tx.invoiceType === 'debit_note';
         const debitVal = isDebit ? tx.total : 0;
         const creditVal = !isDebit ? tx.total : 0;
 
@@ -149,6 +167,10 @@ function getInvoiceTypeLabel(type: string) {
         case 'purchase': return 'Alış Faturası';
         case 'return_sale': return 'Satış İade Faturası';
         case 'return_purchase': return 'Alış İade Faturası';
+        case 'collection': return 'Tahsilat';
+        case 'payment': return 'Tediye (Ödeme)';
+        case 'debit_note': return 'Borç Dekontu';
+        case 'credit_note': return 'Alacak Dekontu';
         default: return type;
     }
 }
@@ -159,6 +181,10 @@ function getInvoiceTypeSeverity(type: string) {
         case 'purchase': return 'warn';
         case 'return_sale': return 'danger';
         case 'return_purchase': return 'success';
+        case 'collection': return 'success';
+        case 'payment': return 'danger';
+        case 'debit_note': return 'info';
+        case 'credit_note': return 'warn';
         default: return 'secondary';
     }
 }
@@ -225,14 +251,14 @@ async function exportPDF() {
             { 
                 label: `Devreden Bakiye (${statementData.value.initialBalanceType})`, 
                 value: formatCurrency(statementData.value.initialBalance), 
-                color: (statementData.value.initialBalanceType === 'Borç' ? 'success' : 'danger') as const 
+                color: (statementData.value.initialBalanceType === 'Borç' ? 'success' : 'danger') as 'success' | 'danger'
             },
             { label: 'Dönem İçi Borç', value: formatCurrency(statementData.value.periodDebitTotal), color: 'info' as const },
             { label: 'Dönem İçi Alacak', value: formatCurrency(statementData.value.periodCreditTotal), color: 'warning' as const },
             { 
                 label: `Net Kalan Bakiye (${statementData.value.finalBalanceType})`, 
                 value: formatCurrency(statementData.value.finalBalance), 
-                color: (statementData.value.finalBalanceType === 'Borç' ? 'success' : 'danger') as const 
+                color: (statementData.value.finalBalanceType === 'Borç' ? 'success' : 'danger') as 'success' | 'danger'
             }
         ];
 

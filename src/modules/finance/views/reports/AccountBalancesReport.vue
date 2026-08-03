@@ -27,10 +27,11 @@ const balanceStatusOptions = [
 ];
 
 onMounted(async () => {
-    // Cari hesapları ve tüm faturaları yükle
+    // Cari hesapları, tüm faturaları ve ödeme/tahsilat kayıtlarını yükle
     await Promise.all([
         financeStore.fetchAccounts(),
-        financeStore.fetchInvoices()
+        financeStore.fetchInvoices(),
+        financeStore.fetchPayments()
     ]);
 });
 
@@ -38,6 +39,7 @@ onMounted(async () => {
 const calculatedBalances = computed(() => {
     const accounts = financeStore.accounts || [];
     const invoices = financeStore.invoices || [];
+    const payments = financeStore.payments || [];
 
     return accounts.map((account) => {
         // Bu cariye ait onaylı ve ödenmiş faturaları filtrele
@@ -45,15 +47,31 @@ const calculatedBalances = computed(() => {
             (inv) => inv.accountId === account.id && inv.status !== 'draft' && inv.status !== 'cancelled'
         );
 
+        // Bu cariye ait kasa fişleri (tahsilat/tediye/dekontlar)
+        const accountPayments = payments.filter(
+            (p) => p.accountId === account.id && p.status === 'completed'
+        );
+
         let totalDebit = 0;   // Borç
         let totalCredit = 0;  // Alacak
 
+        // Faturalardan gelen bakiyeler
         accountInvoices.forEach((inv) => {
             const invoiceTotal = inv.total || 0;
             if (inv.invoiceType === 'sale' || inv.invoiceType === 'return_purchase') {
                 totalDebit += invoiceTotal;
             } else if (inv.invoiceType === 'purchase' || inv.invoiceType === 'return_sale') {
                 totalCredit += invoiceTotal;
+            }
+        });
+
+        // Fiş ve dekontlardan gelen bakiyeler
+        accountPayments.forEach((p) => {
+            const payAmount = p.amount || 0;
+            if (p.paymentType === 'payment' || p.paymentType === 'debit_note') {
+                totalDebit += payAmount;
+            } else if (p.paymentType === 'collection' || p.paymentType === 'credit_note') {
+                totalCredit += payAmount;
             }
         });
 
@@ -202,7 +220,7 @@ async function exportPDF() {
             { 
                 label: `Net Bakiye (${summaryStats.value.netBalanceType})`, 
                 value: formatCurrency(summaryStats.value.netBalance), 
-                color: (summaryStats.value.netBalanceType === 'Borç' ? 'success' : 'danger') as const 
+                color: (summaryStats.value.netBalanceType === 'Borç' ? 'success' : 'danger') as 'success' | 'danger'
             },
             { label: 'Toplam Cari', value: summaryStats.value.totalAccounts, color: 'neutral' as const }
         ];

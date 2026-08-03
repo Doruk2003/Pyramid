@@ -51,13 +51,6 @@ const setProductSelectRef = (el: any, index: number) => {
     if (el) productSelectRefs.value[index] = el;
 };
 
-function getStock(productId: string, wId?: string) {
-    if (!productId) return 0;
-    const targetWarehouse = wId || props.warehouseId;
-    if (!targetWarehouse) return 0;
-    return inventoryStore.balances.find(b => b.productId === productId && b.warehouseId === targetWarehouse)?.balance || 0;
-}
-
 function convertLinePrice(line: any) {
     if (!line.originalPrice || !line.originalCurrency) return;
     const targetCurrency = props.currency || 'TRY';
@@ -118,11 +111,11 @@ function addLine(autoOpenSelect = false) {
         shippedQuantity: 0
     };
     
-    props.lines.push(newLine);
+    emit('update:lines', [...props.lines, newLine]);
 
     if (autoOpenSelect) {
         nextTick(() => {
-            const lastIndex = props.lines.length - 1;
+            const lastIndex = props.lines.length; // lines is not updated in props yet, but after nextTick it will be props.lines.length - 1 of new length
             const lastSelect = productSelectRefs.value[lastIndex];
             if (lastSelect) {
                 if (lastSelect.show) lastSelect.show();
@@ -134,7 +127,7 @@ function addLine(autoOpenSelect = false) {
 }
 
 function removeLine(index: number) {
-    props.lines.splice(index, 1);
+    emit('update:lines', props.lines.filter((_, i) => i !== index));
     emit('change');
 }
 

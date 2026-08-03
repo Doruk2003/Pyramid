@@ -1,9 +1,11 @@
-import { defineStore } from 'pinia';
 import type { Account } from '@/modules/finance/domain/account.entity';
+import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
+import type { AccountFilters, InvoiceFilters, PaymentFilters } from '@/modules/finance/domain/finance.repository';
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
-import type { AccountFilters, InvoiceFilters } from '@/modules/finance/domain/finance.repository';
+import { Payment } from '@/modules/finance/domain/payment.entity';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
 import { SupabaseProjectRepository } from '@/modules/finance/infra/supabase-project.repository';
+import { defineStore } from 'pinia';
 
 const financeRepo = new SupabaseFinanceRepository();
 const projectRepo = new SupabaseProjectRepository();
@@ -15,6 +17,8 @@ export const useFinanceStore = defineStore('finance', {
         subAccounts: [] as Account[],           // Aktif ana hesabın alt hesapları
         invoices: [] as Invoice[],
         projects: [] as any[],                  // Projeler listesi
+        cashRegisters: [] as CashRegister[],    // Kasalar/Bankalar
+        payments: [] as Payment[],              // Kasa hareketleri / Tahsilatlar / Ödemeler
         loading: false,
         error: null as string | null
     }),
@@ -101,6 +105,42 @@ export const useFinanceStore = defineStore('finance', {
             const result = await projectRepo.getProjects();
             if (result.success) this.projects = result.data;
             this.loading = false;
+        },
+
+        // Cash Registers
+        async fetchCashRegisters() {
+            this.loading = true;
+            const result = await financeRepo.getCashRegisters();
+            if (result.success) this.cashRegisters = result.data;
+            this.loading = false;
+        },
+
+        async saveCashRegister(register: CashRegister) {
+            const result = await financeRepo.saveCashRegister(register);
+            if (result.success) await this.fetchCashRegisters();
+            return result;
+        },
+
+        // Payments
+        async fetchPayments(filters?: PaymentFilters) {
+            this.loading = true;
+            const result = await financeRepo.getPayments(filters);
+            if (result.success) this.payments = result.data;
+            this.loading = false;
+        },
+
+        async savePayment(payment: Payment) {
+            const result = await financeRepo.savePayment(payment);
+            if (result.success) await this.fetchPayments();
+            return result;
+        },
+
+        async deletePayment(id: string) {
+            const result = await financeRepo.deletePayment(id);
+            if (result.success) {
+                this.payments = this.payments.map((p) => p.id === id ? Payment.create({ ...p.toObject(), status: 'cancelled' }) : p);
+            }
+            return result;
         }
     }
 });

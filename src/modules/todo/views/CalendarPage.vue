@@ -113,13 +113,7 @@ const deleteTask = (id: string) => {
     });
 };
 
-const getStatusLabel = (status: string) => {
-    switch (status) {
-        case 'completed': return 'Tamamlandı';
-        case 'cancelled': return 'İptal Edildi';
-        default: return 'Bekliyor';
-    }
-};
+
 
 const getPriorityClass = (priority: string) => {
     switch (priority) {

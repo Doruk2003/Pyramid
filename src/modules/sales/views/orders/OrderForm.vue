@@ -314,7 +314,7 @@ function goBack() {
 
                 <!-- Lines Table -->
                 <DocumentItemsTable 
-                    :lines="order.lines" 
+                    v-model:lines="order.lines" 
                     :currency="order.currency" 
                     :exchangeRate="order.exchangeRate" 
                     :accountId="order.accountId"

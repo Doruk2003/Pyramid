@@ -83,6 +83,16 @@ const model = computed(() => {
                             to: '/finance/accounts'
                         },
                         {
+                            label: 'Kasa & Bankalar',
+                            icon: 'pi pi-fw pi-money-bill',
+                            to: '/finance/cash-registers'
+                        },
+                        {
+                            label: 'Kasa & Cari Fişleri',
+                            icon: 'pi pi-fw pi-list',
+                            to: '/finance/transactions'
+                        },
+                        {
                             label: 'Projeler',
                             icon: 'pi pi-fw pi-sitemap',
                             to: '/finance/projects'

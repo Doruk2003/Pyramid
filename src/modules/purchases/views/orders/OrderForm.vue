@@ -186,7 +186,7 @@ async function saveOrder() {
                     <div><label class="block font-bold mb-3">Genel İndirim %</label><InputNumber v-model="order.discountRate" :min="0" :max="100" fluid /></div>
                 </div>
 
-                <DocumentItemsTable :lines="order.lines" :currency="order.currency" :exchangeRate="order.exchangeRate"
+                <DocumentItemsTable v-model:lines="order.lines" :currency="order.currency" :exchangeRate="order.exchangeRate"
                     :accountId="order.accountId" :warehouseId="order.warehouseId" documentType="order"
                     @change="() => {}" @stock-check="checkStock">
                     <template #extra-columns>

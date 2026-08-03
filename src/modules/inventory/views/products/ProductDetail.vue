@@ -208,7 +208,7 @@ function editProduct() {
             </div>
             <div class="flex gap-1.5">
                 <Button v-if="product?.barcode" icon="pi pi-barcode" severity="secondary" text size="small" @click="openBarcodePrint" v-tooltip.top="'Barkod Yazdır'" />
-                <Button label="Düzenle" icon="pi pi-pencil" outlined size="medium"@click="editProduct" />
+                <Button label="Düzenle" icon="pi pi-pencil" outlined size="medium" @click="editProduct" />
                 <Button icon="pi pi-times" severity="secondary" text rounded @click="goBack" class="!w-8 !h-8" />
             </div>
         </div>

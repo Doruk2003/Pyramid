@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { Account, type AddressValue } from '@/modules/finance/domain/account.entity';
 import { Invoice, type InvoiceLineProps, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
-import type { AccountFilters, IFinanceRepository, InvoiceFilters } from '@/modules/finance/domain/finance.repository';
+import { CashRegister } from '@/modules/finance/domain/cash-register.entity';
+import { Payment } from '@/modules/finance/domain/payment.entity';
+import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
 
@@ -97,6 +99,43 @@ function rowToInvoice(row: DbInvoice): Invoice {
         lines: (row.invoice_lines || []).map(rowToInvoiceLine),
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
+    });
+}
+
+function rowToCashRegister(row: any): CashRegister {
+    return CashRegister.create({
+        id: row.id,
+        companyId: row.company_id,
+        name: row.name,
+        type: row.type as 'cash' | 'bank' | 'check_note' | 'credit_card',
+        currency: row.currency,
+        description: row.description ?? undefined,
+        isActive: row.is_active,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+    });
+}
+
+function rowToPayment(row: any): Payment {
+    return Payment.create({
+        id: row.id,
+        companyId: row.company_id,
+        invoiceId: row.invoice_id ?? undefined,
+        accountId: row.account_id ?? undefined,
+        paymentDate: new Date(row.payment_date),
+        amount: Number(row.amount),
+        paymentMethod: row.payment_method as 'cash' | 'bank' | 'check' | 'credit_card',
+        description: row.description ?? undefined,
+        createdAt: new Date(row.created_at),
+        paymentType: (row.payment_type as 'collection' | 'payment' | 'debit_note' | 'credit_note') || 'collection',
+        cashRegisterId: row.cash_register_id ?? undefined,
+        documentNumber: row.document_number ?? undefined,
+        dueDate: row.due_date ? new Date(row.due_date) : undefined,
+        status: (row.status as 'pending' | 'completed' | 'cancelled') || 'completed',
+        updatedAt: new Date(row.updated_at),
+        accountName: row.accounts?.name || undefined,
+        cashRegisterName: row.cash_registers?.name || undefined,
+        invoiceNumber: row.invoices?.invoice_number || undefined
     });
 }
 
@@ -336,6 +375,91 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq('id', id)
             .eq('status', 'draft'); // Güvenlik: sadece draft faturaları sil
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async getCashRegisters(): Promise<Result<CashRegister[]>> {
+        const { data, error } = await supabase
+            .from('cash_registers')
+            .select('*')
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+        if (error) return err(new Error(error.message));
+        return ok((data || []).map(rowToCashRegister));
+    }
+
+    async getCashRegisterById(id: string): Promise<Result<CashRegister>> {
+        const { data, error } = await supabase
+            .from('cash_registers')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error) return err(new Error(error.message));
+        return ok(rowToCashRegister(data));
+    }
+
+    async saveCashRegister(register: CashRegister): Promise<Result<void>> {
+        const obj = register.toObject();
+        const { error } = await supabase
+            .from('cash_registers')
+            .upsert({
+                id: obj.id || undefined,
+                company_id: obj.companyId,
+                name: obj.name,
+                type: obj.type,
+                currency: obj.currency,
+                description: obj.description ?? null,
+                is_active: obj.isActive,
+                updated_at: new Date().toISOString()
+            });
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async getPayments(filters?: PaymentFilters): Promise<Result<Payment[]>> {
+        let query = supabase
+            .from('payments')
+            .select('*, accounts(name), cash_registers(name), invoices(invoice_number)');
+        
+        if (filters?.accountId) query = query.eq('account_id', filters.accountId);
+        if (filters?.cashRegisterId) query = query.eq('cash_register_id', filters.cashRegisterId);
+        if (filters?.paymentType) query = query.eq('payment_type', filters.paymentType);
+
+        const { data, error } = await query.order('payment_date', { ascending: false });
+        if (error) return err(new Error(error.message));
+        return ok((data || []).map(rowToPayment));
+    }
+
+    async savePayment(payment: Payment): Promise<Result<void>> {
+        const obj = payment.toObject();
+        const { error } = await supabase
+            .from('payments')
+            .upsert({
+                id: obj.id || undefined,
+                company_id: obj.companyId,
+                invoice_id: obj.invoiceId || null,
+                account_id: obj.accountId || null,
+                payment_date: obj.paymentDate.toISOString().split('T')[0],
+                amount: obj.amount,
+                payment_method: obj.paymentMethod,
+                description: obj.description ?? null,
+                payment_type: obj.paymentType,
+                cash_register_id: obj.cashRegisterId || null,
+                document_number: obj.documentNumber ?? null,
+                due_date: obj.dueDate ? obj.dueDate.toISOString().split('T')[0] : null,
+                status: obj.status,
+                updated_at: new Date().toISOString()
+            });
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async deletePayment(id: string): Promise<Result<void>> {
+        const { error } = await supabase
+            .from('payments')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', id);
         if (error) return err(new Error(error.message));
         return ok(undefined);
     }
