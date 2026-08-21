@@ -58,7 +58,7 @@ const rolesWithCount = computed(() =>
             </Message>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 :value="rolesWithCount"
                 dataKey="name"

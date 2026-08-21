@@ -39,15 +39,20 @@ const allAccountTransactions = computed(() => {
 
     const invoiceTx = invoices
         .filter((inv) => inv.accountId === selectedAccountId.value && inv.status !== 'draft' && inv.status !== 'cancelled')
-        .map((inv) => ({
-            id: inv.id,
-            date: new Date(inv.issueDate),
-            invoiceNumber: inv.invoiceNumber,
-            invoiceType: inv.invoiceType,
-            notes: inv.notes || '-',
-            total: inv.total || 0,
-            currency: inv.currency || 'TRY'
-        }));
+        .map((inv) => {
+            const hasForeignCurrency = inv.currency && inv.currency !== 'TRY';
+            const totalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
+            const originalInfo = hasForeignCurrency ? ` [Orijinal Tutar: ${inv.total.toFixed(2)} ${inv.currency} | Kur: ${inv.exchangeRate}]` : '';
+            return {
+                id: inv.id,
+                date: new Date(inv.issueDate),
+                invoiceNumber: inv.invoiceNumber,
+                invoiceType: inv.invoiceType,
+                notes: (inv.notes || '-') + originalInfo,
+                total: totalTRY,
+                currency: 'TRY'
+            };
+        });
 
     const paymentTx = payments
         .filter((p) => p.accountId === selectedAccountId.value && p.status === 'completed')
@@ -413,7 +418,7 @@ async function exportPDF() {
         </div>
 
         <!-- Tablo -->
-        <div v-if="selectedAccountId" class="card p-0">
+        <div v-if="selectedAccountId" class="card p-0 dt-compact">
             <DataTable
                 :value="statementData.rows"
                 :loading="financeStore.loading"

@@ -120,6 +120,11 @@ const router = createRouter({
                     component: () => import('@/modules/finance/views/transactions/TransactionForm.vue')
                 },
                 {
+                    path: '/finance/transactions/edit/:id',
+                    name: 'finance-transaction-edit',
+                    component: () => import('@/modules/finance/views/transactions/TransactionForm.vue')
+                },
+                {
                     path: '/finance/invoices',
                     name: 'finance-invoices',
                     component: () => import('@/modules/finance/views/invoices/InvoiceList.vue')

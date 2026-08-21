@@ -9,18 +9,22 @@ const financeStore = useFinanceStore();
 
 const registerId = route.params.id as string;
 const cashRegister = ref<any>(null);
+const loading = ref(false);
 
 onMounted(async () => {
-    financeStore.loading = true;
-    // cash_registers listesinden bul
-    if (financeStore.cashRegisters.length === 0) {
-        await financeStore.fetchCashRegisters();
+    loading.value = true;
+    try {
+        // cash_registers listesinden bul
+        if (financeStore.cashRegisters.length === 0) {
+            await financeStore.fetchCashRegisters();
+        }
+        cashRegister.value = financeStore.cashRegisters.find(c => c.id === registerId);
+        
+        // İşlemleri çek
+        await financeStore.fetchPayments({ cashRegisterId: registerId });
+    } finally {
+        loading.value = false;
     }
-    cashRegister.value = financeStore.cashRegisters.find(c => c.id === registerId);
-    
-    // İşlemleri çek
-    await financeStore.fetchPayments({ cashRegisterId: registerId });
-    financeStore.loading = false;
 });
 
 const sortedPayments = computed(() => {
@@ -129,8 +133,8 @@ function getMethodLabel(method: string): string {
         </div>
 
         <!-- Hareket Detayı Tablosu -->
-        <div class="card">
-            <DataTable :value="statementLines" dataKey="id" :paginator="true" :rows="15">
+        <div class="card dt-compact">
+            <DataTable :value="statementLines" dataKey="id" :paginator="true" :rows="15" :loading="loading">
                 <template #empty>
                     <div class="text-center py-6 text-surface-500">
                         <i class="pi pi-history text-4xl mb-3 text-surface-400 block" />

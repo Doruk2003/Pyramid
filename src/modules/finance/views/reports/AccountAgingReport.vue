@@ -49,10 +49,11 @@ const calculatedAging = computed(() => {
         let totalDebit = 0;
         let totalCredit = 0;
         allInvoices.forEach((inv) => {
+            const invoiceTotalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
             if (inv.invoiceType === 'sale' || inv.invoiceType === 'return_purchase') {
-                totalDebit += inv.total;
+                totalDebit += invoiceTotalTRY;
             } else {
-                totalCredit += inv.total;
+                totalCredit += invoiceTotalTRY;
             }
         });
         const netBalance = totalDebit - totalCredit;
@@ -75,7 +76,9 @@ const calculatedAging = computed(() => {
         let maxOverdueDays = 0;
 
         openInvoices.forEach((inv) => {
-            const outstanding = (inv.total || 0) - (inv.paidAmount || 0);
+            const invoiceTotalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
+            const invoicePaidAmountTRY = (inv.paidAmount || 0) * (inv.exchangeRate || 1);
+            const outstanding = invoiceTotalTRY - invoicePaidAmountTRY;
             if (outstanding <= 0.01) return;
 
             const dueDateStr = inv.dueDate || inv.issueDate;
@@ -353,7 +356,7 @@ async function exportPDF() {
         </div>
 
         <!-- Tablo -->
-        <div class="card p-0">
+        <div class="card p-0 dt-compact">
             <DataTable
                 :value="filteredRows"
                 :loading="financeStore.loading"

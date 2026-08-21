@@ -55,13 +55,13 @@ const calculatedBalances = computed(() => {
         let totalDebit = 0;   // Borç
         let totalCredit = 0;  // Alacak
 
-        // Faturalardan gelen bakiyeler
+        // Faturalardan gelen bakiyeler (TRY karşılığı)
         accountInvoices.forEach((inv) => {
-            const invoiceTotal = inv.total || 0;
+            const invoiceTotalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
             if (inv.invoiceType === 'sale' || inv.invoiceType === 'return_purchase') {
-                totalDebit += invoiceTotal;
+                totalDebit += invoiceTotalTRY;
             } else if (inv.invoiceType === 'purchase' || inv.invoiceType === 'return_sale') {
-                totalCredit += invoiceTotal;
+                totalCredit += invoiceTotalTRY;
             }
         });
 
@@ -356,7 +356,7 @@ async function exportPDF() {
         </div>
 
         <!-- Tablo -->
-        <div class="card p-0">
+        <div class="card p-0 dt-compact">
             <DataTable
                 :value="filteredRows"
                 :loading="financeStore.loading"

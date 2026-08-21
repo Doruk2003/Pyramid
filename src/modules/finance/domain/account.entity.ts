@@ -33,7 +33,7 @@ export interface AccountProps {
 }
 
 export class Account {
-    constructor(private props: AccountProps) {}
+    private constructor(private props: AccountProps) {}
 
     get id(): string {
         return this.props.id;

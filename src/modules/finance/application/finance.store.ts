@@ -4,11 +4,9 @@ import type { AccountFilters, InvoiceFilters, PaymentFilters } from '@/modules/f
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
-import { SupabaseProjectRepository } from '@/modules/finance/infra/supabase-project.repository';
 import { defineStore } from 'pinia';
 
 const financeRepo = new SupabaseFinanceRepository();
-const projectRepo = new SupabaseProjectRepository();
 
 export const useFinanceStore = defineStore('finance', {
     state: () => ({
@@ -16,20 +14,36 @@ export const useFinanceStore = defineStore('finance', {
         rootAccounts: [] as Account[],          // Sadece ana hesaplar (parent_id IS NULL)
         subAccounts: [] as Account[],           // Aktif ana hesabın alt hesapları
         invoices: [] as Invoice[],
-        projects: [] as any[],                  // Projeler listesi
         cashRegisters: [] as CashRegister[],    // Kasalar/Bankalar
         payments: [] as Payment[],              // Kasa hareketleri / Tahsilatlar / Ödemeler
-        loading: false,
+        loadingAccounts: false,
+        loadingSubAccounts: false,
+        loadingInvoices: false,
+        loadingCashRegisters: false,
+        loadingPayments: false,
         error: null as string | null
     }),
+
+    getters: {
+        loading(state): boolean {
+            return state.loadingAccounts ||
+                   state.loadingSubAccounts ||
+                   state.loadingInvoices ||
+                   state.loadingCashRegisters ||
+                   state.loadingPayments;
+        }
+    },
 
     actions: {
         // Accounts — tüm liste (filtre opsiyonel)
         async fetchAccounts(filters?: AccountFilters) {
-            this.loading = true;
-            const result = await financeRepo.getAccounts(filters);
-            if (result.success) this.accounts = result.data;
-            this.loading = false;
+            this.loadingAccounts = true;
+            try {
+                const result = await financeRepo.getAccounts(filters);
+                if (result.success) this.accounts = result.data;
+            } finally {
+                this.loadingAccounts = false;
+            }
         },
 
         // Sadece ana hesaplar (parent_id IS NULL) — form dropdown'ları için
@@ -40,11 +54,14 @@ export const useFinanceStore = defineStore('finance', {
 
         // Belirli bir ana hesabın alt hesapları
         async fetchSubAccounts(parentId: string) {
-            this.loading = true;
-            const result = await financeRepo.getSubAccounts(parentId);
-            if (result.success) this.subAccounts = result.data;
-            else this.subAccounts = [];
-            this.loading = false;
+            this.loadingSubAccounts = true;
+            try {
+                const result = await financeRepo.getSubAccounts(parentId);
+                if (result.success) this.subAccounts = result.data;
+                else this.subAccounts = [];
+            } finally {
+                this.loadingSubAccounts = false;
+            }
         },
 
         // Tekil cari hesap getir (sub-account düzenleme için)
@@ -71,16 +88,34 @@ export const useFinanceStore = defineStore('finance', {
 
         // Invoices
         async fetchInvoices(filters?: InvoiceFilters) {
-            this.loading = true;
-            const result = await financeRepo.getInvoices(filters);
-            if (result.success) this.invoices = result.data;
-            this.loading = false;
+            this.loadingInvoices = true;
+            try {
+                const result = await financeRepo.getInvoices(filters);
+                if (result.success) this.invoices = result.data;
+            } finally {
+                this.loadingInvoices = false;
+            }
         },
 
         async saveInvoice(invoice: Invoice) {
             const result = await financeRepo.saveInvoice(invoice);
             if (result.success) await this.fetchInvoices();
             return result;
+        },
+
+        /**
+         * Sonraki güvenli fatura numarasını DB'den üretir.
+         * View katmanı artık store belleğinden saymaz; doğrudan DB'ye sorgu atılır.
+         *
+         * @param serial           - Ayarlardan gelen seri öneki ("ABC" gibi)
+         * @param startingNumber   - Seri için başlangıç numarası
+         * @returns Güvenli çerçevede üretilen numara veya null (hata durumunda)
+         */
+        async fetchNextInvoiceNumber(serial: string, startingNumber: number): Promise<string | null> {
+            const result = await financeRepo.getNextInvoiceNumber(serial, startingNumber);
+            if (result.success) return result.data;
+            console.warn('[FinanceStore] fetchNextInvoiceNumber hatası:', result.error.message);
+            return null;
         },
 
         async updateStatus(id: string, status: InvoiceStatus) {
@@ -98,21 +133,17 @@ export const useFinanceStore = defineStore('finance', {
             }
             return result;
         },
-        
-        // Projects
-        async fetchProjects() {
-            this.loading = true;
-            const result = await projectRepo.getProjects();
-            if (result.success) this.projects = result.data;
-            this.loading = false;
-        },
+
 
         // Cash Registers
         async fetchCashRegisters() {
-            this.loading = true;
-            const result = await financeRepo.getCashRegisters();
-            if (result.success) this.cashRegisters = result.data;
-            this.loading = false;
+            this.loadingCashRegisters = true;
+            try {
+                const result = await financeRepo.getCashRegisters();
+                if (result.success) this.cashRegisters = result.data;
+            } finally {
+                this.loadingCashRegisters = false;
+            }
         },
 
         async saveCashRegister(register: CashRegister) {
@@ -123,10 +154,17 @@ export const useFinanceStore = defineStore('finance', {
 
         // Payments
         async fetchPayments(filters?: PaymentFilters) {
-            this.loading = true;
-            const result = await financeRepo.getPayments(filters);
-            if (result.success) this.payments = result.data;
-            this.loading = false;
+            this.loadingPayments = true;
+            try {
+                const result = await financeRepo.getPayments(filters);
+                if (result.success) this.payments = result.data;
+            } finally {
+                this.loadingPayments = false;
+            }
+        },
+
+        async getPaymentById(id: string) {
+            return await financeRepo.getPaymentById(id);
         },
 
         async savePayment(payment: Payment) {

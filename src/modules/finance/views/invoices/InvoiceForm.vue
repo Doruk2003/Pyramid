@@ -127,16 +127,18 @@ onMounted(async () => {
         }
     } else {
         addLine(false);
-        // Otomatik Fatura No Oluştur
+        // Otomatik Fatura No Oluştur — DB'den güvenli şekilde al (race condition riski yok)
         if (settingsStore.settings) {
             const serial = settingsStore.settings.invoiceSerial || 'ABC';
             const startingNo = settingsStore.settings.invoiceStartingNumber || 1;
-            
-            await financeStore.fetchInvoices();
-            // Aynı seri ile başlayan faturaları say
-            const count = financeStore.invoices.filter(i => i.invoiceNumber.startsWith(serial)).length;
-            const nextNo = startingNo + count;
-            invoice.value.invoiceNumber = `${serial}-${new Date().getFullYear()}-${String(nextNo).padStart(6, '0')}`;
+
+            // DB'ye doğrudan sorgu: son seri numarasını parse edip +1 yapar.
+            // Eski yöntem (store.invoices.filter().length) race condition'a yol açıyordu.
+            const nextNumber = await financeStore.fetchNextInvoiceNumber(serial, startingNo);
+            if (nextNumber) {
+                invoice.value.invoiceNumber = nextNumber;
+            }
+            // nextNumber null ise alan boş kalır; kullanıcı manuel girebilir.
         }
 
         // --- Kaynak Belgeden (Sipariş/Teklif) Aktarım Mantığı ---

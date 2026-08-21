@@ -256,7 +256,7 @@ onMounted(async () => {
         </div>
 
         <!-- Güncel Kurlar Tablosu -->
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 :value="filteredRates"
                 dataKey="id"

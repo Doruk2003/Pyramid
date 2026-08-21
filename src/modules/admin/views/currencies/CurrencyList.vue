@@ -181,7 +181,7 @@ onMounted(() => {
         </div>
 
         <!-- Tablo -->
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 :value="filteredCurrencies"
                 dataKey="id"

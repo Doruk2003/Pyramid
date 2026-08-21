@@ -133,7 +133,7 @@ function formatCurrency(val: number, curr: string): string {
             </Toolbar>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable :value="cashRegisters" dataKey="id" :paginator="true" :rows="10">
                 <template #empty>
                     <div class="text-center py-6 text-surface-500">

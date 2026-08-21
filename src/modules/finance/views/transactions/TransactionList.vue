@@ -23,6 +23,10 @@ function openNew() {
     router.push('/finance/transactions/create');
 }
 
+function editPayment(payment: Payment) {
+    router.push(`/finance/transactions/edit/${payment.id}`);
+}
+
 function confirmCancelPayment(payment: Payment) {
     paymentToCancel.value = payment;
     cancelDialog.value = true;
@@ -93,7 +97,7 @@ function getMethodLabel(method: string): string {
             </Toolbar>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable :value="payments" dataKey="id" :paginator="true" :rows="10">
                 <template #empty>
                     <div class="text-center py-6 text-surface-500">
@@ -145,8 +149,10 @@ function getMethodLabel(method: string): string {
                     </template>
                 </Column>
                 <Column field="description" header="Açıklama"></Column>
-                <Column header="İşlemler" style="min-width: 80px">
+                <Column header="İşlemler" style="min-width: 120px">
                     <template #body="slotProps">
+                        <Button v-if="slotProps.data.status !== 'cancelled'" icon="pi pi-pencil" severity="secondary" text rounded
+                                v-tooltip.top="'Düzenle'" class="mr-1" @click="editPayment(slotProps.data)" />
                         <Button v-if="slotProps.data.status !== 'cancelled'" icon="pi pi-trash" severity="danger" text rounded
                                 v-tooltip.top="'İşlemi İptal Et'" @click="confirmCancelPayment(slotProps.data)" />
                     </template>

@@ -3,16 +3,25 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { Payment } from '@/modules/finance/domain/payment.entity';
 import { useAuthStore } from '@/core/auth/auth.store';
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { getErrorMessage } from '@/shared/utils/error';
 
 const router = useRouter();
+const route = useRoute();
 const financeStore = useFinanceStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
 const submitted = ref(false);
+const loading = ref(false);
+
+// Edit modunu belirle: route'da :id parametresi varsa düzenleme modundayız
+const editId = computed(() => route.params.id as string | undefined);
+const isEditMode = computed(() => !!editId.value);
+
+// Orijinal payment verisi (düzenleme modunda korunacak alanlar için)
+const originalPayment = ref<Payment | null>(null);
 
 const transactionForm = ref({
     accountId: '',
@@ -43,6 +52,34 @@ const methodOptions = [
 onMounted(async () => {
     await financeStore.fetchAccounts();
     await financeStore.fetchCashRegisters();
+
+    // Düzenleme modunda mevcut işlemi yükle
+    if (isEditMode.value && editId.value) {
+        loading.value = true;
+        const result = await financeStore.getPaymentById(editId.value);
+        loading.value = false;
+
+        if (result.success) {
+            const p = result.data;
+            originalPayment.value = p;
+
+            // Form alanlarını mevcut değerlerle doldur
+            transactionForm.value = {
+                accountId: p.accountId || '',
+                paymentType: p.paymentType,
+                paymentMethod: p.paymentMethod,
+                cashRegisterId: p.cashRegisterId || '',
+                amount: p.amount,
+                paymentDate: new Date(p.paymentDate),
+                documentNumber: p.documentNumber || '',
+                dueDate: p.dueDate ? new Date(p.dueDate) : null,
+                description: p.description || ''
+            };
+        } else {
+            toast.add({ severity: 'error', summary: 'Hata', detail: 'İşlem bilgileri yüklenemedi.', life: 5000 });
+            router.push('/finance/transactions');
+        }
+    }
 });
 
 // Dekont ise Kasa seçimi ve Ödeme Yöntemi gizlenir
@@ -65,14 +102,25 @@ const filteredRegisters = computed(() => {
     return (financeStore.cashRegisters ?? []).filter(c => c.type === targetType && c.isActive);
 });
 
-// Kasa filtresi değiştiğinde ilk kasayı seç
+// Kasa filtresi değiştiğinde:
+// - Yeni modda: ilk kasayı otomatik seç
+// - Düzenleme modunda: sadece mevcut cashRegisterId geçerli değilse güncelle
 watch(filteredRegisters, (newVal) => {
-    if (newVal && newVal.length > 0) {
-        transactionForm.value.cashRegisterId = newVal[0].id;
+    if (isEditMode.value && originalPayment.value) {
+        // Düzenleme modunda, mevcut kasa seçimi yeni filtrede varsa koru
+        const stillValid = newVal.some(r => r.id === transactionForm.value.cashRegisterId);
+        if (!stillValid) {
+            transactionForm.value.cashRegisterId = newVal.length > 0 ? newVal[0].id : '';
+        }
     } else {
-        transactionForm.value.cashRegisterId = '';
+        // Yeni ekleme modunda ilk kasayı otomatik seç
+        if (newVal && newVal.length > 0) {
+            transactionForm.value.cashRegisterId = newVal[0].id;
+        } else {
+            transactionForm.value.cashRegisterId = '';
+        }
     }
-}, { immediate: true });
+});
 
 async function saveTransaction() {
     submitted.value = true;
@@ -82,11 +130,14 @@ async function saveTransaction() {
     if (transactionForm.value.amount <= 0) return;
     if (!isNote.value && !transactionForm.value.cashRegisterId) return;
 
-    const companyId = authStore.user?.companyId || '';
+    const companyId = isEditMode.value && originalPayment.value
+        ? originalPayment.value.companyId
+        : authStore.user?.companyId || '';
     const userId = authStore.user?.id || '';
 
     const pay = Payment.create({
-        id: crypto.randomUUID(),
+        // Düzenleme modunda orijinal id, companyId, createdAt, createdBy ve status korunur
+        id: isEditMode.value && originalPayment.value ? originalPayment.value.id : crypto.randomUUID(),
         companyId,
         accountId: transactionForm.value.accountId,
         paymentDate: transactionForm.value.paymentDate,
@@ -97,15 +148,16 @@ async function saveTransaction() {
         cashRegisterId: isNote.value ? undefined : transactionForm.value.cashRegisterId,
         documentNumber: transactionForm.value.documentNumber || undefined,
         dueDate: transactionForm.value.paymentMethod === 'check' ? (transactionForm.value.dueDate || undefined) : undefined,
-        status: 'completed',
-        createdBy: userId,
-        createdAt: new Date(),
+        status: isEditMode.value && originalPayment.value ? originalPayment.value.status : 'completed',
+        createdBy: isEditMode.value && originalPayment.value ? originalPayment.value.createdBy : userId,
+        createdAt: isEditMode.value && originalPayment.value ? originalPayment.value.createdAt : new Date(),
         updatedAt: new Date()
     });
 
     const result = await financeStore.savePayment(pay);
     if (result.success) {
-        toast.add({ severity: 'success', summary: 'Başarılı', detail: 'İşlem başarıyla kaydedildi', life: 3000 });
+        const msg = isEditMode.value ? 'İşlem başarıyla güncellendi' : 'İşlem başarıyla kaydedildi';
+        toast.add({ severity: 'success', summary: 'Başarılı', detail: msg, life: 3000 });
         router.push('/finance/transactions');
     } else {
         toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result.error), life: 5000 });
@@ -122,12 +174,22 @@ function goBack() {
         <!-- Header -->
         <div class="card p-4 min-h-32 flex flex-col gap-2">
             <div class="flex flex-col gap-1">
-                <div class="m-0 text-2xl font-medium">Yeni Kasa / Cari İşlemi</div>
-                <div class="text-surface-600 dark:text-surface-400">Cari tahsilat, ödeme veya virman/dekont fişlerini buradan ekleyebilirsiniz.</div>
+                <div class="m-0 text-2xl font-medium">
+                    {{ isEditMode ? 'İşlem Düzenle' : 'Yeni Kasa / Cari İşlemi' }}
+                </div>
+                <div class="text-surface-600 dark:text-surface-400">
+                    {{ isEditMode ? 'Mevcut kasa hareketini veya tahsilat/tediye fişini düzenleyebilirsiniz.' : 'Cari tahsilat, ödeme veya virman/dekont fişlerini buradan ekleyebilirsiniz.' }}
+                </div>
             </div>
         </div>
 
-        <div class="card p-6">
+        <!-- Yükleniyor göstergesi -->
+        <div v-if="loading" class="card p-6 flex items-center justify-center gap-3 text-surface-500">
+            <i class="pi pi-spin pi-spinner text-2xl" />
+            <span>İşlem bilgileri yükleniyor...</span>
+        </div>
+
+        <div v-else class="card p-6">
             <div class="grid grid-cols-12 gap-4">
                 <div class="col-span-12 md:col-span-6 flex flex-col gap-2">
                     <label class="font-bold">İşlem Tipi</label>
@@ -180,7 +242,7 @@ function goBack() {
 
             <div class="flex gap-4 mt-6">
                 <Button label="İptal" icon="pi pi-times" severity="secondary" class="flex-1" outlined @click="goBack" />
-                <Button label="Kaydet" icon="pi pi-check" class="flex-1" @click="saveTransaction" />
+                <Button :label="isEditMode ? 'Güncelle' : 'Kaydet'" icon="pi pi-check" class="flex-1" @click="saveTransaction" />
             </div>
         </div>
     </div>

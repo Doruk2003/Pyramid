@@ -36,6 +36,12 @@ export interface IFinanceRepository {
     updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>>;
     // Soft delete: sadece 'draft' statüsündeki faturalar silinebilir
     deleteInvoice(id: string): Promise<Result<void>>;
+    /**
+     * Belirtilen seri ve başlangıç numarasına göre sonraki güvenli fatura numarasını
+     * DB'den atomik olarak üretir. Race condition riskini minimize eder;
+     * nihai güvence DB'deki UNIQUE constraint'tir.
+     */
+    getNextInvoiceNumber(serial: string, startingNumber: number): Promise<Result<string>>;
 
     // Cash Register
     getCashRegisters(): Promise<Result<CashRegister[]>>;
@@ -44,6 +50,7 @@ export interface IFinanceRepository {
 
     // Payment
     getPayments(filters?: PaymentFilters): Promise<Result<Payment[]>>;
+    getPaymentById(id: string): Promise<Result<Payment>>;
     savePayment(payment: Payment): Promise<Result<void>>;
     deletePayment(id: string): Promise<Result<void>>;
 }

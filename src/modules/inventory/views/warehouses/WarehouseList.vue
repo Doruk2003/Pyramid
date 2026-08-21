@@ -231,7 +231,7 @@ function clearFilters() {
             </div>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable :value="filteredWarehouses" dataKey="id" :paginator="true" :rows="10"
                 paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                 :rowsPerPageOptions="[5, 10, 25]"

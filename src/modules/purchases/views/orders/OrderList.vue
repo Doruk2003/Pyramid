@@ -121,7 +121,7 @@ function clearFilters() { filterForm.value = { orderNumber: '', status: null, st
             </div>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable :value="filteredOrders" v-model:selection="selectedOrders" dataKey="id"
                 :paginator="true" :rows="10" :rowsPerPageOptions="[10, 25, 50]"
                 emptyMessage="Kayıtlı satın alma siparişi bulunamadı." :loading="purchasesStore.loading">

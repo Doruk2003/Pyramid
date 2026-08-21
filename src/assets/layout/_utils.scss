@@ -24,3 +24,27 @@
         top: 100px;
     }
 }
+
+// ── DataTable Yoğunluk Yardımcı Sınıfları ──────────────────────────────────
+// Kullanım: DataTable'ın sardığı div'e uygulanır.
+// PrimeVue'nun varsayılan satır yüksekliği td padding'i ile kontrol edilir.
+
+.dt-compact {
+    // Satır hücresi padding'i: üst/alt → 0.45rem (varsayılan ~1rem)
+    .p-datatable-tbody > tr > td {
+        padding: 0.45rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    // Başlık hücreleri de aynı yatay padding'i korusun, dikey biraz azalsın
+    .p-datatable-thead > tr > th {
+        padding: 0.6rem 1rem;
+        font-size: 0.78rem;
+    }
+
+    // Görsel sütunundaki küçük img'ler için row yüksekliği çok kalabalık olmasın
+    .p-datatable-tbody > tr > td img {
+        max-height: 36px;
+        width: auto;
+    }
+}

@@ -301,7 +301,7 @@ const getBadgeSeverity = (role: UserRole) => {
         </div>
 
         <!-- ── TABLO ─────────────────────────────────────────────────────── -->
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 v-model:selection="selectedUsers"
                 :value="filteredUsers"

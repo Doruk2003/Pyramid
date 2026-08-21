@@ -40,7 +40,7 @@ export interface ProjectProps {
 }
 
 export class Project {
-    constructor(private props: ProjectProps) {}
+    private constructor(private props: ProjectProps) {}
 
     get id(): string            { return this.props.id; }
     get companyId(): string     { return this.props.companyId; }

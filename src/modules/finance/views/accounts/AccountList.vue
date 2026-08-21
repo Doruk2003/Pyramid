@@ -264,7 +264,7 @@ function clearFilters() {
         </div>
 
         <!-- Ana Hesaplar Listesi -->
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 v-model:selection="selectedAccounts"
                 :value="filteredAccounts"

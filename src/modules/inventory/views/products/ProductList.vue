@@ -455,7 +455,7 @@ function getPriceUnitLabel(value: string | null | undefined) {
         <Message v-if="productStore.error" severity="error" class="mb-4">{{ productStore.error }}</Message>
 
         <!-- 3. Card: DataTable -->
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 ref="dt"
                 v-model:selection="selectedProducts"

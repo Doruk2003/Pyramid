@@ -232,7 +232,7 @@ function clearFilters() {
             </div>
         </div>
 
-        <div class="card">
+        <div class="card dt-compact">
             <DataTable
                 :value="filteredOrders"
                 v-model:selection="selectedOrders"

@@ -357,7 +357,7 @@ async function exportPDF() {
         </div>
 
         <!-- Tablo -->
-        <div class="card p-0">
+        <div class="card p-0 dt-compact">
             <DataTable
                 :value="filteredRows"
                 :loading="inventoryStore.loading || productStore.loading"

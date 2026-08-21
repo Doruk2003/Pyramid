@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import FloatingConfigurator from '@/shared/components/FloatingConfigurator.vue';
+import loginBg from '@/assets/login-bg.png';
+import { useAuthStore } from '@/core/auth/auth.store';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/core/auth/auth.store';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
+const rememberMe = ref(false);
+const showPassword = ref(false);
 const errorMessage = ref('');
 
 async function handleLogin() {
@@ -30,45 +32,117 @@ async function handleLogin() {
 </script>
 
 <template>
-    <FloatingConfigurator />
-    <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
-        <div class="flex flex-col items-center justify-center">
-            <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%)">
-                <div class="w-full bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20" style="border-radius: 53px">
-                    <div class="text-center mb-8">
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-bold mb-2">🔺 Pyramid ERP</div>
-                        <span class="text-muted-color font-medium">Devam etmek için giriş yapın</span>
-                    </div>
+    <div class="login-root">
+        <!-- SOL PANEL: Görsel + Marka -->
+        <div class="login-left" :style="{ backgroundImage: `url(${loginBg})` }">
+            <div class="login-left-overlay" />
 
-                    <div>
-                        <label for="login-email" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">E-posta</label>
-                        <InputText id="login-email" type="email" placeholder="ornek@sirket.com" class="w-full md:w-[30rem] mb-6" v-model="email" @keyup.enter="handleLogin" />
+            <!-- Logo -->
+            <div class="login-logo">
+                <div class="login-logo-mark">P</div>
+                <span class="login-logo-name">PYRAMID ERP</span>
+            </div>
 
-                        <label for="login-password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Şifre</label>
-                        <Password id="login-password" v-model="password" placeholder="Şifrenizi girin" :toggleMask="true" class="mb-4" fluid :feedback="false" @keyup.enter="handleLogin" />
+            <!-- Alt içerik -->
+            <div class="login-left-content">
+                <p class="login-tagline-small">SİPARİŞ · ÜRETİM · PROJE · FİNANS</p>
+                <h1 class="login-headline">
+                    İşletmenizin tüm süreçlerini <br />tek platformdan yönetin.
+                </h1>
+                <p class="login-desc">
+                    Sipariş, lojistik ve cari akışını tek panelden yönet.
+                    Devam etmek için kurumsal hesabınla giriş yap.
+                </p>
+                <ul class="login-features">
+                    <li><span class="login-dot" />Teklif, Sipariş ve Proje takibi</li>
+                    <li><span class="login-dot" />Bayi ve cari yönetimi</li>
+                    <li><span class="login-dot" />Raporlama ve maliyet analizi</li>
+                </ul>
+            </div>
 
-                        <!-- Hata mesajı -->
-                        <div v-if="errorMessage" class="mb-4 p-3 rounded-lg flex items-center gap-2" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3)">
-                            <i class="pi pi-exclamation-triangle" style="color: #ef4444"></i>
-                            <span style="color: #ef4444; font-size: 0.9rem">{{ errorMessage }}</span>
-                        </div>
+            <!-- Footer sol -->
+            <div class="login-left-footer">
+                <span>© 2026 Pyramid ERP</span>
+                <span>KVKK Aydınlatma Metni</span>
+            </div>
+        </div>
 
-                        <Button id="login-btn" label="Giriş Yap" icon="pi pi-sign-in" class="w-full mt-4" :loading="authStore.loading" :disabled="authStore.loading" @click="handleLogin" />
+        <!-- SAĞ PANEL: Form -->
+        <div class="login-right">
+            <div class="login-form-wrapper">
+                <h2 class="login-welcome">Hoşgeldiniz</h2>
+                <p class="login-welcome-sub">
+                    Devam etmek için <span class="login-accent">kurumsal hesabınla</span> giriş yap.
+                </p>
+
+                <!-- E-posta -->
+                <div class="login-field">
+                    <label for="login-email" class="login-label">E-POSTA</label>
+                    <input
+                        id="login-email"
+                        v-model="email"
+                        type="email"
+                        class="login-input"
+                        autocomplete="email"
+                        @keyup.enter="handleLogin"
+                    />
+                </div>
+
+                <!-- Şifre -->
+                <div class="login-field">
+                    <label for="login-password" class="login-label">ŞİFRE</label>
+                    <div class="login-input-wrap">
+                        <input
+                            id="login-password"
+                            v-model="password"
+                            :type="showPassword ? 'text' : 'password'"
+                            class="login-input"
+                            autocomplete="current-password"
+                            @keyup.enter="handleLogin"
+                        />
+                        <button
+                            type="button"
+                            class="login-eye-btn"
+                            :aria-label="showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                            @click="showPassword = !showPassword"
+                        >
+                            <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'" />
+                        </button>
                     </div>
                 </div>
+
+                <!-- Beni hatırla -->
+                <div class="login-remember">
+                    <label class="login-checkbox-label">
+                        <input v-model="rememberMe" type="checkbox" class="login-checkbox" />
+                        Beni hatırla
+                    </label>
+                </div>
+
+                <!-- Hata mesajı -->
+                <div v-if="errorMessage" class="login-error">
+                    <i class="pi pi-exclamation-triangle" />
+                    {{ errorMessage }}
+                </div>
+
+                <!-- Giriş Butonu -->
+                <button
+                    id="login-btn"
+                    class="login-btn"
+                    :disabled="authStore.loading"
+                    @click="handleLogin"
+                >
+                    <i v-if="authStore.loading" class="pi pi-spin pi-spinner" />
+                    <span>{{ authStore.loading ? 'Giriş yapılıyor...' : 'Giriş Yap' }}</span>
+                </button>
+
+                <!-- Yardım -->
+                <p class="login-help">
+                    Hesabınla ilgili sorun mu yaşıyorsun?
+                    <a href="mailto:destek@pyramid.com" class="login-help-link">Yardım</a>
+                </p>
             </div>
         </div>
     </div>
 </template>
 
-<style scoped>
-.pi-eye {
-    transform: scale(1.6);
-    margin-right: 1rem;
-}
-
-.pi-eye-slash {
-    transform: scale(1.6);
-    margin-right: 1rem;
-}
-</style>
