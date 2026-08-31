@@ -6,6 +6,7 @@ export interface CashRegisterProps {
     currency: string;
     description?: string;
     isActive: boolean;
+    balance?: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -20,6 +21,7 @@ export class CashRegister {
     get currency(): string { return this.props.currency; }
     get description(): string | undefined { return this.props.description; }
     get isActive(): boolean { return this.props.isActive; }
+    get balance(): number { return this.props.balance ?? 0; }
     get createdAt(): Date { return this.props.createdAt; }
     get updatedAt(): Date { return this.props.updatedAt; }
 

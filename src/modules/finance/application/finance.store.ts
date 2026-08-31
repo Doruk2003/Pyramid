@@ -1,6 +1,6 @@
 import type { Account } from '@/modules/finance/domain/account.entity';
 import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
-import type { AccountFilters, InvoiceFilters, PaymentFilters } from '@/modules/finance/domain/finance.repository';
+import type { AccountFilters, InvoiceFilters, PaymentFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
@@ -179,6 +179,15 @@ export const useFinanceStore = defineStore('finance', {
                 this.payments = this.payments.map((p) => p.id === id ? Payment.create({ ...p.toObject(), status: 'cancelled' }) : p);
             }
             return result;
+        },
+
+        // Reports
+        async fetchAccountBalancesReport() {
+            return await financeRepo.getAccountBalancesReport();
+        },
+
+        async fetchAccountStatementReport(accountId: string, startDate?: Date | null, endDate?: Date | null) {
+            return await financeRepo.getAccountStatementReport(accountId, startDate, endDate);
         }
     }
 });

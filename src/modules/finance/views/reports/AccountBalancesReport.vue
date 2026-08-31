@@ -4,6 +4,8 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useToast } from 'primevue/usetoast';
 import { exportReportToPDF } from '@/shared/utils/pdf-generator';
 
+import type { AccountBalanceReportItem } from '@/modules/finance/domain/finance.repository';
+
 const financeStore = useFinanceStore();
 const toast = useToast();
 
@@ -26,77 +28,24 @@ const balanceStatusOptions = [
     { label: 'Alacak Bakiyesi Verenler', value: 'credit_balance' }
 ];
 
+const calculatedBalances = ref<AccountBalanceReportItem[]>([]);
+const loading = ref(false);
+
 onMounted(async () => {
-    // Cari hesapları, tüm faturaları ve ödeme/tahsilat kayıtlarını yükle
-    await Promise.all([
-        financeStore.fetchAccounts(),
-        financeStore.fetchInvoices(),
-        financeStore.fetchPayments()
-    ]);
-});
-
-// Her Cari için Borç, Alacak ve Bakiye hesapla
-const calculatedBalances = computed(() => {
-    const accounts = financeStore.accounts || [];
-    const invoices = financeStore.invoices || [];
-    const payments = financeStore.payments || [];
-
-    return accounts.map((account) => {
-        // Bu cariye ait onaylı ve ödenmiş faturaları filtrele
-        const accountInvoices = invoices.filter(
-            (inv) => inv.accountId === account.id && inv.status !== 'draft' && inv.status !== 'cancelled'
-        );
-
-        // Bu cariye ait kasa fişleri (tahsilat/tediye/dekontlar)
-        const accountPayments = payments.filter(
-            (p) => p.accountId === account.id && p.status === 'completed'
-        );
-
-        let totalDebit = 0;   // Borç
-        let totalCredit = 0;  // Alacak
-
-        // Faturalardan gelen bakiyeler (TRY karşılığı)
-        accountInvoices.forEach((inv) => {
-            const invoiceTotalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
-            if (inv.invoiceType === 'sale' || inv.invoiceType === 'return_purchase') {
-                totalDebit += invoiceTotalTRY;
-            } else if (inv.invoiceType === 'purchase' || inv.invoiceType === 'return_sale') {
-                totalCredit += invoiceTotalTRY;
-            }
-        });
-
-        // Fiş ve dekontlardan gelen bakiyeler
-        accountPayments.forEach((p) => {
-            const payAmount = p.amount || 0;
-            if (p.paymentType === 'payment' || p.paymentType === 'debit_note') {
-                totalDebit += payAmount;
-            } else if (p.paymentType === 'collection' || p.paymentType === 'credit_note') {
-                totalCredit += payAmount;
-            }
-        });
-
-        const balance = totalDebit - totalCredit;
-        let balanceType = 'Bakiye Yok';
-        if (balance > 0) {
-            balanceType = 'Borç';
-        } else if (balance < 0) {
-            balanceType = 'Alacak';
+    loading.value = true;
+    try {
+        const result = await financeStore.fetchAccountBalancesReport();
+        if (result.success) {
+            calculatedBalances.value = result.data;
+        } else {
+            toast.add({ severity: 'error', summary: 'Hata', detail: 'Bakiye raporu yüklenemedi.', life: 4000 });
         }
-
-        return {
-            id: account.id,
-            code: account.code || '-',
-            name: account.name,
-            accountType: account.accountType,
-            phone: account.phone || '-',
-            authorizedPerson: account.authorizedPerson || '-',
-            debit: totalDebit,
-            credit: totalCredit,
-            balance: Math.abs(balance),
-            rawBalance: balance, // yön bilgisiyle birlikte (Borç + / Alacak -)
-            balanceType
-        };
-    });
+    } catch (err) {
+        console.error(err);
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Sorgu sırasında beklenmedik hata oluştu.', life: 4000 });
+    } finally {
+        loading.value = false;
+    }
 });
 
 // Filtrelenmiş Liste
@@ -359,7 +308,7 @@ async function exportPDF() {
         <div class="card p-0 dt-compact">
             <DataTable
                 :value="filteredRows"
-                :loading="financeStore.loading"
+                :loading="loading || financeStore.loading"
                 paginator
                 :rows="25"
                 :rowsPerPageOptions="[25, 50, 100]"

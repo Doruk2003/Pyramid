@@ -53,4 +53,49 @@ export interface IFinanceRepository {
     getPaymentById(id: string): Promise<Result<Payment>>;
     savePayment(payment: Payment): Promise<Result<void>>;
     deletePayment(id: string): Promise<Result<void>>;
+
+    // Reports
+    getAccountBalancesReport(): Promise<Result<AccountBalanceReportItem[]>>;
+    getAccountStatementReport(
+        accountId: string,
+        startDate?: Date | null,
+        endDate?: Date | null
+    ): Promise<Result<AccountStatementReportData>>;
+}
+
+export interface AccountBalanceReportItem {
+    id: string;
+    code: string;
+    name: string;
+    accountType: string;
+    phone: string;
+    authorizedPerson: string;
+    debit: number;
+    credit: number;
+    balance: number;
+    rawBalance: number;
+    balanceType: string;
+}
+
+export interface AccountStatementRow {
+    id: string;
+    date: Date;
+    invoiceNumber: string;
+    invoiceType: string;
+    notes: string;
+    debit: number;
+    credit: number;
+    cumulativeBalance: number;
+    cumulativeBalanceType: string;
+}
+
+export interface AccountStatementReportData {
+    initialBalance: number;
+    initialBalanceType: string;
+    rawInitialBalance: number;
+    rows: AccountStatementRow[];
+    periodDebitTotal: number;
+    periodCreditTotal: number;
+    finalBalance: number;
+    finalBalanceType: string;
 }

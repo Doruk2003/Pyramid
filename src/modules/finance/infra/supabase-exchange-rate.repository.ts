@@ -30,24 +30,12 @@ export class SupabaseExchangeRateRepository implements IExchangeRateRepository {
      */
     async getCurrentRates(): Promise<Result<ExchangeRate[]>> {
         const { data, error } = await supabase
-            .from('exchange_rates')
-            .select('*, currencies(code, name)')
-            .order('currency_id')
-            .order('effective_date', { ascending: false });
+            .from('current_exchange_rates')
+            .select('*, currencies(code, name)');
 
         if (error) return err(new Error(error.message));
 
-        // Uygulama katmanında her currency_id için ilk kaydı al (en güncel)
-        const seen = new Set<string>();
-        const latest: DbExchangeRate[] = [];
-        for (const row of (data as DbExchangeRate[]) || []) {
-            if (!seen.has(row.currency_id)) {
-                seen.add(row.currency_id);
-                latest.push(row);
-            }
-        }
-
-        return ok(latest.map(rowToExchangeRate));
+        return ok(((data as DbExchangeRate[]) || []).map(rowToExchangeRate));
     }
 
     async getRateHistory(currencyId: string): Promise<Result<ExchangeRate[]>> {

@@ -40,20 +40,9 @@ const currencyOptions = [
 
 onMounted(async () => {
     await financeStore.fetchCashRegisters();
-    await financeStore.fetchPayments();
 });
 
 const cashRegisters = computed(() => financeStore.cashRegisters ?? []);
-
-function getRegisterBalance(registerId: string): number {
-    return (financeStore.payments ?? [])
-        .filter(p => p.cashRegisterId === registerId && p.status === 'completed')
-        .reduce((sum, p) => {
-            if (p.paymentType === 'collection') return sum + p.amount;
-            if (p.paymentType === 'payment') return sum - p.amount;
-            return sum;
-        }, 0);
-}
 
 function openNew() {
     registerForm.value = {
@@ -151,10 +140,10 @@ function formatCurrency(val: number, curr: string): string {
                     </template>
                 </Column>
                 <Column field="currency" header="Para Birimi" sortable></Column>
-                <Column header="Bakiye" sortable>
+                <Column field="balance" header="Bakiye" sortable>
                     <template #body="slotProps">
-                        <span class="font-bold" :class="getRegisterBalance(slotProps.data.id) >= 0 ? 'text-green-600' : 'text-red-600'">
-                            {{ formatCurrency(getRegisterBalance(slotProps.data.id), slotProps.data.currency) }}
+                        <span class="font-bold" :class="slotProps.data.balance >= 0 ? 'text-green-600' : 'text-red-600'">
+                            {{ formatCurrency(slotProps.data.balance, slotProps.data.currency) }}
                         </span>
                     </template>
                 </Column>

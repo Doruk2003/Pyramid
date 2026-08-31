@@ -9,6 +9,61 @@ import { getErrorMessage } from '@/shared/utils/error';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 
+// ── Quick-add dialog state ─────────────────────────────────────────────────
+type QuickAddType = 'brand' | 'category' | 'type';
+const quickAddVisible = ref(false);
+const quickAddType = ref<QuickAddType>('brand');
+const quickAddName = ref('');
+const quickAddSaving = ref(false);
+
+const quickAddLabels: Record<QuickAddType, string> = {
+    brand: 'Marka',
+    category: 'Kategori',
+    type: 'Tip'
+};
+
+function openQuickAdd(type: QuickAddType) {
+    quickAddType.value = type;
+    quickAddName.value = '';
+    quickAddVisible.value = true;
+}
+
+async function saveQuickAdd() {
+    const name = quickAddName.value.trim();
+    if (!name) return;
+    quickAddSaving.value = true;
+    try {
+        let result: any;
+        if (quickAddType.value === 'brand') {
+            result = await lookupStore.addBrand(name);
+            if (result.success) {
+                const added = lookupStore.brands.find((b: any) => b.name === name);
+                if (added) product.value.brandId = added.id;
+            }
+        } else if (quickAddType.value === 'category') {
+            result = await lookupStore.addCategory(name);
+            if (result.success) {
+                const added = lookupStore.categories.find((c: any) => c.name === name);
+                if (added) product.value.categoryId = added.id;
+            }
+        } else {
+            result = await lookupStore.addProductType(name);
+            if (result.success) {
+                const added = lookupStore.productTypes.find((t: any) => t.name === name);
+                if (added) product.value.typeId = added.id;
+            }
+        }
+        if (result?.success) {
+            toast.add({ severity: 'success', summary: 'Eklendi', detail: `${quickAddLabels[quickAddType.value]} "${name}" başarıyla eklendi.`, life: 2500 });
+            quickAddVisible.value = false;
+        } else {
+            toast.add({ severity: 'error', summary: 'Hata', detail: getErrorMessage(result?.error), life: 3000 });
+        }
+    } finally {
+        quickAddSaving.value = false;
+    }
+}
+
 const props = defineProps<{
     initialData?: Partial<ProductProps>;
     isEdit?: boolean;
@@ -278,25 +333,32 @@ async function handleSubmit() {
                 </div>
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Barkod</label>
-                    <InputGroup>
-                        <InputText v-model.trim="product.barcode" fluid />
-                        <InputGroupAddon>
-                            <Button icon="pi pi-refresh" severity="secondary" text @click="generateBarcode" v-tooltip.top="'Barkod Üret'" />
-                        </InputGroupAddon>
-                    </InputGroup>
+                    <div class="flex gap-2 items-center">
+                        <InputText v-model.trim="product.barcode" class="flex-1" />
+                        <Button icon="pi pi-refresh" severity="secondary" outlined @click="generateBarcode" v-tooltip.top="'Barkod Üret'" />
+                    </div>
                 </div>
 
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Marka</label>
-                    <Select v-model="product.brandId" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Seçiniz" fluid />
+                    <div class="flex gap-2 items-center">
+                        <Select v-model="product.brandId" :options="lookupStore.brands" optionLabel="name" optionValue="id" placeholder="Seçiniz" class="flex-1" />
+                        <Button icon="pi pi-plus" severity="secondary" outlined v-tooltip.top="'Yeni Marka Ekle'" @click="openQuickAdd('brand')" />
+                    </div>
                 </div>
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Kategori</label>
-                    <Select v-model="product.categoryId" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Seçiniz" fluid />
+                    <div class="flex gap-2 items-center">
+                        <Select v-model="product.categoryId" :options="lookupStore.categories" optionLabel="name" optionValue="id" placeholder="Seçiniz" class="flex-1" />
+                        <Button icon="pi pi-plus" severity="secondary" outlined v-tooltip.top="'Yeni Kategori Ekle'" @click="openQuickAdd('category')" />
+                    </div>
                 </div>
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Tip</label>
-                    <Select v-model="product.typeId" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Seçiniz" fluid />
+                    <div class="flex gap-2 items-center">
+                        <Select v-model="product.typeId" :options="lookupStore.productTypes" optionLabel="name" optionValue="id" placeholder="Seçiniz" class="flex-1" />
+                        <Button icon="pi pi-plus" severity="secondary" outlined v-tooltip.top="'Yeni Tip Ekle'" @click="openQuickAdd('type')" />
+                    </div>
                 </div>
 
                 <div class="col-span-12 lg:col-span-4 text-left">
@@ -314,7 +376,7 @@ async function handleSubmit() {
 
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Fiyat</label>
-                    <InputNumber v-model="product.price" mode="currency" :currency="selectedCurrencyCode" :locale="selectedCurrencyLocale" fluid />
+                    <InputNumber v-model="product.price" mode="decimal" :min-fraction-digits="2" :max-fraction-digits="4" fluid />
                 </div>
                 <div class="col-span-12 lg:col-span-4 text-left">
                     <label class="block font-semibold mb-3">Döviz</label>
@@ -377,4 +439,23 @@ async function handleSubmit() {
             </div>
         </div>
     </div>
+
+    <!-- Quick-Add Dialog -->
+    <Dialog v-model:visible="quickAddVisible" modal :header="`Yeni ${quickAddLabels[quickAddType]} Ekle`" :style="{ width: '360px' }" :closable="!quickAddSaving">
+        <div class="flex flex-col gap-4 pt-2">
+            <div class="flex flex-col gap-2">
+                <label class="font-semibold text-sm">{{ quickAddLabels[quickAddType] }} Adı</label>
+                <InputText
+                    v-model.trim="quickAddName"
+                    :placeholder="`${quickAddLabels[quickAddType]} adını giriniz`"
+                    autofocus
+                    @keydown.enter="saveQuickAdd"
+                />
+            </div>
+        </div>
+        <template #footer>
+            <Button label="İptal" icon="pi pi-times" severity="secondary" text @click="quickAddVisible = false" :disabled="quickAddSaving" />
+            <Button label="Kaydet" icon="pi pi-check" :loading="quickAddSaving" :disabled="!quickAddName.trim()" @click="saveQuickAdd" />
+        </template>
+    </Dialog>
 </template>

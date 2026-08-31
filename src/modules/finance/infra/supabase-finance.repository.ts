@@ -3,7 +3,7 @@ import { Account, type AddressValue } from '@/modules/finance/domain/account.ent
 import { Invoice, type InvoiceLineProps, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
 import { CashRegister } from '@/modules/finance/domain/cash-register.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
-import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters } from '@/modules/finance/domain/finance.repository';
+import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
 
@@ -111,6 +111,7 @@ function rowToCashRegister(row: any): CashRegister {
         currency: row.currency,
         description: row.description ?? undefined,
         isActive: row.is_active,
+        balance: row.balance !== undefined ? Number(row.balance) : undefined,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
     });
@@ -219,8 +220,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             dealer_discount2: obj.dealerDiscount2,
             dealer_discount3: obj.dealerDiscount3,
             credit_limit: obj.creditLimit,
-            is_active: obj.isActive,
-            updated_at: new Date().toISOString()
+            is_active: obj.isActive
         });
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -342,7 +342,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
     async updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>> {
         const { error } = await supabase
             .from('invoices')
-            .update({ status, updated_at: new Date().toISOString() })
+            .update({ status })
             .eq('id', id);
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -353,7 +353,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         // Sadece taslak (draft) faturalar silinebilir; diğerleri iptal edilmeli.
         const { data, error } = await supabase
             .from('invoices')
-            .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .update({ deleted_at: new Date().toISOString() })
             .eq('id', id)
             .eq('status', 'draft') // Güvenlik: sadece draft faturaları sil
             .select('id');
@@ -367,7 +367,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
     async getCashRegisters(): Promise<Result<CashRegister[]>> {
         const { data, error } = await supabase
-            .from('cash_registers')
+            .from('cash_registers_with_balance')
             .select('*')
             .eq('is_active', true)
             .order('name', { ascending: true });
@@ -377,7 +377,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
     async getCashRegisterById(id: string): Promise<Result<CashRegister>> {
         const { data, error } = await supabase
-            .from('cash_registers')
+            .from('cash_registers_with_balance')
             .select('*')
             .eq('id', id)
             .single();
@@ -396,8 +396,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 type: obj.type,
                 currency: obj.currency,
                 description: obj.description ?? null,
-                is_active: obj.isActive,
-                updated_at: new Date().toISOString()
+                is_active: obj.isActive
             });
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -429,6 +428,41 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
     async savePayment(payment: Payment): Promise<Result<void>> {
         const obj = payment.toObject();
+
+        // Ödeme/tediye durumunda (outflow) kasa bakiyesinin yeterli olup olmadığını kontrol et
+        if (obj.paymentType === 'payment' && obj.cashRegisterId && obj.status === 'completed') {
+            const regResult = await this.getCashRegisterById(obj.cashRegisterId);
+            if (!regResult.success) {
+                return err(new Error(`Kasa/Banka hesabı bulunamadı: ${regResult.error.message}`));
+            }
+
+            const register = regResult.data;
+            let currentBalance = register.balance;
+
+            // Düzenleme modunda isek, bu işlemin kendi eski tutarını bakiye hesabından geçici olarak arındır (geri ekle)
+            if (obj.id) {
+                const oldPaymentResult = await this.getPaymentById(obj.id);
+                if (oldPaymentResult.success) {
+                    const oldPayment = oldPaymentResult.data;
+                    if (oldPayment.status === 'completed' && oldPayment.cashRegisterId === obj.cashRegisterId) {
+                        if (oldPayment.paymentType === 'payment') {
+                            currentBalance += oldPayment.amount; // Eski ödemeyi iade et
+                        } else if (oldPayment.paymentType === 'collection') {
+                            currentBalance -= oldPayment.amount; // Eski tahsilatı çıkar
+                        }
+                    }
+                }
+            }
+
+            if (currentBalance < obj.amount) {
+                return err(new Error(
+                    `Yetersiz Bakiye! Seçilen Kasa/Banka hesabında yeterli bakiye bulunmamaktadır. \n` +
+                    `Mevcut Bakiye: ${currentBalance.toFixed(2)} ${register.currency} | ` +
+                    `Ödenmek İstenen: ${obj.amount.toFixed(2)} ${register.currency}`
+                ));
+            }
+        }
+
         const { error } = await supabase
             .from('payments')
             .upsert({
@@ -444,8 +478,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 cash_register_id: obj.cashRegisterId || null,
                 document_number: obj.documentNumber ?? null,
                 due_date: obj.dueDate ? obj.dueDate.toISOString().split('T')[0] : null,
-                status: obj.status,
-                updated_at: new Date().toISOString()
+                status: obj.status
             });
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -454,7 +487,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
     async deletePayment(id: string): Promise<Result<void>> {
         const { error } = await supabase
             .from('payments')
-            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .update({ status: 'cancelled' })
             .eq('id', id);
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -499,5 +532,90 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         const nextSeq = isNaN(lastSeq) ? startingNumber : lastSeq + 1;
 
         return ok(`${serial}-${year}-${String(nextSeq).padStart(6, '0')}`);
+    }
+
+    async getAccountBalancesReport(): Promise<Result<AccountBalanceReportItem[]>> {
+        const { data, error } = await supabase
+            .from('account_balances')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) return err(new Error(error.message));
+
+        const mapped = (data || []).map((row: any) => {
+            const rawBalance = Number(row.raw_balance);
+            const balance = Math.abs(rawBalance);
+            let balanceType = 'Bakiye Yok';
+            if (rawBalance > 0) {
+                balanceType = 'Borç';
+            } else if (rawBalance < 0) {
+                balanceType = 'Alacak';
+            }
+            return {
+                id: row.id,
+                code: row.code || '-',
+                name: row.name,
+                accountType: row.account_type,
+                phone: row.phone || '-',
+                authorizedPerson: row.authorized_person || '-',
+                debit: Number(row.debit),
+                credit: Number(row.credit),
+                balance,
+                rawBalance,
+                balanceType
+            };
+        });
+
+        return ok(mapped);
+    }
+
+    async getAccountStatementReport(
+        accountId: string,
+        startDate?: Date | null,
+        endDate?: Date | null
+    ): Promise<Result<AccountStatementReportData>> {
+        const p_start_date = startDate ? startDate.toISOString().split('T')[0] : null;
+        const p_end_date = endDate ? endDate.toISOString().split('T')[0] : null;
+
+        const { data, error } = await supabase.rpc('get_account_statement', {
+            p_account_id: accountId,
+            p_start_date,
+            p_end_date
+        });
+
+        if (error) return err(new Error(error.message));
+
+        const rows = ((data as any).rows || []).map((r: any) => ({
+            id: r.id,
+            date: new Date(r.date),
+            invoiceNumber: r.invoiceNumber,
+            invoiceType: r.invoiceType,
+            notes: r.notes,
+            debit: Number(r.debit),
+            credit: Number(r.credit),
+            cumulativeBalance: Number(r.cumulativeBalance),
+            cumulativeBalanceType: r.cumulativeBalanceType
+        }));
+
+        const periodDebitTotal = rows.reduce((sum: number, r: any) => sum + r.debit, 0);
+        const periodCreditTotal = rows.reduce((sum: number, r: any) => sum + r.credit, 0);
+
+        const initialBalance = Number((data as any).initialBalance);
+        const initialBalanceType = (data as any).initialBalanceType;
+        const rawInitialBalance = Number((data as any).rawInitialBalance);
+
+        const finalBalance = rows.length > 0 ? rows[rows.length - 1].cumulativeBalance : initialBalance;
+        const finalBalanceType = rows.length > 0 ? rows[rows.length - 1].cumulativeBalanceType : initialBalanceType;
+
+        return ok({
+            initialBalance,
+            initialBalanceType,
+            rawInitialBalance,
+            rows,
+            periodDebitTotal,
+            periodCreditTotal,
+            finalBalance,
+            finalBalanceType
+        });
     }
 }

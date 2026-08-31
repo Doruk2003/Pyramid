@@ -4,6 +4,8 @@ import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useToast } from 'primevue/usetoast';
 import { exportReportToPDF } from '@/shared/utils/pdf-generator';
 
+import type { AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
+
 const financeStore = useFinanceStore();
 const toast = useToast();
 
@@ -11,149 +13,73 @@ const selectedAccountId = ref<string | null>(null);
 const startDate = ref<Date | null>(null);
 const endDate = ref<Date | null>(null);
 
-onMounted(async () => {
-    await Promise.all([
-        financeStore.fetchAccounts(),
-        financeStore.fetchInvoices(),
-        financeStore.fetchPayments()
-    ]);
-
-    // Varsayılan olarak ilk cariyi seç
-    if (financeStore.accounts && financeStore.accounts.length > 0) {
-        selectedAccountId.value = financeStore.accounts[0].id;
-    }
+const statementData = ref<AccountStatementReportData>({
+    initialBalance: 0,
+    initialBalanceType: 'Bakiye Yok',
+    rawInitialBalance: 0,
+    rows: [],
+    periodDebitTotal: 0,
+    periodCreditTotal: 0,
+    finalBalance: 0,
+    finalBalanceType: 'Bakiye Yok'
 });
 
-// Cari hesap değiştirdiğinde tarihleri sıfırlama (opsiyonel)
-watch(selectedAccountId, () => {
-    // startDate.value = null;
-    // endDate.value = null;
-});
+const loading = ref(false);
 
-// Seçilen Cariye ait ham işlemleri (faturaları) filtrele ve tarihe göre sırala
-const allAccountTransactions = computed(() => {
-    if (!selectedAccountId.value) return [];
-    
-    const invoices = financeStore.invoices || [];
-    const payments = financeStore.payments || [];
-
-    const invoiceTx = invoices
-        .filter((inv) => inv.accountId === selectedAccountId.value && inv.status !== 'draft' && inv.status !== 'cancelled')
-        .map((inv) => {
-            const hasForeignCurrency = inv.currency && inv.currency !== 'TRY';
-            const totalTRY = (inv.total || 0) * (inv.exchangeRate || 1);
-            const originalInfo = hasForeignCurrency ? ` [Orijinal Tutar: ${inv.total.toFixed(2)} ${inv.currency} | Kur: ${inv.exchangeRate}]` : '';
-            return {
-                id: inv.id,
-                date: new Date(inv.issueDate),
-                invoiceNumber: inv.invoiceNumber,
-                invoiceType: inv.invoiceType,
-                notes: (inv.notes || '-') + originalInfo,
-                total: totalTRY,
-                currency: 'TRY'
-            };
-        });
-
-    const paymentTx = payments
-        .filter((p) => p.accountId === selectedAccountId.value && p.status === 'completed')
-        .map((p) => ({
-            id: p.id,
-            date: new Date(p.paymentDate),
-            invoiceNumber: p.documentNumber || 'KASA-FİŞİ',
-            invoiceType: p.paymentType, // collection, payment, debit_note, credit_note
-            notes: p.description || `${getInvoiceTypeLabel(p.paymentType)} işlemi`,
-            total: p.amount || 0,
-            currency: 'TRY'
-        }));
-
-    return [...invoiceTx, ...paymentTx]
-        // Tarihe göre artan sırada (kronolojik)
-        .sort((a, b) => a.date.getTime() - b.date.getTime());
-});
-
-// Devreden Bakiye, Dönem İçi İşlemler ve Kümülatif Bakiye Hesabı
-const statementData = computed(() => {
-    const transactions = allAccountTransactions.value;
-    const start = startDate.value ? new Date(startDate.value) : null;
-    if (start) start.setHours(0, 0, 0, 0);
-    const end = endDate.value ? new Date(endDate.value) : null;
-    if (end) end.setHours(23, 59, 59, 999);
-
-    let initialDebit = 0;
-    let initialCredit = 0;
-    const periodRows: any[] = [];
-    
-    // 1) Devreden Bakiye Hesapla (Başlangıç tarihinden önceki hareketler)
-    transactions.forEach((tx) => {
-        if (start && tx.date.getTime() < start.getTime()) {
-            const isDebit = tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase' || tx.invoiceType === 'payment' || tx.invoiceType === 'debit_note';
-            if (isDebit) {
-                initialDebit += tx.total;
-            } else {
-                initialCredit += tx.total;
-            }
-        }
-    });
-
-    const initialBalance = initialDebit - initialCredit;
-    let currentCumulative = initialBalance;
-
-    // 2) Dönem İçi İşlemleri ve Kümülatif Bakiyeyi Oluştur
-    transactions.forEach((tx) => {
-        const isInPeriod = 
-            (!start || tx.date.getTime() >= start.getTime()) && 
-            (!end || tx.date.getTime() <= end.getTime());
-
-        const isDebit = tx.invoiceType === 'sale' || tx.invoiceType === 'return_purchase' || tx.invoiceType === 'payment' || tx.invoiceType === 'debit_note';
-        const debitVal = isDebit ? tx.total : 0;
-        const creditVal = !isDebit ? tx.total : 0;
-
-        if (isInPeriod) {
-            currentCumulative += (debitVal - creditVal);
-            
-            periodRows.push({
-                id: tx.id,
-                date: tx.date,
-                invoiceNumber: tx.invoiceNumber,
-                invoiceType: tx.invoiceType,
-                notes: tx.notes,
-                debit: debitVal,
-                credit: creditVal,
-                cumulativeBalance: Math.abs(currentCumulative),
-                cumulativeBalanceType: currentCumulative >= 0 ? 'Borç' : 'Alacak'
-            });
-        } else if (!start) {
-            // Başlangıç tarihi seçilmemişse, tümü dönem içidir.
-            currentCumulative += (debitVal - creditVal);
-            
-            periodRows.push({
-                id: tx.id,
-                date: tx.date,
-                invoiceNumber: tx.invoiceNumber,
-                invoiceType: tx.invoiceType,
-                notes: tx.notes,
-                debit: debitVal,
-                credit: creditVal,
-                cumulativeBalance: Math.abs(currentCumulative),
-                cumulativeBalanceType: currentCumulative >= 0 ? 'Borç' : 'Alacak'
-            });
-        }
-    });
-
-    // Dönem içi borç/alacak toplamları
-    const periodDebitTotal = periodRows.reduce((sum, r) => sum + r.debit, 0);
-    const periodCreditTotal = periodRows.reduce((sum, r) => sum + r.credit, 0);
-
-    return {
-        initialBalance: Math.abs(initialBalance),
-        initialBalanceType: initialBalance >= 0 ? 'Borç' : 'Alacak',
-        rawInitialBalance: initialBalance,
-        rows: periodRows,
-        periodDebitTotal,
-        periodCreditTotal,
-        finalBalance: Math.abs(currentCumulative),
-        finalBalanceType: currentCumulative >= 0 ? 'Borç' : 'Alacak'
+function resetStatementData() {
+    statementData.value = {
+        initialBalance: 0,
+        initialBalanceType: 'Bakiye Yok',
+        rawInitialBalance: 0,
+        rows: [],
+        periodDebitTotal: 0,
+        periodCreditTotal: 0,
+        finalBalance: 0,
+        finalBalanceType: 'Bakiye Yok'
     };
+}
+
+async function fetchStatement() {
+    if (!selectedAccountId.value) {
+        resetStatementData();
+        return;
+    }
+    loading.value = true;
+    try {
+        const result = await financeStore.fetchAccountStatementReport(
+            selectedAccountId.value,
+            startDate.value,
+            endDate.value
+        );
+        if (result.success) {
+            statementData.value = result.data;
+        } else {
+            toast.add({ severity: 'error', summary: 'Hata', detail: 'Ekstre yüklenirken hata oluştu.', life: 4000 });
+        }
+    } catch (err) {
+        console.error(err);
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Ekstre çekilirken beklenmedik bir hata oluştu.', life: 4000 });
+    } finally {
+        loading.value = false;
+    }
+}
+
+watch([selectedAccountId, startDate, endDate], () => {
+    fetchStatement();
+});
+
+onMounted(async () => {
+    loading.value = true;
+    try {
+        await financeStore.fetchAccounts();
+        if (financeStore.accounts && financeStore.accounts.length > 0) {
+            selectedAccountId.value = financeStore.accounts[0].id;
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        loading.value = false;
+    }
 });
 
 // Seçilen Cari Hesap Detay Bilgisi
@@ -421,7 +347,7 @@ async function exportPDF() {
         <div v-if="selectedAccountId" class="card p-0 dt-compact">
             <DataTable
                 :value="statementData.rows"
-                :loading="financeStore.loading"
+                :loading="loading || financeStore.loading"
                 size="small"
                 stripedRows
                 scrollable

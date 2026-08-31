@@ -112,8 +112,7 @@ export class SupabaseProjectRepository implements IProjectRepository {
             budget_equipment: obj.budget.equipment,
             budget_general:   obj.budget.general,
             description:      obj.description ?? null,
-            is_active:        obj.isActive,
-            updated_at:       new Date().toISOString()
+            is_active:        obj.isActive
         });
         if (error) return err(new Error(error.message));
         return ok(undefined);
@@ -122,7 +121,7 @@ export class SupabaseProjectRepository implements IProjectRepository {
     async deleteProject(id: string): Promise<Result<void>> {
         const { error } = await supabase
             .from('projects')
-            .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .update({ deleted_at: new Date().toISOString() })
             .eq('id', id);
         if (error) return err(new Error(error.message));
         return ok(undefined);
