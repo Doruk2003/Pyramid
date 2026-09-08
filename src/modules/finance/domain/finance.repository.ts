@@ -2,6 +2,7 @@ import type { Account, AccountType } from '@/modules/finance/domain/account.enti
 import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/domain/invoice.entity';
 import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
 import type { Payment } from '@/modules/finance/domain/payment.entity';
+import type { ChequeNote, ChequeNoteDirection, ChequeNoteStatus, ChequeNoteType } from '@/modules/finance/domain/cheque-note.entity';
 import type { Result } from '@/shared/types/result';
 
 export interface AccountFilters {
@@ -20,6 +21,13 @@ export interface PaymentFilters {
     paymentType?: 'collection' | 'payment' | 'debit_note' | 'credit_note';
 }
 
+export interface ChequeNoteFilters {
+    type?: ChequeNoteType;
+    direction?: ChequeNoteDirection;
+    status?: ChequeNoteStatus;
+    accountId?: string;
+}
+
 export interface IFinanceRepository {
     // Account
     getAccounts(filters?: AccountFilters): Promise<Result<Account[]>>;
@@ -34,13 +42,7 @@ export interface IFinanceRepository {
     getInvoiceById(id: string): Promise<Result<Invoice>>;
     saveInvoice(invoice: Invoice): Promise<Result<void>>;
     updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>>;
-    // Soft delete: sadece 'draft' statüsündeki faturalar silinebilir
     deleteInvoice(id: string): Promise<Result<void>>;
-    /**
-     * Belirtilen seri ve başlangıç numarasına göre sonraki güvenli fatura numarasını
-     * DB'den atomik olarak üretir. Race condition riskini minimize eder;
-     * nihai güvence DB'deki UNIQUE constraint'tir.
-     */
     getNextInvoiceNumber(serial: string, startingNumber: number): Promise<Result<string>>;
 
     // Cash Register
@@ -54,12 +56,21 @@ export interface IFinanceRepository {
     savePayment(payment: Payment): Promise<Result<void>>;
     deletePayment(id: string): Promise<Result<void>>;
 
+    // Cheque & Note
+    getChequeNotes(filters?: ChequeNoteFilters): Promise<Result<ChequeNote[]>>;
+    getChequeNoteById(id: string): Promise<Result<ChequeNote>>;
+    saveChequeNote(item: ChequeNote): Promise<Result<void>>;
+    updateChequeNoteStatus(id: string, status: ChequeNoteStatus, cashRegisterId?: string): Promise<Result<void>>;
+    deleteChequeNote(id: string): Promise<Result<void>>;
+
+
     // Reports
-    getAccountBalancesReport(): Promise<Result<AccountBalanceReportItem[]>>;
+    getAccountBalancesReport(currency?: string): Promise<Result<AccountBalanceReportItem[]>>;
     getAccountStatementReport(
         accountId: string,
         startDate?: Date | null,
-        endDate?: Date | null
+        endDate?: Date | null,
+        currency?: string | null
     ): Promise<Result<AccountStatementReportData>>;
 }
 
@@ -70,6 +81,7 @@ export interface AccountBalanceReportItem {
     accountType: string;
     phone: string;
     authorizedPerson: string;
+    currency: string;
     debit: number;
     credit: number;
     balance: number;
@@ -82,6 +94,8 @@ export interface AccountStatementRow {
     date: Date;
     invoiceNumber: string;
     invoiceType: string;
+    currency?: string;
+    exchangeRate?: number;
     notes: string;
     debit: number;
     credit: number;
@@ -99,3 +113,4 @@ export interface AccountStatementReportData {
     finalBalance: number;
     finalBalanceType: string;
 }
+

@@ -15,6 +15,8 @@ export interface InvoiceLineForm {
     discountRate1: number;
     discountRate2: number;
     discountRate3: number;
+    withholdingRate?: number;
+    withholdingAmount?: number;
     lineTotal: number;
     sourceLineId?: string;
 }
@@ -49,5 +51,7 @@ export interface InvoiceTotals {
     subtotal: number;
     netSubtotal: number;
     vatTotal: number;
+    withholdingTotal?: number;
     total: number;
 }
+

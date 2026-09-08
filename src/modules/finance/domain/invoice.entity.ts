@@ -1,3 +1,5 @@
+import { CurrencyConversionService } from './currency-conversion.service';
+
 export type InvoiceType = 'sale' | 'purchase' | 'return_sale' | 'return_purchase';
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled';
 export type PaymentType = 'cash' | 'check' | 'note' | 'open_account' | 'credit_card';
@@ -17,6 +19,8 @@ export interface InvoiceLineProps {
     discountRate1: number;
     discountRate2: number;
     discountRate3: number;
+    withholdingRate?: number;   // Tevkifat oranı (%) (ör. 50 = %50 = 5/10)
+    withholdingAmount?: number; // Tevkifat tutarı
     lineTotal: number;
     sourceLineId?: string;     // Yeni eklenen: Hangi sipariş/teklif satırından geldi?
 }
@@ -38,6 +42,7 @@ export interface InvoiceProps {
     discountRate: number;   // Fatura geneline uygulanan indirim oranı (%)
     discountAmount: number; // Fatura geneline uygulanan indirim tutarı
     vatTotal: number;
+    withholdingTotal?: number; // Fatura genelindeki KDV Tevkifatı toplamı (-)
     total: number;
     paidAmount: number;
     currency: string;
@@ -49,6 +54,7 @@ export interface InvoiceProps {
     createdAt: Date;
     updatedAt: Date;
 }
+
 
 export class Invoice {
     private constructor(private readonly props: InvoiceProps) {}
@@ -95,6 +101,9 @@ export class Invoice {
     get vatTotal(): number {
         return this.props.vatTotal;
     }
+    get withholdingTotal(): number {
+        return this.props.withholdingTotal ?? 0;
+    }
     get invoiceType(): InvoiceType {
         return this.props.invoiceType;
     }
@@ -137,6 +146,7 @@ export class Invoice {
     calculateTotals(): Invoice {
         let linesSubtotal = 0;
         let linesVat = 0;
+        let linesWithholding = 0;
         const isExport = this.props.documentCategory === 'export' || this.props.documentCategory === 'export_registered';
 
         const updatedLines = this.props.lines.map((line) => {
@@ -145,38 +155,62 @@ export class Invoice {
             const d2 = 1 - (line.discountRate2 || 0) / 100;
             const d3 = 1 - (line.discountRate3 || 0) / 100;
             
-            const lineSubtotal = line.quantity * line.unitPrice * d1 * d2 * d3;
+            const lineSubtotal = CurrencyConversionService.roundCurrency(line.quantity * line.unitPrice * d1 * d2 * d3);
             // İhracat/İhraç Kayıtlı ise KDV 0 olur
-            const lineVat = isExport ? 0 : lineSubtotal * (line.vatRate / 100);
-            const lineTotal = lineSubtotal + lineVat;
+            const lineVat = isExport ? 0 : CurrencyConversionService.roundCurrency(lineSubtotal * (line.vatRate / 100));
+
+            // Tevkifat Hesaplama (Tevkifat Oranı % cinsinden, örn 50 = %50 = 5/10)
+            const wRate = line.withholdingRate || 0;
+            const lineWithholding = isExport ? 0 : CurrencyConversionService.roundCurrency(lineVat * (wRate / 100));
+
+            // Satır net toplamı: Ara Toplam + (KDV - Tevkifat)
+            const lineTotal = CurrencyConversionService.roundCurrency(lineSubtotal + (lineVat - lineWithholding));
 
             linesSubtotal += lineSubtotal;
             linesVat += lineVat;
+            linesWithholding += lineWithholding;
 
-            return { ...line, lineTotal };
+            return {
+                ...line,
+                withholdingRate: wRate,
+                withholdingAmount: lineWithholding,
+                lineTotal
+            };
         });
+
+        linesSubtotal = CurrencyConversionService.roundCurrency(linesSubtotal);
+        linesVat = CurrencyConversionService.roundCurrency(linesVat);
+        linesWithholding = CurrencyConversionService.roundCurrency(linesWithholding);
 
         // Fatura Geneli İndirim Hesaplama (Net Ara Toplam üzerinden)
         const discountRate = this.props.discountRate || 0;
-        const discountAmount = Math.round((linesSubtotal * (discountRate / 100)) * 100) / 100;
-        const netSubtotal = Math.round((linesSubtotal - discountAmount) * 100) / 100;
+        const discountAmount = CurrencyConversionService.roundCurrency(linesSubtotal * (discountRate / 100));
+        const netSubtotal = CurrencyConversionService.roundCurrency(linesSubtotal - discountAmount);
         
-        // KDV, indirim sonrası tutar üzerinden tekrar hesaplanır (veya orantılı düşülür)
-        // İhracat durumunda linesVat zaten 0 olduğu için vatTotal da 0 olacaktır.
+        // KDV ve Tevkifat, indirim sonrası tutar üzerinden tekrar hesaplanır/oranlanır
         const vatTotal = netSubtotal > 0 && linesSubtotal > 0 
-            ? Math.round((linesVat * (netSubtotal / linesSubtotal)) * 100) / 100 
+            ? CurrencyConversionService.roundCurrency(linesVat * (netSubtotal / linesSubtotal))
             : 0;
+
+        const withholdingTotal = netSubtotal > 0 && linesSubtotal > 0
+            ? CurrencyConversionService.roundCurrency(linesWithholding * (netSubtotal / linesSubtotal))
+            : 0;
+
+        // Ödenecek Genel Toplam = Ara Toplam - İndirim + (KDV Toplamı - Tevkifat Kesintisi)
+        const total = CurrencyConversionService.roundCurrency(netSubtotal + (vatTotal - withholdingTotal));
 
         return new Invoice({
             ...this.props,
             lines: updatedLines,
-            subtotal: Math.round(linesSubtotal * 100) / 100,
+            subtotal: linesSubtotal,
             discountAmount: discountAmount,
             vatTotal: vatTotal,
-            total: Math.round((netSubtotal + vatTotal) * 100) / 100,
+            withholdingTotal: withholdingTotal,
+            total: total,
             updatedAt: new Date()
         });
     }
+
 
     toObject(): InvoiceProps {
         return JSON.parse(JSON.stringify(this.props)); // Deep copy for safety

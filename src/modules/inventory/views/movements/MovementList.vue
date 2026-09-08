@@ -76,6 +76,45 @@ function getMovementSeverity(type: MovementType) {
     return map[type] || 'secondary';
 }
 
+function getReferenceLabel(type?: string) {
+    switch (type) {
+        case 'invoice': return 'Fatura';
+        case 'sales_order': return 'Satış Siparişi';
+        case 'purchase_order': return 'Satın Alma Siparişi';
+        case 'order': return 'Sipariş';
+        case 'count': return 'Sayım';
+        case 'adjustment': return 'Düzeltme';
+        case 'manual': return 'Manuel';
+        default: return type || '—';
+    }
+}
+
+function getReferenceIcon(type?: string) {
+    switch (type) {
+        case 'invoice': return 'pi pi-file-edit';
+        case 'sales_order': return 'pi pi-shopping-cart';
+        case 'purchase_order': return 'pi pi-truck';
+        case 'order': return 'pi pi-box';
+        case 'count': return 'pi pi-calculator';
+        case 'adjustment': return 'pi pi-pencil';
+        case 'manual': return 'pi pi-user-edit';
+        default: return 'pi pi-link';
+    }
+}
+
+function navigateToReference(referenceType?: string, referenceId?: string) {
+    if (!referenceId || !referenceType) return;
+    const routeMap: Record<string, string> = {
+        invoice: `/finance/invoices/edit/${referenceId}`,
+        sales_order: `/sales/orders/edit/${referenceId}`,
+        purchase_order: `/purchases/orders/edit/${referenceId}`,
+        order: `/sales/orders/edit/${referenceId}`,
+        count: `/inventory/count/${referenceId}`
+    };
+    const path = routeMap[referenceType];
+    if (path) router.push(path);
+}
+
 const filteredMovements = computed(() => {
     let list = invStore.movements ?? [];
     const filters = activeFilters.value;
@@ -205,6 +244,26 @@ function clearFilters() {
                 </Column>
                 <Column field="quantity" header="Miktar" sortable style="min-width: 80px" />
                 <Column field="note" header="Not" style="min-width: 150px" />
+                <Column header="Kaynak Evrak" style="min-width: 160px">
+                    <template #body="slotProps">
+                        <!-- Tıklanabilir: referenceId varsa ve bilinen bir evrak tipiyse -->
+                        <Button
+                            v-if="slotProps.data.referenceId && ['invoice','sales_order','purchase_order','order','count'].includes(slotProps.data.referenceType)"
+                            :label="getReferenceLabel(slotProps.data.referenceType)"
+                            :icon="getReferenceIcon(slotProps.data.referenceType)"
+                            size="small"
+                            text
+                            severity="info"
+                            class="p-0 text-xs font-medium"
+                            v-tooltip.top="'Evrakı aç'"
+                            @click="navigateToReference(slotProps.data.referenceType, slotProps.data.referenceId)"
+                        />
+                        <!-- Tıklanamaz: evrak linki olmayan hareketler -->
+                        <span v-else class="text-xs text-surface-400">
+                            {{ getReferenceLabel(slotProps.data.referenceType) }}
+                        </span>
+                    </template>
+                </Column>
             </DataTable>
         </div>
     </div>

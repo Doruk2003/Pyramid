@@ -93,10 +93,16 @@ const model = computed(() => {
                             to: '/finance/transactions'
                         },
                         {
+                            label: 'Çek & Senetler',
+                            icon: 'pi pi-fw pi-ticket',
+                            to: '/finance/cheques-notes'
+                        },
+                        {
                             label: 'Projeler',
                             icon: 'pi pi-fw pi-sitemap',
                             to: '/finance/projects'
                         }
+
                     ]
                 }
             ]

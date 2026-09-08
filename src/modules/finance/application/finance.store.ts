@@ -1,8 +1,9 @@
 import type { Account } from '@/modules/finance/domain/account.entity';
 import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
-import type { AccountFilters, InvoiceFilters, PaymentFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
+import type { AccountFilters, InvoiceFilters, PaymentFilters, ChequeNoteFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
+import type { ChequeNote, ChequeNoteStatus } from '@/modules/finance/domain/cheque-note.entity';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
 import { defineStore } from 'pinia';
 
@@ -16,11 +17,13 @@ export const useFinanceStore = defineStore('finance', {
         invoices: [] as Invoice[],
         cashRegisters: [] as CashRegister[],    // Kasalar/Bankalar
         payments: [] as Payment[],              // Kasa hareketleri / Tahsilatlar / Ödemeler
+        chequeNotes: [] as ChequeNote[],        // Çek ve Senetler
         loadingAccounts: false,
         loadingSubAccounts: false,
         loadingInvoices: false,
         loadingCashRegisters: false,
         loadingPayments: false,
+        loadingChequeNotes: false,
         error: null as string | null
     }),
 
@@ -30,9 +33,11 @@ export const useFinanceStore = defineStore('finance', {
                    state.loadingSubAccounts ||
                    state.loadingInvoices ||
                    state.loadingCashRegisters ||
-                   state.loadingPayments;
+                   state.loadingPayments ||
+                   state.loadingChequeNotes;
         }
     },
+
 
     actions: {
         // Accounts — tüm liste (filtre opsiyonel)
@@ -181,13 +186,50 @@ export const useFinanceStore = defineStore('finance', {
             return result;
         },
 
-        // Reports
-        async fetchAccountBalancesReport() {
-            return await financeRepo.getAccountBalancesReport();
+        // Cheques & Notes
+        async fetchChequeNotes(filters?: ChequeNoteFilters) {
+            this.loadingChequeNotes = true;
+            try {
+                const result = await financeRepo.getChequeNotes(filters);
+                if (result.success) this.chequeNotes = result.data;
+            } finally {
+                this.loadingChequeNotes = false;
+            }
         },
 
-        async fetchAccountStatementReport(accountId: string, startDate?: Date | null, endDate?: Date | null) {
-            return await financeRepo.getAccountStatementReport(accountId, startDate, endDate);
+        async getChequeNoteById(id: string) {
+            return await financeRepo.getChequeNoteById(id);
+        },
+
+        async saveChequeNote(item: ChequeNote) {
+            const result = await financeRepo.saveChequeNote(item);
+            if (result.success) await this.fetchChequeNotes();
+            return result;
+        },
+
+        async updateChequeNoteStatus(id: string, status: ChequeNoteStatus, cashRegisterId?: string) {
+            const result = await financeRepo.updateChequeNoteStatus(id, status, cashRegisterId);
+            if (result.success) await this.fetchChequeNotes();
+            return result;
+        },
+
+        async deleteChequeNote(id: string) {
+            const result = await financeRepo.deleteChequeNote(id);
+            if (result.success) {
+                this.chequeNotes = this.chequeNotes.filter((c) => c.id !== id);
+            }
+            return result;
+        },
+
+
+        // Reports
+        async fetchAccountBalancesReport(currency?: string) {
+            return await financeRepo.getAccountBalancesReport(currency);
+        },
+
+        async fetchAccountStatementReport(accountId: string, startDate?: Date | null, endDate?: Date | null, currency?: string | null) {
+            return await financeRepo.getAccountStatementReport(accountId, startDate, endDate, currency);
         }
     }
 });
+

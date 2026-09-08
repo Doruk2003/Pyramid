@@ -1,10 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { Warehouse } from '@/modules/inventory/domain/warehouse.entity';
 import { StockMovement, type MovementType } from '@/modules/inventory/domain/stock-movement.entity';
+import { InventoryCount, type InventoryCountItemProps } from '@/modules/inventory/domain/inventory-count.entity';
 import type { StockBalance } from '@/modules/inventory/domain/stock-balance.entity';
 import type { IInventoryRepository } from '@/modules/inventory/domain/inventory.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbWarehouse, DbStockMovement } from '@/shared/infra/db-types';
+
 
 interface DbStockBalance {
     product_id: string;
@@ -138,5 +140,162 @@ export class SupabaseInventoryRepository implements IInventoryRepository {
                 balance: Number(row.balance)
             }))
         );
+    }
+
+    async saveInventoryCount(count: {
+        id: string;
+        companyId: string;
+        warehouseId: string;
+        createdBy: string;
+        note?: string;
+        itemCount: number;
+        items: InventoryCountItemProps[];
+    }): Promise<Result<string>> {
+        // Ana sayım kaydını oluştur
+        const { error: countError } = await supabase.from('inventory_counts').insert({
+            id: count.id,
+            company_id: count.companyId,
+            warehouse_id: count.warehouseId,
+            created_by: count.createdBy,
+            note: count.note || null,
+            item_count: count.itemCount,
+            counted_at: new Date().toISOString()
+        });
+        if (countError) return err(new Error(countError.message));
+
+        // Kalem detaylarını kaydet
+        if (count.items.length > 0) {
+            const itemPayloads = count.items.map((item) => ({
+                id: item.id,
+                count_id: count.id,
+                product_id: item.productId,
+                system_qty: item.systemQty,
+                counted_qty: item.countedQty
+            }));
+            const { error: itemsError } = await supabase.from('inventory_count_items').insert(itemPayloads);
+            if (itemsError) return err(new Error(itemsError.message));
+        }
+
+        return ok(count.id);
+    }
+
+    async getInventoryCountById(id: string): Promise<Result<InventoryCount | null>> {
+        const { data: countData, error: countError } = await supabase
+            .from('inventory_counts')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (countError) return err(new Error(countError.message));
+        if (!countData) return ok(null);
+
+        const { data: itemsData, error: itemsError } = await supabase
+            .from('inventory_count_items')
+            .select('*')
+            .eq('count_id', id);
+        if (itemsError) return err(new Error(itemsError.message));
+
+        const items: InventoryCountItemProps[] = ((itemsData as any[]) || []).map((row) => ({
+            id: row.id,
+            countId: row.count_id,
+            productId: row.product_id,
+            systemQty: Number(row.system_qty),
+            countedQty: Number(row.counted_qty),
+            difference: Number(row.difference)
+        }));
+
+        return ok(
+            InventoryCount.create({
+                id: countData.id,
+                companyId: countData.company_id,
+                warehouseId: countData.warehouse_id,
+                countedAt: new Date(countData.counted_at),
+                createdBy: countData.created_by,
+                note: countData.note,
+                itemCount: countData.item_count,
+                createdAt: new Date(countData.created_at),
+                items
+            })
+        );
+    }
+
+    /** Belirli bir referansa bağlı tüm stok hareketlerini siler */
+    async deleteStockMovementsByReference(referenceType: string, referenceId: string): Promise<Result<void>> {
+        const { error } = await supabase
+            .from('stock_movements')
+            .delete()
+            .eq('reference_type', referenceType)
+            .eq('reference_id', referenceId);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    /** Sayım kalemlerini günceller: eski hareketleri siler, yeni hareketler yazar */
+    async updateInventoryCount(
+        countId: string,
+        companyId: string,
+        warehouseId: string,
+        createdBy: string,
+        updatedItems: InventoryCountItemProps[]
+    ): Promise<Result<void>> {
+        // 1) Eski stok hareketlerini sil
+        const delResult = await this.deleteStockMovementsByReference('count', countId);
+        if (!delResult.success) return delResult;
+
+        // 2) count_items güncelle
+        for (const item of updatedItems) {
+            const { error } = await supabase
+                .from('inventory_count_items')
+                .update({ counted_qty: item.countedQty })
+                .eq('id', item.id);
+            if (error) return err(new Error(error.message));
+        }
+
+        // 3) item_count güncelle
+        const diffItems = updatedItems.filter(i => (i.countedQty - i.systemQty) !== 0);
+        await supabase
+            .from('inventory_counts')
+            .update({ item_count: diffItems.length })
+            .eq('id', countId);
+
+        // 4) Yeni stok hareketlerini oluştur (sadece fark olanlar)
+        const now = new Date();
+        const movements = diffItems.map((item) => {
+            const diff = item.countedQty - item.systemQty;
+            return {
+                id: crypto.randomUUID(),
+                company_id: companyId,
+                product_id: item.productId,
+                warehouse_id: warehouseId,
+                movement_type: diff > 0 ? 'in' : 'out',
+                quantity: Math.abs(diff),
+                reference_type: 'count',
+                reference_id: countId,
+                note: `Envanter Sayım Düzeltmesi (Sistem: ${item.systemQty}, Sayılan: ${item.countedQty})`,
+                created_by: createdBy,
+                created_at: now.toISOString()
+            };
+        });
+
+        if (movements.length > 0) {
+            const { error } = await supabase.from('stock_movements').insert(movements);
+            if (error) return err(new Error(error.message));
+        }
+
+        return ok(undefined);
+    }
+
+    /** Sayım kaydını ve bağlı tüm stok hareketlerini siler */
+    async deleteInventoryCount(countId: string): Promise<Result<void>> {
+        // Önce stok hareketlerini geri al
+        const delMov = await this.deleteStockMovementsByReference('count', countId);
+        if (!delMov.success) return delMov;
+
+        // Sonra sayım kaydını sil (CASCADE → count_items da silinir)
+        const { error } = await supabase
+            .from('inventory_counts')
+            .delete()
+            .eq('id', countId);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
     }
 }

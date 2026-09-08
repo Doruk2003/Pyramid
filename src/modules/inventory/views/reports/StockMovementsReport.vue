@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
 import { useToast } from 'primevue/usetoast';
@@ -8,6 +9,7 @@ import { exportReportToPDF } from '@/shared/utils/pdf-generator';
 const inventoryStore = useInventoryStore();
 const productStore = useProductStore();
 const toast = useToast();
+const router = useRouter();
 
 // Filtreler
 const dateFrom = ref<Date | null>((() => { const d = new Date(); d.setDate(1); return d; })());
@@ -116,11 +118,38 @@ function getMovementIcon(type: string) {
 function getReferenceLabel(type?: string) {
     switch (type) {
         case 'invoice': return 'Fatura';
+        case 'sales_order': return 'Satış Siparişi';
+        case 'purchase_order': return 'Satın Alma Siparişi';
         case 'order': return 'Sipariş';
         case 'count': return 'Sayım';
         case 'manual': return 'Manuel';
         default: return type || '-';
     }
+}
+
+function getReferenceIcon(type?: string) {
+    switch (type) {
+        case 'invoice': return 'pi pi-file-edit';
+        case 'sales_order': return 'pi pi-shopping-cart';
+        case 'purchase_order': return 'pi pi-truck';
+        case 'order': return 'pi pi-box';
+        case 'count': return 'pi pi-calculator';
+        case 'manual': return 'pi pi-user-edit';
+        default: return 'pi pi-link';
+    }
+}
+
+function navigateToReference(referenceType?: string, referenceId?: string) {
+    if (!referenceId || !referenceType) return;
+    const routeMap: Record<string, string> = {
+        invoice: `/finance/invoices/edit/${referenceId}`,
+        sales_order: `/sales/orders/edit/${referenceId}`,
+        purchase_order: `/purchases/orders/edit/${referenceId}`,
+        order: `/sales/orders/edit/${referenceId}`,
+        count: `/inventory/count/${referenceId}`
+    };
+    const path = routeMap[referenceType];
+    if (path) router.push(path);
 }
 
 function clearFilters() {
@@ -407,7 +436,19 @@ async function exportPDF() {
                 </Column>
                 <Column field="referenceType" header="Kaynak" style="width: 10%">
                     <template #body="{ data }">
-                        <span class="text-xs bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded">
+                        <Button
+                            v-if="data.referenceId && ['invoice','sales_order','purchase_order','order','count'].includes(data.referenceType)"
+                            :label="getReferenceLabel(data.referenceType)"
+                            :icon="getReferenceIcon(data.referenceType)"
+                            size="small"
+                            text
+                            severity="info"
+                            class="p-0 text-xs font-medium"
+                            v-tooltip.top="'Evrakı aç'"
+                            @click="navigateToReference(data.referenceType, data.referenceId)"
+                        />
+                        <span v-else class="text-xs bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded flex items-center gap-1">
+                            <i :class="getReferenceIcon(data.referenceType)" style="font-size:0.7rem"></i>
                             {{ getReferenceLabel(data.referenceType) }}
                         </span>
                     </template>

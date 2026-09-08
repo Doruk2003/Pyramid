@@ -82,10 +82,15 @@ function fmt(n: number) {
                     <span>{{ isExport ? 'VAT Total:' : 'KDV Toplam:' }}</span>
                     <span class="font-medium">{{ fmt(totals.vatTotal) }} {{ currency }}</span>
                 </div>
+                <div v-if="totals.withholdingTotal && totals.withholdingTotal > 0" class="flex justify-between text-red-600 dark:text-red-400">
+                    <span>{{ isExport ? 'VAT Withholding (-):' : 'KDV Tevkifatı (-):' }}</span>
+                    <span class="font-medium">- {{ fmt(totals.withholdingTotal) }} {{ currency }}</span>
+                </div>
                 <div class="flex justify-between text-medium font-semibold border-t pt-4">
                     <span>{{ isExport ? 'Grand Total:' : 'Genel Toplam:' }}</span>
                     <span>{{ fmt(totals.total) }} {{ currency }}</span>
                 </div>
+
 
                 <!-- TRY karşılığı (yabancı döviz ise göster) -->
                 <div v-if="isForeignCurrency && totalsTRY" class="border-t pt-3 mt-1">

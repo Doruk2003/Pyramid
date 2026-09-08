@@ -12,6 +12,15 @@ const toast = useToast();
 const selectedAccountId = ref<string | null>(null);
 const startDate = ref<Date | null>(null);
 const endDate = ref<Date | null>(null);
+const selectedCurrency = ref<string>('all');
+
+const currencyOptions = [
+    { label: 'Tümü (TL Konsolide)', value: 'all' },
+    { label: 'Türk Lirası (TRY)', value: 'TRY' },
+    { label: 'Amerikan Doları (USD)', value: 'USD' },
+    { label: 'Euro (EUR)', value: 'EUR' },
+    { label: 'İngiliz Sterlini (GBP)', value: 'GBP' }
+];
 
 const statementData = ref<AccountStatementReportData>({
     initialBalance: 0,
@@ -49,7 +58,8 @@ async function fetchStatement() {
         const result = await financeStore.fetchAccountStatementReport(
             selectedAccountId.value,
             startDate.value,
-            endDate.value
+            endDate.value,
+            selectedCurrency.value
         );
         if (result.success) {
             statementData.value = result.data;
@@ -64,7 +74,7 @@ async function fetchStatement() {
     }
 }
 
-watch([selectedAccountId, startDate, endDate], () => {
+watch([selectedAccountId, startDate, endDate, selectedCurrency], () => {
     fetchStatement();
 });
 
@@ -88,9 +98,10 @@ const selectedAccountDetails = computed(() => {
     return financeStore.accounts.find((a) => a.id === selectedAccountId.value) || null;
 });
 
-function formatCurrency(value: number) {
-    return value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
+function formatCurrency(value: number, currencyCode = selectedCurrency.value !== 'all' ? selectedCurrency.value : 'TRY') {
+    return value.toLocaleString('tr-TR', { style: 'currency', currency: currencyCode });
 }
+
 
 function getInvoiceTypeLabel(type: string) {
     switch (type) {
@@ -266,7 +277,7 @@ async function exportPDF() {
 
         <!-- Seçici ve Filtreler -->
         <div class="card p-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                 <div>
                     <label class="block text-sm font-semibold mb-2">Cari Hesap Seçin</label>
                     <Select
@@ -275,7 +286,17 @@ async function exportPDF() {
                         optionLabel="name"
                         optionValue="id"
                         filter
-                        placeholder="Ekstre çekmek istediğiniz cari hesabı seçin"
+                        placeholder="Cari hesabı seçin"
+                        fluid
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Para Birimi</label>
+                    <Select
+                        v-model="selectedCurrency"
+                        :options="currencyOptions"
+                        optionLabel="label"
+                        optionValue="value"
                         fluid
                     />
                 </div>
@@ -288,6 +309,7 @@ async function exportPDF() {
                     <DatePicker v-model="endDate" placeholder="Bitiş Tarihi" dateFormat="dd.mm.yy" fluid />
                 </div>
             </div>
+
             <div class="flex justify-between items-center mt-3">
                 <div v-if="selectedAccountDetails" class="text-sm text-surface-600 dark:text-surface-400">
                     Seçili Cari: <strong class="text-surface-900 dark:text-surface-100">{{ selectedAccountDetails.name }}</strong> 

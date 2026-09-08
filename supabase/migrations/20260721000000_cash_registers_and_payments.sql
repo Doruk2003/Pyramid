@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS cash_registers (
 -- RLS cash_registers
 ALTER TABLE cash_registers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "company_isolation" ON cash_registers;
 CREATE POLICY "company_isolation" ON cash_registers
   USING (company_id = get_auth_user_company_id())
   WITH CHECK (company_id = get_auth_user_company_id());

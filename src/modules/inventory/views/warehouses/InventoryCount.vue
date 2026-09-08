@@ -2,6 +2,7 @@
 import { useAuthStore } from '@/core/auth/auth.store';
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { SupabaseInventoryRepository } from '@/modules/inventory/infra/supabase-inventory.repository';
 import { StockMovement } from '@/modules/inventory/domain/stock-movement.entity';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -12,6 +13,8 @@ const productStore = useProductStore();
 const authStore = useAuthStore();
 const toast = useToast();
 const router = useRouter();
+const invRepo = new SupabaseInventoryRepository();
+
 
 const selectedWarehouseId = ref<string>('');
 const countData = ref<Record<string, number>>({});
@@ -63,40 +66,75 @@ async function saveCount() {
     }
 
     submitted.value = true;
-    const movements: StockMovement[] = [];
-    const now = new Date();
 
-    Object.keys(countData.value).forEach(productId => {
-        const diff = getDifference(productId);
-        if (diff !== 0) {
-            movements.push(StockMovement.create({
-                id: crypto.randomUUID(),
-                companyId: authStore.user?.companyId || '',
-                productId: productId,
-                warehouseId: selectedWarehouseId.value,
-                movementType: diff > 0 ? 'in' : 'out',
-                quantity: Math.abs(diff),
-                referenceType: 'adjustment',
-                note: `Envanter Sayım Farkı (Sistem: ${warehouseBalances.value[productId] || 0}, Sayılan: ${countData.value[productId]})`,
-                createdBy: authStore.user?.id || '',
-                createdAt: now
-            }));
-        }
-    });
+    // Fark olan kalemleri topla
+    const diffItems = Object.keys(countData.value).filter(pid => getDifference(pid) !== 0);
 
-    if (movements.length === 0) {
+    if (diffItems.length === 0) {
         toast.add({ severity: 'info', summary: 'Bilgi', detail: 'Herhangi bir fark bulunamadı.' });
+        submitted.value = false;
         return;
     }
 
+    loading.value = true;
+    const countId = crypto.randomUUID();
+    const now = new Date();
+
+    // Sayım kalem detayları
+    const countItems = diffItems.map(productId => ({
+        id: crypto.randomUUID(),
+        countId,
+        productId,
+        systemQty: warehouseBalances.value[productId] || 0,
+        countedQty: countData.value[productId] || 0,
+        difference: getDifference(productId)
+    }));
+
+    // Sayım oturumunu kaydet
+    const countResult = await invRepo.saveInventoryCount({
+        id: countId,
+        companyId: authStore.user?.companyId || '',
+        warehouseId: selectedWarehouseId.value,
+        createdBy: authStore.user?.id || '',
+        itemCount: diffItems.length,
+        items: countItems
+    });
+
+    if (!countResult.success) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Sayım kaydedilemedi.' });
+        loading.value = false;
+        return;
+    }
+
+    // Stok hareketlerini referenceType='count' ve referenceId=countId ile oluştur
+    const movements: StockMovement[] = diffItems.map(productId => {
+        const diff = getDifference(productId);
+        return StockMovement.create({
+            id: crypto.randomUUID(),
+            companyId: authStore.user?.companyId || '',
+            productId,
+            warehouseId: selectedWarehouseId.value,
+            movementType: diff > 0 ? 'in' : 'out',
+            quantity: Math.abs(diff),
+            referenceType: 'count',
+            referenceId: countId,
+            note: `Envanter Sayım Farkı (Sistem: ${warehouseBalances.value[productId] || 0}, Sayılan: ${countData.value[productId]})`,
+            createdBy: authStore.user?.id || '',
+            createdAt: now
+        });
+    });
+
     const result = await invStore.addMovements(movements);
+    loading.value = false;
+
     if (result.success) {
         toast.add({ severity: 'success', summary: 'Başarılı', detail: `${movements.length} kalem için stok düzeltmesi yapıldı.` });
         router.push('/inventory/movements');
     } else {
-        toast.add({ severity: 'error', summary: 'Hata', detail: 'Düzeltme kaydedilemedi.' });
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Stok hareketleri kaydedilemedi.' });
     }
 }
+
 </script>
 
 <template>

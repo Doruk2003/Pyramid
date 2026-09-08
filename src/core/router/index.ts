@@ -85,6 +85,11 @@ const router = createRouter({
                     component: () => import('@/modules/inventory/views/warehouses/InventoryCount.vue')
                 },
                 {
+                    path: '/inventory/count/:id',
+                    name: 'inventory-count-detail',
+                    component: () => import('@/modules/inventory/views/warehouses/InventoryCountDetail.vue')
+                },
+                {
                     path: '/finance/accounts',
                     name: 'finance-accounts',
                     component: () => import('@/modules/finance/views/accounts/AccountList.vue')
@@ -144,6 +149,22 @@ const router = createRouter({
                     name: 'finance-exchange-rates',
                     component: () => import('@/modules/finance/views/exchange-rates/ExchangeRateList.vue')
                 },
+                {
+                    path: '/finance/cheques-notes',
+                    name: 'finance-cheques-notes',
+                    component: () => import('@/modules/finance/views/cheques-notes/ChequeNoteList.vue')
+                },
+                {
+                    path: '/finance/cheques-notes/create',
+                    name: 'finance-cheque-note-create',
+                    component: () => import('@/modules/finance/views/cheques-notes/ChequeNoteForm.vue')
+                },
+                {
+                    path: '/finance/cheques-notes/edit/:id',
+                    name: 'finance-cheque-note-edit',
+                    component: () => import('@/modules/finance/views/cheques-notes/ChequeNoteForm.vue')
+                },
+
                 {
                     path: '/sales/quotes',
                     name: 'sales-quotes',

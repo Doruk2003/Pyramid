@@ -51,6 +51,17 @@ function focusAddLineButton() {
     if (btn) btn.focus();
 }
 
+const withholdingRates = [
+    { label: 'Yok', value: 0 },
+    { label: '2/10', value: 20 },
+    { label: '3/10', value: 30 },
+    { label: '4/10', value: 40 },
+    { label: '5/10', value: 50 },
+    { label: '7/10', value: 70 },
+    { label: '9/10', value: 90 },
+    { label: '10/10', value: 100 }
+];
+
 defineExpose({ openLastProductSelect });
 </script>
 
@@ -114,11 +125,17 @@ defineExpose({ openLastProductSelect });
                     <Select v-model="slotProps.data.vatRate" :options="taxRates" optionLabel="label" optionValue="value" fluid />
                 </template>
             </Column>
+            <Column header="Tevkifat" style="width: 7%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
+                <template #body="slotProps">
+                    <Select v-model="slotProps.data.withholdingRate" :options="withholdingRates" optionLabel="label" optionValue="value" fluid />
+                </template>
+            </Column>
             <Column :header="discountLabel1 || 'İskonto 1'" style="width: 4%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
                 <template #body="slotProps">
                     <InputNumber v-model="slotProps.data.discountRate1" :min="0" :max="100" fluid inputClass="text-right" />
                 </template>
             </Column>
+
             <Column :header="discountLabel2 || 'İskonto 2'" style="width: 4%" headerClass="text-right" :pt="{ headerContent: { class: 'justify-end' } }">
                 <template #body="slotProps">
                     <InputNumber v-model="slotProps.data.discountRate2" :min="0" :max="100" fluid inputClass="text-right" />

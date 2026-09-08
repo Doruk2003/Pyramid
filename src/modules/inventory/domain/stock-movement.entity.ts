@@ -38,6 +38,15 @@ export class StockMovement {
     get createdAt(): Date {
         return this.props.createdAt;
     }
+    get referenceType(): string | undefined {
+        return this.props.referenceType;
+    }
+    get referenceId(): string | undefined {
+        return this.props.referenceId;
+    }
+    get unitCost(): number | undefined {
+        return this.props.unitCost;
+    }
     static create(props: StockMovementProps): StockMovement {
         return new StockMovement(props);
     }

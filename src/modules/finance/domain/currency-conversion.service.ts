@@ -13,7 +13,14 @@
 export class CurrencyConversionService {
     private static readonly PRECISION = 6;
     private static readonly round = (n: number, d = 2) =>
-        Math.round(n * Math.pow(10, d)) / Math.pow(10, d);
+        Math.round((n + Number.EPSILON) * Math.pow(10, d)) / Math.pow(10, d);
+
+    /**
+     * Kuruş seviyesinde hassas yuvarlama (2 basamak)
+     */
+    static roundCurrency(n: number): number {
+        return this.round(n, 2);
+    }
 
     /**
      * Yabancı para biriminden TRY'ye çevir

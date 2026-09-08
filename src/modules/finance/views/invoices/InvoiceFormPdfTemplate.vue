@@ -134,11 +134,15 @@ function fmt(n: number) {
                     <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
                         <span>Net Toplam:</span><span style="color: #444;">{{ fmt(totals?.netSubtotal || 0) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 6px; color: #777;">
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #777;">
                         <span>Toplam KDV:</span><span style="color: #444;">{{ fmt(totals?.vatTotal || 0) }}</span>
+                    </div>
+                    <div v-if="totals?.withholdingTotal && totals.withholdingTotal > 0" style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; color: #c2410c;">
+                        <span>KDV Tevkifatı (-):</span><span>- {{ fmt(totals.withholdingTotal) }}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 500; color: #111; margin-top: 4px; border-top: 1px solid #1e293b; padding-top: 6px;">
                         <span>GENEL TOPLAM:</span>
+
                         <span>
                             <span style="font-size: 10px; margin-right: 2px; font-weight: 400;">{{ invoice?.currency === 'TRY' ? '₺' : invoice?.currency }}</span>
                             {{ fmt(totals?.total || 0) }}

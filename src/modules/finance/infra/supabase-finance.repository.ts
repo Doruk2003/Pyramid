@@ -3,9 +3,11 @@ import { Account, type AddressValue } from '@/modules/finance/domain/account.ent
 import { Invoice, type InvoiceLineProps, type InvoiceStatus, type InvoiceType, type PaymentType, type DocumentCategory } from '@/modules/finance/domain/invoice.entity';
 import { CashRegister } from '@/modules/finance/domain/cash-register.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
-import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
+import { ChequeNote, type ChequeNoteStatus } from '@/modules/finance/domain/cheque-note.entity';
+import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters, ChequeNoteFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
+
 
 function normalizeAddress(address: unknown): AddressValue {
     if (typeof address === 'string') return address;
@@ -50,7 +52,7 @@ function rowToAccount(row: DbAccount): Account {
 }
 
 // K4 — Tekrarlayan satır mapping kodu tek fonksiyona çekildi (DRY)
-function rowToInvoiceLine(l: DbInvoiceLine): InvoiceLineProps {
+function rowToInvoiceLine(l: any): InvoiceLineProps {
     return {
         id: l.id,
         invoiceId: l.invoice_id,
@@ -65,12 +67,14 @@ function rowToInvoiceLine(l: DbInvoiceLine): InvoiceLineProps {
         discountRate1: Number(l.discount_rate1),
         discountRate2: Number(l.discount_rate2),
         discountRate3: Number(l.discount_rate3),
+        withholdingRate: Number(l.withholding_rate || 0),
+        withholdingAmount: Number(l.withholding_amount || 0),
         lineTotal: Number(l.line_total),
         sourceLineId: l.source_line_id
     };
 }
 
-function rowToInvoice(row: DbInvoice): Invoice {
+function rowToInvoice(row: any): Invoice {
     return Invoice.create({
         id: row.id,
         companyId: row.company_id,
@@ -87,12 +91,12 @@ function rowToInvoice(row: DbInvoice): Invoice {
         discountRate: Number(row.discount_rate || 0),
         discountAmount: Number(row.discount_amount || 0),
         vatTotal: Number(row.vat_total),
+        withholdingTotal: Number(row.withholding_total || 0),
         total: Number(row.total),
         paidAmount: Number(row.paid_amount),
         currency: row.currency,
         exchangeRate: Number(row.exchange_rate),
         notes: row.notes,
-        // K5 — `as any` kaldırıldı; geçerli değerler union type ile kısıtlandı
         sourceType: (row.source_type as 'quote' | 'order' | undefined) ?? undefined,
         sourceIds: row.source_ids,
         documentCategory: (row.document_category as DocumentCategory) || 'domestic',
@@ -101,6 +105,7 @@ function rowToInvoice(row: DbInvoice): Invoice {
         updatedAt: new Date(row.updated_at)
     });
 }
+
 
 function rowToCashRegister(row: any): CashRegister {
     return CashRegister.create({
@@ -135,12 +140,39 @@ function rowToPayment(row: any): Payment {
         status: (row.status as 'pending' | 'completed' | 'cancelled') || 'completed',
         updatedAt: new Date(row.updated_at),
         accountName: row.accounts?.name || undefined,
-        cashRegisterName: row.cash_registers?.name || undefined,
         invoiceNumber: row.invoices?.invoice_number || undefined
     });
 }
 
+function rowToChequeNote(row: any): ChequeNote {
+    return ChequeNote.create({
+        id: row.id,
+        companyId: row.company_id,
+        type: row.type,
+        direction: row.direction,
+        serialNumber: row.serial_number,
+        bankName: row.bank_name ?? undefined,
+        bankBranch: row.bank_branch ?? undefined,
+        accountNumber: row.account_number ?? undefined,
+        drawer: row.drawer ?? undefined,
+        accountId: row.account_id ?? undefined,
+        issueDate: new Date(row.issue_date),
+        dueDate: new Date(row.due_date),
+        amount: Number(row.amount),
+        currency: row.currency,
+        status: row.status,
+        cashRegisterId: row.cash_register_id ?? undefined,
+        notes: row.notes ?? undefined,
+        createdBy: row.created_by ?? undefined,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        accountName: row.accounts?.name || undefined,
+        cashRegisterName: row.cash_registers?.name || undefined
+    });
+}
+
 export class SupabaseFinanceRepository implements IFinanceRepository {
+
     async getAccounts(filters?: AccountFilters): Promise<Result<Account[]>> {
         let query = supabase
             .from('accounts')
@@ -297,6 +329,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             discount_rate: obj.discountRate,
             discount_amount: obj.discountAmount,
             vat_total: obj.vatTotal,
+            withholding_total: obj.withholdingTotal || 0,
             total: obj.total,
             paid_amount: obj.paidAmount,
             currency: obj.currency,
@@ -321,9 +354,12 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             discount_rate1: l.discountRate1,
             discount_rate2: l.discountRate2,
             discount_rate3: l.discountRate3,
+            withholding_rate: l.withholdingRate || 0,
+            withholding_amount: l.withholdingAmount || 0,
             line_total: l.lineTotal,
             source_line_id: l.sourceLineId || null
         }));
+
 
         // Call the secure RPC function to perform upsert/delete/insert atomically
         const { error } = await supabase.rpc('save_invoice_with_lines', {
@@ -340,6 +376,24 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
 
 
     async updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Result<void>> {
+        if (status === 'cancelled') {
+            // Güvenlik kısıtı: Faturaya bağlı aktif/tamamlanmış ödeme var mı kontrol et
+            const { data: payments, error: payErr } = await supabase
+                .from('payments')
+                .select('id, amount')
+                .eq('invoice_id', id)
+                .eq('status', 'completed');
+
+            if (payErr) return err(new Error(`Fatura durum kontrolü başarısız: ${payErr.message}`));
+            if (payments && payments.length > 0) {
+                const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                return err(new Error(
+                    `Bu faturaya bağlı ${payments.length} adet tamamlanmış ödeme/tahsilat kaydı (Toplam: ${totalPaid.toFixed(2)}) bulunmaktadır.\n` +
+                    `Faturayı iptal etmek için önce bağlı tahsilat/ödeme kayıtlarını iptal etmelisiniz.`
+                ));
+            }
+        }
+
         const { error } = await supabase
             .from('invoices')
             .update({ status })
@@ -463,6 +517,27 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             }
         }
 
+        let paymentDescription = obj.description ?? null;
+
+        // Faturaya bağlı ödemelerde Kur Farkı (FX Difference) tespiti ve audit açıklaması
+        if (obj.invoiceId && obj.status === 'completed') {
+            const { data: invData } = await supabase
+                .from('invoices')
+                .select('currency, exchange_rate, invoice_number')
+                .eq('id', obj.invoiceId)
+                .maybeSingle();
+
+            if (invData && invData.currency && invData.currency !== 'TRY' && Number(invData.exchange_rate) > 0) {
+                const invoiceRate = Number(invData.exchange_rate);
+                const fxNote = `[Fatura Kuru: 1 ${invData.currency} = ${invoiceRate} TRY]`;
+                if (!paymentDescription) {
+                    paymentDescription = fxNote;
+                } else if (!paymentDescription.includes('[Fatura Kuru:')) {
+                    paymentDescription = `${paymentDescription} | ${fxNote}`;
+                }
+            }
+        }
+
         const { error } = await supabase
             .from('payments')
             .upsert({
@@ -473,7 +548,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 payment_date: obj.paymentDate.toISOString().split('T')[0],
                 amount: obj.amount,
                 payment_method: obj.paymentMethod,
-                description: obj.description ?? null,
+                description: paymentDescription,
                 payment_type: obj.paymentType,
                 cash_register_id: obj.cashRegisterId || null,
                 document_number: obj.documentNumber ?? null,
@@ -484,6 +559,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         return ok(undefined);
     }
 
+
     async deletePayment(id: string): Promise<Result<void>> {
         const { error } = await supabase
             .from('payments')
@@ -492,6 +568,83 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         if (error) return err(new Error(error.message));
         return ok(undefined);
     }
+
+    // Cheque & Note Repository Implementation
+    async getChequeNotes(filters?: ChequeNoteFilters): Promise<Result<ChequeNote[]>> {
+        let query = supabase
+            .from('cheques_notes')
+            .select('*, accounts(name), cash_registers(name)')
+            .is('deleted_at', null);
+
+        if (filters?.type) query = query.eq('type', filters.type);
+        if (filters?.direction) query = query.eq('direction', filters.direction);
+        if (filters?.status) query = query.eq('status', filters.status);
+        if (filters?.accountId) query = query.eq('account_id', filters.accountId);
+
+        const { data, error } = await query.order('due_date', { ascending: true });
+        if (error) return err(new Error(error.message));
+        return ok((data || []).map(rowToChequeNote));
+    }
+
+    async getChequeNoteById(id: string): Promise<Result<ChequeNote>> {
+        const { data, error } = await supabase
+            .from('cheques_notes')
+            .select('*, accounts(name), cash_registers(name)')
+            .eq('id', id)
+            .single();
+        if (error) return err(new Error(error.message));
+        return ok(rowToChequeNote(data));
+    }
+
+    async saveChequeNote(item: ChequeNote): Promise<Result<void>> {
+        const obj = item.toObject();
+        const { error } = await supabase
+            .from('cheques_notes')
+            .upsert({
+                id: obj.id || undefined,
+                company_id: obj.companyId,
+                type: obj.type,
+                direction: obj.direction,
+                serial_number: obj.serialNumber,
+                bank_name: obj.bankName ?? null,
+                bank_branch: obj.bankBranch ?? null,
+                account_number: obj.accountNumber ?? null,
+                drawer: obj.drawer ?? null,
+                account_id: obj.accountId ?? null,
+                issue_date: obj.issueDate instanceof Date ? obj.issueDate.toISOString().split('T')[0] : obj.issueDate,
+                due_date: obj.dueDate instanceof Date ? obj.dueDate.toISOString().split('T')[0] : obj.dueDate,
+                amount: obj.amount,
+                currency: obj.currency,
+                status: obj.status,
+                cash_register_id: obj.cashRegisterId ?? null,
+                notes: obj.notes ?? null,
+                created_by: obj.createdBy ?? null
+            });
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async updateChequeNoteStatus(id: string, status: ChequeNoteStatus, cashRegisterId?: string): Promise<Result<void>> {
+        const payload: any = { status, updated_at: new Date().toISOString() };
+        if (cashRegisterId) payload.cash_register_id = cashRegisterId;
+
+        const { error } = await supabase
+            .from('cheques_notes')
+            .update(payload)
+            .eq('id', id);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
+    async deleteChequeNote(id: string): Promise<Result<void>> {
+        const { error } = await supabase
+            .from('cheques_notes')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+        if (error) return err(new Error(error.message));
+        return ok(undefined);
+    }
+
 
     /**
      * Sonraki fatura numarasını DB'den güvenli şekilde üretir.
@@ -534,11 +687,15 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
         return ok(`${serial}-${year}-${String(nextSeq).padStart(6, '0')}`);
     }
 
-    async getAccountBalancesReport(): Promise<Result<AccountBalanceReportItem[]>> {
-        const { data, error } = await supabase
-            .from('account_balances')
-            .select('*')
-            .order('name', { ascending: true });
+    async getAccountBalancesReport(currency?: string): Promise<Result<AccountBalanceReportItem[]>> {
+        const useCurrencyView = currency && currency !== 'all';
+        const tableOrView = useCurrencyView ? 'account_currency_balances' : 'account_balances';
+        let query = supabase.from(tableOrView).select('*');
+        if (useCurrencyView) {
+            query = query.eq('currency', currency);
+        }
+
+        const { data, error } = await query.order('name', { ascending: true });
 
         if (error) return err(new Error(error.message));
 
@@ -558,6 +715,7 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
                 accountType: row.account_type,
                 phone: row.phone || '-',
                 authorizedPerson: row.authorized_person || '-',
+                currency: row.currency || 'TRY',
                 debit: Number(row.debit),
                 credit: Number(row.credit),
                 balance,
@@ -572,15 +730,18 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
     async getAccountStatementReport(
         accountId: string,
         startDate?: Date | null,
-        endDate?: Date | null
+        endDate?: Date | null,
+        currency?: string | null
     ): Promise<Result<AccountStatementReportData>> {
         const p_start_date = startDate ? startDate.toISOString().split('T')[0] : null;
         const p_end_date = endDate ? endDate.toISOString().split('T')[0] : null;
+        const p_currency = currency && currency !== 'all' ? currency : null;
 
         const { data, error } = await supabase.rpc('get_account_statement', {
             p_account_id: accountId,
             p_start_date,
-            p_end_date
+            p_end_date,
+            p_currency
         });
 
         if (error) return err(new Error(error.message));
@@ -590,6 +751,8 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             date: new Date(r.date),
             invoiceNumber: r.invoiceNumber,
             invoiceType: r.invoiceType,
+            currency: r.currency || 'TRY',
+            exchangeRate: r.exchangeRate ? Number(r.exchangeRate) : 1,
             notes: r.notes,
             debit: Number(r.debit),
             credit: Number(r.credit),
@@ -618,4 +781,5 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             finalBalanceType
         });
     }
+
 }

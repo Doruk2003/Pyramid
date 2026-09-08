@@ -13,6 +13,7 @@ const toast = useToast();
 const searchQuery = ref('');
 const selectedType = ref<string>('all');
 const selectedBalanceStatus = ref<string>('all');
+const selectedCurrency = ref<string>('all');
 
 const typeOptions = [
     { label: 'Tümü', value: 'all' },
@@ -28,13 +29,21 @@ const balanceStatusOptions = [
     { label: 'Alacak Bakiyesi Verenler', value: 'credit_balance' }
 ];
 
+const currencyOptions = [
+    { label: 'Tümü (TL Konsolide)', value: 'all' },
+    { label: 'Türk Lirası (TRY)', value: 'TRY' },
+    { label: 'Amerikan Doları (USD)', value: 'USD' },
+    { label: 'Euro (EUR)', value: 'EUR' },
+    { label: 'İngiliz Sterlini (GBP)', value: 'GBP' }
+];
+
 const calculatedBalances = ref<AccountBalanceReportItem[]>([]);
 const loading = ref(false);
 
-onMounted(async () => {
+async function loadBalances() {
     loading.value = true;
     try {
-        const result = await financeStore.fetchAccountBalancesReport();
+        const result = await financeStore.fetchAccountBalancesReport(selectedCurrency.value);
         if (result.success) {
             calculatedBalances.value = result.data;
         } else {
@@ -46,7 +55,10 @@ onMounted(async () => {
     } finally {
         loading.value = false;
     }
-});
+}
+
+onMounted(loadBalances);
+watch(selectedCurrency, loadBalances);
 
 // Filtrelenmiş Liste
 const filteredRows = computed(() => {
@@ -270,13 +282,23 @@ async function exportPDF() {
 
         <!-- Filtreler -->
         <div class="card p-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                     <label class="block text-sm font-semibold mb-2">Cari Hesap Ara</label>
                     <div class="p-input-icon-left w-full">
                         <i class="pi pi-search"></i>
                         <InputText v-model="searchQuery" placeholder="Cari ünvanı veya kodu..." fluid />
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Para Birimi</label>
+                    <Select
+                        v-model="selectedCurrency"
+                        :options="currencyOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        fluid
+                    />
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-2">Cari Tipi</label>
@@ -299,6 +321,7 @@ async function exportPDF() {
                     />
                 </div>
             </div>
+
             <div class="flex justify-end mt-3">
                 <Button label="Filtreleri Temizle" icon="pi pi-filter-slash" text size="small" @click="clearFilters" />
             </div>
