@@ -3,6 +3,7 @@ import type { Invoice, InvoiceStatus, InvoiceType } from '@/modules/finance/doma
 import type { CashRegister } from '@/modules/finance/domain/cash-register.entity';
 import type { Payment } from '@/modules/finance/domain/payment.entity';
 import type { ChequeNote, ChequeNoteDirection, ChequeNoteStatus, ChequeNoteType } from '@/modules/finance/domain/cheque-note.entity';
+import type { FiscalYear } from '@/modules/finance/domain/fiscal-year.entity';
 import type { Result } from '@/shared/types/result';
 
 export interface AccountFilters {
@@ -63,6 +64,10 @@ export interface IFinanceRepository {
     updateChequeNoteStatus(id: string, status: ChequeNoteStatus, cashRegisterId?: string): Promise<Result<void>>;
     deleteChequeNote(id: string): Promise<Result<void>>;
 
+    // Fiscal Years & Period Closing
+    getFiscalYears(): Promise<Result<FiscalYear[]>>;
+    closeFiscalYear(year: number, closedByUserId?: string): Promise<Result<{ transferredAccountsCount: number; message: string }>>;
+    reopenFiscalYear(year: number): Promise<Result<void>>;
 
     // Reports
     getAccountBalancesReport(currency?: string): Promise<Result<AccountBalanceReportItem[]>>;
@@ -72,6 +77,11 @@ export interface IFinanceRepository {
         endDate?: Date | null,
         currency?: string | null
     ): Promise<Result<AccountStatementReportData>>;
+    getAccountReconciliation(
+        accountId: string,
+        asOfDate: Date,
+        currency?: string
+    ): Promise<Result<AccountReconciliationData>>;
 }
 
 export interface AccountBalanceReportItem {
@@ -112,5 +122,41 @@ export interface AccountStatementReportData {
     periodCreditTotal: number;
     finalBalance: number;
     finalBalanceType: string;
+}
+
+export interface AccountReconciliationData {
+    asOfDate: Date;
+    currency: string;
+    account: {
+        id: string;
+        code?: string;
+        name: string;
+        taxOffice?: string;
+        taxNumber?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+        authorizedPerson?: string;
+        city?: string;
+        district?: string;
+    };
+    company: {
+        name: string;
+        taxOffice?: string;
+        taxNumber?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+    };
+    financials: {
+        debitTotal: number;
+        creditTotal: number;
+        balance: number;
+        balanceType: string;
+        baCount: number;
+        baTotal: number;
+        bsCount: number;
+        bsTotal: number;
+    };
 }
 

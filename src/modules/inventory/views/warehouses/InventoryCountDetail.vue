@@ -130,7 +130,7 @@ function confirmDelete() {
         icon: 'pi pi-exclamation-triangle',
         rejectLabel: 'İptal',
         acceptLabel: 'Evet, Sil',
-        acceptSeverity: 'danger',
+        acceptClass: 'p-button-danger',
         accept: doDelete
     });
 }

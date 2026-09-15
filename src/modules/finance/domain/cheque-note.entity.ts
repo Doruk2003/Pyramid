@@ -1,14 +1,14 @@
 export type ChequeNoteType = 'cheque' | 'note';
 export type ChequeNoteDirection = 'received' | 'issued';
 export type ChequeNoteStatus =
-    | 'portfolio'       -- Portföyde (Henüz tahsil/ciro edilmedi)
-    | 'endorsed'        -- Ciro Edildi (Tedarikçiye verildi)
-    | 'bank_clearing'   -- Bankaya Takasa Verildi
-    | 'bank_collateral' -- Bankaya Teminata Verildi
-    | 'collected'       -- Tahsil Edildi (Alınan çek tahsil edildi)
-    | 'paid'            -- Ödendi (Verilen borç çeki ödendi)
-    | 'unpaid'          -- Karşılıksız / Protestolu
-    | 'returned';       -- İade Edildi
+    | 'portfolio'       // Portföyde (Henüz tahsil/ciro edilmedi)
+    | 'endorsed'        // Ciro Edildi (Tedarikçiye verildi)
+    | 'bank_clearing'   // Bankaya Takasa Verildi
+    | 'bank_collateral' // Bankaya Teminata Verildi
+    | 'collected'       // Tahsil Edildi (Alınan çek tahsil edildi)
+    | 'paid'            // Ödendi (Verilen borç çeki ödendi)
+    | 'unpaid'          // Karşılıksız / Protestolu
+    | 'returned';       // İade Edildi
 
 export interface ChequeNoteProps {
     id: string;

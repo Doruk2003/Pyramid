@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useFinanceStore } from '@/modules/finance/application/finance.store';
 import { useToast } from 'primevue/usetoast';
 import { exportReportToPDF } from '@/shared/utils/pdf-generator';

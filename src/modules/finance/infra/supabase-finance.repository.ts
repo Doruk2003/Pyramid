@@ -4,7 +4,8 @@ import { Invoice, type InvoiceLineProps, type InvoiceStatus, type InvoiceType, t
 import { CashRegister } from '@/modules/finance/domain/cash-register.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
 import { ChequeNote, type ChequeNoteStatus } from '@/modules/finance/domain/cheque-note.entity';
-import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters, ChequeNoteFilters, AccountBalanceReportItem, AccountStatementReportData } from '@/modules/finance/domain/finance.repository';
+import { FiscalYear } from '@/modules/finance/domain/fiscal-year.entity';
+import type { AccountFilters, IFinanceRepository, InvoiceFilters, PaymentFilters, ChequeNoteFilters, AccountBalanceReportItem, AccountStatementReportData, AccountReconciliationData } from '@/modules/finance/domain/finance.repository';
 import { ok, err, type Result } from '@/shared/types/result';
 import type { DbAccount, DbInvoice, DbInvoiceLine } from '@/shared/infra/db-types';
 
@@ -168,6 +169,21 @@ function rowToChequeNote(row: any): ChequeNote {
         updatedAt: new Date(row.updated_at),
         accountName: row.accounts?.name || undefined,
         cashRegisterName: row.cash_registers?.name || undefined
+    });
+}
+
+function rowToFiscalYear(row: any): FiscalYear {
+    return FiscalYear.create({
+        id: row.id,
+        companyId: row.company_id,
+        year: row.year,
+        startDate: new Date(row.start_date),
+        endDate: new Date(row.end_date),
+        status: row.status,
+        closedAt: row.closed_at ? new Date(row.closed_at) : undefined,
+        closedBy: row.closed_by ?? undefined,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
     });
 }
 
@@ -779,6 +795,92 @@ export class SupabaseFinanceRepository implements IFinanceRepository {
             periodCreditTotal,
             finalBalance,
             finalBalanceType
+        });
+    }
+
+    async getFiscalYears(): Promise<Result<FiscalYear[]>> {
+        const { data, error } = await supabase
+            .from('fiscal_years')
+            .select('*')
+            .order('year', { ascending: false });
+        if (error) return err(new Error(error.message));
+        return ok((data || []).map(rowToFiscalYear));
+    }
+
+    async closeFiscalYear(year: number, closedByUserId?: string): Promise<Result<{ transferredAccountsCount: number; message: string }>> {
+        const { data: member } = await supabase
+            .from('users')
+            .select('company_id')
+            .limit(1)
+            .maybeSingle();
+
+        if (!member?.company_id) return err(new Error('Firma bilgisi bulunamadı.'));
+
+        const { data, error } = await supabase.rpc('close_fiscal_year', {
+            p_company_id: member.company_id,
+            p_year: year,
+            p_closed_by: closedByUserId || null
+        });
+
+        if (error) return err(new Error(`Mali yıl kapanışı başarısız: ${error.message}`));
+
+        return ok({
+            transferredAccountsCount: Number((data as any)?.transferredAccountsCount || 0),
+            message: String((data as any)?.message || 'Mali yıl başarıyla kapatıldı.')
+        });
+    }
+
+    async reopenFiscalYear(year: number): Promise<Result<void>> {
+        const { data: member } = await supabase
+            .from('users')
+            .select('company_id')
+            .limit(1)
+            .maybeSingle();
+
+        if (!member?.company_id) return err(new Error('Firma bilgisi bulunamadı.'));
+
+        const { error } = await supabase.rpc('reopen_fiscal_year', {
+            p_company_id: member.company_id,
+            p_year: year
+        });
+
+        if (error) return err(new Error(`Mali yıl yeniden açılması başarısız: ${error.message}`));
+
+        return ok(undefined);
+    }
+
+    async getAccountReconciliation(
+        accountId: string,
+        asOfDate: Date,
+        currency?: string
+    ): Promise<Result<AccountReconciliationData>> {
+        const p_as_of_date = asOfDate.toISOString().split('T')[0];
+        const p_currency = currency && currency !== 'all' ? currency : 'TRY';
+
+        const { data, error } = await supabase.rpc('get_account_reconciliation_data', {
+            p_account_id: accountId,
+            p_as_of_date,
+            p_currency
+        });
+
+        if (error) return err(new Error(`Mutabakat verileri alınamadı: ${error.message}`));
+
+        const d = data as any;
+        return ok({
+            asOfDate: new Date(d.asOfDate),
+            currency: d.currency,
+            account: d.account,
+            company: d.company,
+            financials: {
+                debitTotal: Number(d.financials.debitTotal),
+                creditTotal: Number(d.financials.creditTotal),
+                balance: Number(d.financials.balance),
+                balanceType: d.financials.balanceType,
+                baCount: Number(d.financials.baCount),
+                baTotal: Number(d.financials.baTotal),
+                bsCount: Number(d.financials.bsCount),
+                bsTotal: Number(d.financials.bsTotal)
+            }
         });
     }
 

@@ -269,6 +269,16 @@ const router = createRouter({
                     path: '/reports/accounts/aging',
                     name: 'report-accounts-aging',
                     component: () => import('@/modules/finance/views/reports/AccountAgingReport.vue')
+                },
+                {
+                    path: '/reports/accounts/reconciliation',
+                    name: 'report-accounts-reconciliation',
+                    component: () => import('@/modules/finance/views/reports/AccountReconciliationReport.vue')
+                },
+                {
+                    path: '/finance/period-closing',
+                    name: 'finance-period-closing',
+                    component: () => import('@/modules/finance/views/period-closing/PeriodClosingList.vue')
                 }
             ]
         },

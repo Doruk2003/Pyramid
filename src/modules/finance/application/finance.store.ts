@@ -4,6 +4,7 @@ import type { AccountFilters, InvoiceFilters, PaymentFilters, ChequeNoteFilters,
 import type { Invoice, InvoiceStatus } from '@/modules/finance/domain/invoice.entity';
 import { Payment } from '@/modules/finance/domain/payment.entity';
 import type { ChequeNote, ChequeNoteStatus } from '@/modules/finance/domain/cheque-note.entity';
+import type { FiscalYear } from '@/modules/finance/domain/fiscal-year.entity';
 import { SupabaseFinanceRepository } from '@/modules/finance/infra/supabase-finance.repository';
 import { defineStore } from 'pinia';
 
@@ -18,12 +19,14 @@ export const useFinanceStore = defineStore('finance', {
         cashRegisters: [] as CashRegister[],    // Kasalar/Bankalar
         payments: [] as Payment[],              // Kasa hareketleri / Tahsilatlar / Ödemeler
         chequeNotes: [] as ChequeNote[],        // Çek ve Senetler
+        fiscalYears: [] as FiscalYear[],        // Mali Yıllar (Kapanış & Devir)
         loadingAccounts: false,
         loadingSubAccounts: false,
         loadingInvoices: false,
         loadingCashRegisters: false,
         loadingPayments: false,
         loadingChequeNotes: false,
+        loadingFiscalYears: false,
         error: null as string | null
     }),
 
@@ -229,6 +232,33 @@ export const useFinanceStore = defineStore('finance', {
 
         async fetchAccountStatementReport(accountId: string, startDate?: Date | null, endDate?: Date | null, currency?: string | null) {
             return await financeRepo.getAccountStatementReport(accountId, startDate, endDate, currency);
+        },
+
+        async fetchAccountReconciliation(accountId: string, asOfDate: Date, currency?: string) {
+            return await financeRepo.getAccountReconciliation(accountId, asOfDate, currency);
+        },
+
+        // Fiscal Years & Period Closing
+        async fetchFiscalYears() {
+            this.loadingFiscalYears = true;
+            try {
+                const result = await financeRepo.getFiscalYears();
+                if (result.success) this.fiscalYears = result.data;
+            } finally {
+                this.loadingFiscalYears = false;
+            }
+        },
+
+        async closeFiscalYear(year: number, closedByUserId?: string) {
+            const result = await financeRepo.closeFiscalYear(year, closedByUserId);
+            if (result.success) await this.fetchFiscalYears();
+            return result;
+        },
+
+        async reopenFiscalYear(year: number) {
+            const result = await financeRepo.reopenFiscalYear(year);
+            if (result.success) await this.fetchFiscalYears();
+            return result;
         }
     }
 });

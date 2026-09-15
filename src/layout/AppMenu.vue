@@ -101,8 +101,12 @@ const model = computed(() => {
                             label: 'Projeler',
                             icon: 'pi pi-fw pi-sitemap',
                             to: '/finance/projects'
+                        },
+                        {
+                            label: 'Mali Yıl & Dönem Kapanış',
+                            icon: 'pi pi-fw pi-calendar-times',
+                            to: '/finance/period-closing'
                         }
-
                     ]
                 }
             ]
@@ -218,6 +222,11 @@ const model = computed(() => {
                                     label: 'Cari Borç/Alacak Raporu',
                                     icon: 'pi pi-fw pi-chart-line',
                                     to: '/reports/accounts/aging'
+                                },
+                                {
+                                    label: 'Cari Mutabakat Formu',
+                                    icon: 'pi pi-fw pi-file-edit',
+                                    to: '/reports/accounts/reconciliation'
                                 }
                             ]
                         }

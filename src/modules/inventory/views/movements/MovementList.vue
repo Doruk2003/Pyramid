@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { useInventoryStore } from '@/modules/inventory/application/inventory.store';
 import { useProductStore } from '@/modules/inventory/application/product.store';
+import { SupabaseInventoryRepository } from '@/modules/inventory/infra/supabase-inventory.repository';
 import type { MovementType } from '@/modules/inventory/domain/stock-movement.entity';
+import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 import { computed, onMounted, ref } from 'vue';
-
 import { useRouter } from 'vue-router';
+import { supabase } from '@/lib/supabase';
 
 const router = useRouter();
 const invStore = useInventoryStore();
 const productStore = useProductStore();
+const invRepo = new SupabaseInventoryRepository();
+const toast = useToast();
+const confirm = useConfirm();
 const showFilters = ref(false);
+const deletingId = ref<string | null>(null);
 
 interface MovementFilterForm {
     productId: string | null;
@@ -115,6 +122,55 @@ function navigateToReference(referenceType?: string, referenceId?: string) {
     if (path) router.push(path);
 }
 
+// --------------- SİLME ---------------
+
+/**
+ * Sayım hareketi mi? → sayım sayfasına yönlendir (oradan silme yapılabilir)
+ * Diğerleri → doğrudan hareketi sil
+ */
+function handleDelete(movement: any) {
+    // Kayıtlı sayıma bağlıysa → detay sayfasına yönlendir
+    if (movement.referenceType === 'count' && movement.referenceId) {
+        confirm.require({
+            message: 'Bu hareket bir sayım kaydına bağlı. Sayım sayfasından tüm sayımı silebilir veya düzenleyebilirsiniz. Sayım sayfasına gitmek ister misiniz?',
+            header: 'Kayıtlı Sayım',
+            icon: 'pi pi-info-circle',
+            rejectLabel: 'İptal',
+            acceptLabel: 'Sayım Sayfasına Git',
+            accept: () => navigateToReference('count', movement.referenceId)
+        });
+        return;
+    }
+
+    // Bağımsız hareket → doğrudan sil
+    confirm.require({
+        message: `Bu stok hareketi kalıcı olarak silinecek. Stok bakiyesi otomatik güncellenir. Devam etmek istiyor musunuz?`,
+        header: 'Hareketi Sil',
+        icon: 'pi pi-exclamation-triangle',
+        rejectLabel: 'İptal',
+        acceptLabel: 'Evet, Sil',
+        acceptSeverity: 'danger',
+        accept: () => doDeleteMovement(movement.id)
+    });
+}
+
+async function doDeleteMovement(id: string) {
+    deletingId.value = id;
+    const { error } = await supabase.from('stock_movements').delete().eq('id', id);
+    deletingId.value = null;
+
+    if (error) {
+        toast.add({ severity: 'error', summary: 'Hata', detail: 'Hareket silinemedi: ' + error.message, life: 4000 });
+        return;
+    }
+
+    // Store'dan da kaldır
+    invStore.movements = invStore.movements.filter(m => m.id !== id);
+    toast.add({ severity: 'success', summary: 'Silindi', detail: 'Stok hareketi silindi. Bakiye güncellendi.', life: 3000 });
+}
+
+// --------------- FİLTRELER ---------------
+
 const filteredMovements = computed(() => {
     let list = invStore.movements ?? [];
     const filters = activeFilters.value;
@@ -170,6 +226,8 @@ function clearFilters() {
 
 <template>
     <div>
+        <ConfirmDialog />
+
         <div class="card mb-4">
             <div class="flex items-center justify-between mb-0">
                 <div class="m-0 text-2xl font-medium">Stok Hareketleri</div>
@@ -262,6 +320,23 @@ function clearFilters() {
                         <span v-else class="text-xs text-surface-400">
                             {{ getReferenceLabel(slotProps.data.referenceType) }}
                         </span>
+                    </template>
+                </Column>
+                <!-- İşlemler sütunu -->
+                <Column header="" style="min-width: 60px; width: 60px" bodyClass="text-center">
+                    <template #body="slotProps">
+                        <Button
+                            icon="pi pi-trash"
+                            size="small"
+                            text
+                            severity="danger"
+                            class="p-1"
+                            :loading="deletingId === slotProps.data.id"
+                            v-tooltip.top="slotProps.data.referenceType === 'count' && slotProps.data.referenceId
+                                ? 'Bu hareket bir sayıma bağlı — sayım sayfasından yönetin'
+                                : 'Hareketi sil'"
+                            @click="handleDelete(slotProps.data)"
+                        />
                     </template>
                 </Column>
             </DataTable>

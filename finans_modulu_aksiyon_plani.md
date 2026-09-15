@@ -90,8 +90,14 @@ Bu doküman, finans modülündeki geliştirmeleri aşamalı ve sırayla yapabilm
   * `journal_entries` ve `journal_lines` tablolarının oluşturulması.
   * Fatura onaylandığında otomatik *120 Borçlu / 600-391 Alacaklı* yevmiye fişinin oluşturulması.
 
-### `[ ]` Adım 4.3: Mali Yıl Kapanış & Devir İşlemleri (Period Closing)
-* **Amaç:** Yıl sonlarında hesapların kapatılarak yeni yıla Devir Fişi (Opening Journal Entry) ile başlanması.
+### `[x]` Adım 4.3: Mali Yıl Kapanış & Devir İşlemleri (Period Closing) & Cari Mutabakat Formu
+* **Amaç:** Yıl sonlarında hesapların kapatılarak kayıtların kilitlenmesi, yeni yıla otomatik Devir Fişi (Opening Balance) ile başlanması ve kurumsal cari mutabakat mektubu üretilmesi.
+* **Yapılacaklar:**
+  * `fiscal_years` veritabanı tablosu, `close_fiscal_year`, `reopen_fiscal_year` ve `get_account_reconciliation_data` RPC fonksiyonları eklendi ([20260915180000_period_closing_and_reconciliation.sql](file:///d:/Pyramid/supabase/migrations/20260915180000_period_closing_and_reconciliation.sql)).
+  * `FiscalYear` entity'si, `IFinanceRepository` arayüzü ve Pinia `finance.store` güncellendi.
+  * Mali Yıl Kapanış & Devir yönetim ekranı (`/finance/period-closing`) eklendi ([PeriodClosingList.vue](file:///d:/Pyramid/src/modules/finance/views/period-closing/PeriodClosingList.vue)).
+  * Cari Hesap Borç/Alacak & BA-BS Form Mutabakatı canlı önizleme ve PDF indirme ekranı (`/reports/accounts/reconciliation`) eklendi ([AccountReconciliationReport.vue](file:///d:/Pyramid/src/modules/finance/views/reports/AccountReconciliationReport.vue)).
+  * `exportReconciliationToPDF` ile çift taraflı ıslak imzalı kurumsal PDF mektubu indirme altyapısı geliştirildi ([pdf-generator.ts](file:///d:/Pyramid/src/shared/utils/pdf-generator.ts)).
 
 ---
 
